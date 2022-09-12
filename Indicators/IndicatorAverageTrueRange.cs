@@ -34,7 +34,7 @@ namespace Volatility
         public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorAverageTrueRange.cs";
 
         private Indicator ma;
-        private TR tr;
+        private IndicatorTrueRange tr;
         private HistoricalDataCustom customHD;
 
         /// <summary>
@@ -62,7 +62,7 @@ namespace Volatility
             // Get MA indicator from built-in indicator collection (according to selected 'MaType').
             this.ma = Core.Indicators.BuiltIn.MA(this.Period, PriceType.Close, this.MAType, this.CalculationType);
             this.ma.UpdateType = IndicatorUpdateType.OnTick;
-            this.AddIndicator(this.tr = new TR() { UpdateType = IndicatorUpdateType.OnTick });
+            this.AddIndicator(this.tr = new IndicatorTrueRange() { UpdateType = IndicatorUpdateType.OnTick });
 
             // Create a custom HistoricalData and syncronize it with this(ART) indicator.
             this.customHD = new HistoricalDataCustom(this);
