@@ -15,7 +15,8 @@ namespace Oscillators
         public int Period = 14;
 
         public int MinHistoryDepths => this.Period;
-        public override string ShortName => "KRI (" + this.Period + ")";
+        public override string ShortName => $"KRI ({this.Period})";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorKairiRelativeIndex.cs";
 
         // Holds simple moving average values.
         private Indicator sma;

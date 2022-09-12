@@ -39,6 +39,7 @@ namespace MovingAverages
         public bool least_squares_method = true;
 
         public override string ShortName => $"AFIRMA by {this.win} Windowing";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorAutoregressiveFiniteImpulseResponseMovingAverage.cs";
 
         private double den;
         private double sx2;

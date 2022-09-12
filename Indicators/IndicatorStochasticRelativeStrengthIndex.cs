@@ -29,6 +29,7 @@ namespace Oscillators
 
         public int MinHistoryDepths => this.rsiPeriod + Math.Max(this.kPeriod, this.dPeriod);
         public override string ShortName => $"StochasticRSI ({this.rsiPeriod}: {this.StochPeriod}: {this.kPeriod}: {this.dPeriod})";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorStochasticRelativeStrengthIndex.cs";
 
         private Indicator rsi;
         private Indicator stochRSI;

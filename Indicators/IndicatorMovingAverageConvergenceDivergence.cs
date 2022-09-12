@@ -26,9 +26,10 @@ namespace Oscillators
         })]
         public IndicatorCalculationType CalculationType = Indicator.DEFAULT_CALCULATION_TYPE;
 
-        public override string HelpLink => "https://help.quantower.com/analytics-panels/chart/technical-indicators/oscillators/moving-average-convergence-divergence";
         public int MinHistoryDepths => this.MaxEMAPeriod + this.SignalPeriod;
         public override string ShortName => $"MACD ({this.FastPeriod}: {this.SlowPeriod}: {this.SignalPeriod})";
+        public override string HelpLink => "https://help.quantower.com/analytics-panels/chart/technical-indicators/oscillators/moving-average-convergence-divergence";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorMovingAverageConvergenceDivergence.cs";
 
         private int MaxEMAPeriod => Math.Max(this.FastPeriod, this.SlowPeriod);
 

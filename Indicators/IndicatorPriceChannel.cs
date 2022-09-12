@@ -12,7 +12,8 @@ namespace Channels
         public int Period = 20;
 
         public int MinHistoryDepths => this.Period;
-        public override string ShortName => "Channel (" + this.Period + ")";
+        public override string ShortName => $"Channel ({this.Period})";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorPriceChannel.cs";
 
         /// <summary>
         /// Indicator's constructor. Contains general information: name, description, LineSeries etc. 

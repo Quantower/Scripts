@@ -54,6 +54,7 @@ namespace MovingAverages
 
         public int MinHistoryDepths => this.MaPeriod * 2;
         public override string ShortName => $"SMMA ({this.MaPeriod}: {this.SourcePrice})";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorSmoothedMovingAverage.cs";
 
         /// <summary>
         /// Calculation entry point. This function is called when a price data updates. 

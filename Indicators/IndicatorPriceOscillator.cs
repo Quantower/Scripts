@@ -50,6 +50,7 @@ namespace Oscillators
 
         public int MinHistoryDepths => Enumerable.Max(new int[] { this.MAPeriod1, this.MAPeriod2 });
         public override string ShortName => $"PO ({this.MAPeriod1}: {this.MAPeriod2}: {this.SourcePrice}: {this.MAType})";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorPriceOscillator.cs";
 
         // Holds moving averages values.
         private Indicator ma1, ma2;

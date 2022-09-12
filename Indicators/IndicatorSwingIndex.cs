@@ -25,6 +25,7 @@ namespace Trend
 
         public int MinHistoryDepths => this.CalculationType == IndicatorCalculationType.AllAvailableData ? 2 : this.Period * 2;
         public override string ShortName => $"SI ({this.Divider})";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorSwingIndex.cs";
 
         private Indicator atr;
 

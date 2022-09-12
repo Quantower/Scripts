@@ -13,8 +13,8 @@ namespace Oscillators
 
         public int MinHistoryDepths => this.Period;
         public override string ShortName => "AROON (" + this.Period + ")";
-
         public override string HelpLink => "https://help.quantower.com/analytics-panels/chart/technical-indicators/oscillators/aroon-indicator";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorAroon.cs";
 
         /// <summary>
         /// Indicator's constructor. Contains general information: name, description, LineSeries etc. 

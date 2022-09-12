@@ -33,6 +33,7 @@ namespace Trend
         public override string ShortName => $"ICH ({this.TenkanPeriod}: {this.KijunPeriod}: {this.SenkouSpanB})";
         public int MinHistoryDepths => Math.Max(this.TenkanPeriod, Math.Max(this.KijunPeriod, this.SenkouSpanB));
         public override string HelpLink => "https://help.quantower.com/analytics-panels/chart/technical-indicators/trend/ichimoku-indicator";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorIchimoku.cs";
 
         private Trend currentTrend;
 
@@ -49,8 +50,8 @@ namespace Trend
             // Defines line on demand with particular parameters.
             this.AddLineSeries("Tenkan", Color.Blue, 1, LineStyle.Solid);
             this.AddLineSeries("Kijun", Color.Lime, 1, LineStyle.Solid);
-            this.AddLineSeries("Senkou Span B", Color.SpringGreen, 1, LineStyle.Solid);
-            this.AddLineSeries("Senkou Span A", Color.Red, 1, LineStyle.Solid);
+            this.AddLineSeries("Senkou Span A", Color.SpringGreen, 1, LineStyle.Solid);
+            this.AddLineSeries("Senkou Span B", Color.Red, 1, LineStyle.Solid);
             this.AddLineSeries("Chinkou Span", Color.FromArgb(255, 153, 0), 1, LineStyle.Solid);
 
             this.SeparateWindow = false;

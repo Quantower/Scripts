@@ -28,6 +28,7 @@ namespace Volume
 
         public int MinHistoryDepths => MIN_PERIOD;
         public override string ShortName => $"PVI ({this.SourcePrice})";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorPositiveVolumeIndex.cs";
 
         // Keeps previous volume, price and PVI values.
         private double prevVolume = 0;

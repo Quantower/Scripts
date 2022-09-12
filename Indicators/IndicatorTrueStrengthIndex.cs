@@ -36,6 +36,7 @@ namespace Oscillators
 
         public int MinHistoryDepths => this.FirstPeriod + this.SecondPeriod;
         public override string ShortName => $"TSI ({this.FirstPeriod}:{this.SecondPeriod})";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorTrueStrengthIndex.cs";
 
         /// <summary>
         /// Indicator's constructor. Contains general information: name, description, LineSeries etc. 

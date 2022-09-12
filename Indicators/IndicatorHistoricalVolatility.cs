@@ -48,6 +48,7 @@ namespace Volatility
         private Font percentileTextFont;
 
         public override string ShortName => $"HV ({this.STDPeriod}: {this.DisplayMode}: {(this.isAllHistoryMode ? "All history" : this.PercentilePeriod.ToString())})";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorHistoricalVolatility.cs";
 
         /// <summary>
         /// Indicator's constructor. Contains general information: name, description, LineSeries etc. 

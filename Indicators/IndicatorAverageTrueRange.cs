@@ -28,9 +28,10 @@ namespace Volatility
         })]
         public IndicatorCalculationType CalculationType = Indicator.DEFAULT_CALCULATION_TYPE;
 
-        public override string HelpLink => "https://help.quantower.com/analytics-panels/chart/technical-indicators/volatility/average-true-range";
         public int MinHistoryDepths => this.Period;
         public override string ShortName => $"ATR ({this.Period}: {this.MAType})";
+        public override string HelpLink => "https://help.quantower.com/analytics-panels/chart/technical-indicators/volatility/average-true-range";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorAverageTrueRange.cs";
 
         private Indicator ma;
         private TR tr;

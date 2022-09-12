@@ -30,6 +30,7 @@ namespace MovingAverages
 
         public int MinHistoryDepths => this.Period;
         public override string ShortName => $"MMA ({this.Period}: {this.SourcePrice})";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorModifiedMovingAverage.cs";
 
         // Calculation coefficient.
         private double coeff;

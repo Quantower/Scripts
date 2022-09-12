@@ -27,6 +27,7 @@ namespace MovingAverages
 
         public int MinHistoryDepths => this.Period;
         public override string ShortName => $"LWMA ({this.Period}: {this.SourcePrice})";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorLinearlyWeightedMovingAverage.cs";
 
         /// <summary>
         /// Indicator's constructor. Contains general information: name, description, LineSeries etc. 

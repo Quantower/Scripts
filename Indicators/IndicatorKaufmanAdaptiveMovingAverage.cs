@@ -53,6 +53,7 @@ namespace MovingAverages
         //public Color downTrendColor = Color.Red;
 
         public override string ShortName => $"KAMA ({this.periodAMA}: {this.nfast}: {this.nslow})";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorKaufmanAdaptiveMovingAverage.cs";
 
         private HistoricalDataCustom customHDabsDiff;
         private HistoricalDataCustom customHDama;

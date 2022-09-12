@@ -30,6 +30,7 @@ namespace Trend
         public int MinHistoryDepths => this.Period * 2;
         public override string ShortName => $"DMI ({this.Period}:{this.MAType})";
         public override string HelpLink => "https://help.quantower.com/analytics-panels/chart/technical-indicators/trend/directional-movement-index-dmi-indicator";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorDirectionalMovementIndex.cs";
 
         private Indicator atr;
         private Indicator firstMA;

@@ -11,6 +11,10 @@ namespace MovingAverages
         [InputParameter("Period of PPMA", 0, 1, 9999, 1, 0)]
         public int Period = 5;
 
+        public int MinHistoryDepths => this.Period;
+        public override string ShortName => $"PPMA ({this.Period})";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorPivotPointMovingAverage.cs";
+
         /// <summary>
         /// Indicator's constructor. Contains general information: name, description, LineSeries etc. 
         /// </summary>
@@ -26,9 +30,6 @@ namespace MovingAverages
 
             this.SeparateWindow = false;
         }
-
-        public int MinHistoryDepths => this.Period;
-        public override string ShortName => $"PPMA ({this.Period})";
 
         /// <summary>
         /// Calculation entry point. This function is called when a price data updates. 

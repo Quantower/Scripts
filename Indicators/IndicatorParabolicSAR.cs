@@ -31,6 +31,7 @@ namespace Trend
 
         public int MinHistoryDepths => this.CalculationType == IndicatorCalculationType.AllAvailableData ? 3 : this.Period + 1;
         public override string ShortName => $"SAR ({this.Step}: {this.Maximum})";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorParabolicSAR.cs";
 
         private bool first;
         private bool dirlong;

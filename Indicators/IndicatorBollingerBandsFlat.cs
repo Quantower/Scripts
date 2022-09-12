@@ -55,6 +55,7 @@ namespace Channels
         private Indicator sd;
         public int MinHistoryDepths => this.Period;
         public override string ShortName => $"BBF ({this.Period}: {this.Deviation})";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorBollingerBandsFlat.cs";
 
         /// <summary>
         /// Indicator's constructor. Contains general information: name, description, LineSeries etc. 

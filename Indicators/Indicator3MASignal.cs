@@ -32,6 +32,7 @@ namespace MovingAverages
 
         public int MinHistoryDepths => Enumerable.Max(new int[] { this.ShortMaPeriod, this.MiddleMaPeriod, this.LongMaPeriod });
         public override string ShortName => $"MAS3 ({this.ShortMaPeriod}:{this.MiddleMaPeriod}:{this.LongMaPeriod}:{this.BarsInterval})";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/Indicator3MASignal.cs";
 
         /// <summary>
         /// Indicator's constructor. Contains general information: name, description, LineSeries etc. 

@@ -27,6 +27,7 @@ namespace Volatility
 
         public int MinHistoryDepths => this.Period + 1;
         public override string ShortName => $"CMO ({this.Period}: {this.SourcePrice})";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorChandeMomentumOscillator.cs";
 
         /// <summary>
         /// Indicator's constructor. Contains general information: name, description, LineSeries etc. 

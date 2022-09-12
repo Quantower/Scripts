@@ -10,8 +10,6 @@ namespace Trend
     /// </summary>
     public sealed class IndicatorZigZag : Indicator
     {
-        public override string HelpLink => "https://help.quantower.com/analytics-panels/chart/technical-indicators/trend/zigzag";
-
         // Displays Input Parameter as input field (or checkbox if value type is bolean).
         [InputParameter("Percent Deviation", 0, 0.01, 100.0, 0.01, 2)]
         public double deviation = 5;
@@ -23,6 +21,8 @@ namespace Trend
         private double lastTurnPoint;
 
         public override string ShortName => $"ZZ ({this.deviation})";
+        public override string HelpLink => "https://help.quantower.com/analytics-panels/chart/technical-indicators/trend/zigzag";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorVolume.cs";
 
         /// <summary>
         /// Indicator's constructor. Contains general information: name, description, LineSeries etc. 

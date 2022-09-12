@@ -93,6 +93,7 @@ namespace Trend
 
         // Serves for an identification of related indicators with different parameters.
         public override string ShortName => $"ALLIGATOR ({this.JawMAPeiod}:{this.TeethMAPeiod}:{this.LipsMAPeiod})";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorAlligator.cs";
 
         private Indicator jawMa;
         private Indicator teethMa;

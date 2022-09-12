@@ -50,6 +50,7 @@ namespace Channels
 
         public int MinHistoryDepths => this.Period;
         public override string ShortName => $"Keltner ({this.Period}: {this.Offset}: {this.SourcePrice}: {this.MAType})";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorKeltnerChannel.cs";
 
         private Indicator ma;
         private Indicator atr;

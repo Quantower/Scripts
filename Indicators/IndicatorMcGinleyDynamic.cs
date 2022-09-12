@@ -41,11 +41,12 @@ namespace MovingAverages
         })]
         public IndicatorCalculationType CalculationType = Indicator.DEFAULT_CALCULATION_TYPE;
 
-        // Holds EMA's smoothing values.
-        private Indicator ema;
-
         public int MinHistoryDepths => this.Period + 1;
         public override string ShortName => $"MD ({this.Period}: {this.TrackingFactor}: {this.SourcePrice})";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorMcGinleyDynamic.cs";
+
+        // Holds EMA's smoothing values.
+        private Indicator ema;
 
         /// <summary>
         /// Indicator's constructor. Contains general information: name, description, LineSeries etc. 

@@ -37,6 +37,7 @@ namespace Volume
 
         public int MinHistoryDepths => this.CalculationType == IndicatorCalculationType.AllAvailableData ? MIN_PERIOD : this.Period + 1;
         public override string ShortName => $"OBV ({this.SourcePrice})";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorOnBalanceVolume.cs";
 
         /// <summary>
         /// Indicator's constructor. Contains general information: name, description, LineSeries etc. 

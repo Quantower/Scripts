@@ -14,8 +14,9 @@ namespace Oscillators
         public int Period = 14;
 
         public int MinHistoryDepths => this.Period;
-        public override string ShortName => "RLW (" + this.Period + ")";
+        public override string ShortName => $"RLW ({this.Period})";
         public override string HelpLink => "https://help.quantower.com/analytics-panels/chart/technical-indicators/oscillators/r-larry-williams";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorQstick.cs";
 
         // Highest 
         private readonly List<double> highest;

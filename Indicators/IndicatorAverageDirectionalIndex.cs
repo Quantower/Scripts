@@ -34,6 +34,7 @@ namespace Trend
         public int MinHistoryDepths => this.Period * 2;
         public override string ShortName => $"ADX ({this.Period}: {this.MAType})";
         public override string HelpLink => "https://help.quantower.com/analytics-panels/chart/technical-indicators/trend/average-directional-movement-index-adx-indicator";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorAverageDirectionalIndex.cs";
 
         private HistoricalDataCustom customHDadx;
         private HistoricalDataCustom customHDplusDm;

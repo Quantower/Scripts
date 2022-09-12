@@ -31,6 +31,7 @@ namespace Oscillators
         private int MaxEMAPeriod => Math.Max(this.fastEmaPeriod, this.slowEmaPeriod);
         public int MinHistoryDepths => this.MaxEMAPeriod + this.signalEmaPeriod;
         public override string ShortName => $"PPO ({this.fastEmaPeriod}: {this.slowEmaPeriod}: {this.signalEmaPeriod})";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorPercentagePriceOscillator.cs";
 
         private Indicator fastEma;
         private Indicator slowEma;

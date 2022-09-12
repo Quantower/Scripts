@@ -12,8 +12,9 @@ namespace Oscillators
         public int Period = 9;
 
         public int MinHistoryDepths => this.Period + 1;
-        public override string ShortName => "ROC (" + this.Period + ")";
+        public override string ShortName => $"ROC ({this.Period})";
         public override string HelpLink => "https://help.quantower.com/analytics-panels/chart/technical-indicators/oscillators/rate-of-change";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorRateOfChange.cs";
 
         /// <summary>
         /// Indicator's constructor. Contains general information: name, description, LineSeries etc. 

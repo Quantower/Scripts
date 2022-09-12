@@ -63,6 +63,7 @@ namespace Oscillators
         public override string ShortName => $"RSI ({this.Period}: {this.SourcePrice})";
 
         public override string HelpLink => "https://help.quantower.com/analytics-panels/chart/technical-indicators/oscillators/relative-strength-index-rsi-indicator";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorRelativeStrengthIndex.cs";
 
         private Indicator ma;
         private HistoricalDataCustom histCustom;

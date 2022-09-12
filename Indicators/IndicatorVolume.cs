@@ -35,6 +35,7 @@ namespace BarsDataIndicators
                 return name;
             }
         }
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorVolume.cs";
 
         public override IList<SettingItem> Settings
         {

@@ -14,6 +14,7 @@ namespace Oscillators
         private const int AO_MAX_PERIOD = 34;
 
         public override string HelpLink => "https://help.quantower.com/analytics-panels/chart/technical-indicators/oscillators/accelerator-oscillator";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorAccelerationOscillator.cs";
         public int MinHistoryDepths => AC_PERIOD + AO_MAX_PERIOD;
         public override string ShortName => "AC";
 

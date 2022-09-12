@@ -33,6 +33,7 @@ namespace Oscillators
 
         public int MinHistoryDepths => this.Period;
         public override string ShortName => $"Qstick ({this.Period}: {this.MAType})";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorQstick.cs";
 
         private HistoricalDataCustom customHistData;
         private Indicator ma;

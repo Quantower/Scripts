@@ -10,8 +10,6 @@ namespace MovingAverages
     /// </summary>
     public sealed class IndicatorExponentialMovingAverage : Indicator, IWatchlistIndicator
     {
-        #region Parameters
-
         // Period of moving average. 
         [InputParameter("Period of Exponential Moving Average", 10, 1, 9999, 1, 0)]
         public int MaPeriod = 9;
@@ -39,7 +37,13 @@ namespace MovingAverages
         })]
         public IndicatorCalculationType CalculationType = Indicator.DEFAULT_CALCULATION_TYPE;
 
-        #endregion
+        public int MinHistoryDepths => this.CalculationType switch
+        {
+            IndicatorCalculationType.AllAvailableData => this.MaPeriod,
+            _ => this.MaPeriod * 2
+        };
+        public override string ShortName => $"EMA ({this.MaPeriod}: {this.SourcePrice})";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorExponentialMovingAverage.cs";
 
         // EMA's calculation coefficient
         private double k;
@@ -59,13 +63,6 @@ namespace MovingAverages
 
             this.SeparateWindow = false;
         }
-
-        public int MinHistoryDepths => this.CalculationType switch
-        {
-            IndicatorCalculationType.AllAvailableData => this.MaPeriod,
-            _ => this.MaPeriod * 2
-        };
-        public override string ShortName => $"EMA ({this.MaPeriod}: {this.SourcePrice})";
 
         /// <summary>
         /// This function will be called after creating an indicator as well as after its input params reset or chart (symbol or timeframe) updates.

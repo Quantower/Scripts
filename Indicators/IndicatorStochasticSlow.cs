@@ -37,7 +37,8 @@ namespace Oscillators
         public IndicatorCalculationType CalculationType = Indicator.DEFAULT_CALCULATION_TYPE;
 
         public int MinHistoryDepths => this.Smooth + this.DoubleSmooth + this.Period;
-        public override string ShortName => "SSD (" + this.Period + ")";
+        public override string ShortName => $"SSD ({this.Period})";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorStochasticSlow.cs";
 
         private Indicator ssdMa;
         private Indicator smoothedMa;

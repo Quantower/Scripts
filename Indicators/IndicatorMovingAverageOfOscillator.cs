@@ -28,7 +28,8 @@ namespace Oscillators
 
         private int MaxEMAPeriod => Math.Max(this.FastPeriod, this.SlowPeriod);
         public int MinHistoryDepths => this.MaxEMAPeriod + this.SignalPeriod;
-        public override string ShortName => "OsMA (" + this.FastPeriod + ":" + this.SlowPeriod + ":" + this.SignalPeriod + ")";
+        public override string ShortName => $"OsMA ({this.FastPeriod}:{this.SlowPeriod}:{this.SignalPeriod})";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorMovingAverageOfOscillator.cs";
 
         private Indicator fastEMA;
         private Indicator slowEMA;

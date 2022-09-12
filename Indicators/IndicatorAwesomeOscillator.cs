@@ -7,10 +7,10 @@ namespace Oscillators
 {
     public sealed class IndicatorAwesomeOscillator: Indicator, IWatchlistIndicator
     {
-        public override string HelpLink => "https://help.quantower.com/analytics-panels/chart/technical-indicators/oscillators/awesome-oscillator";
-
         public int MinHistoryDepths => SLOW_PERIOD;
         public override string ShortName => "AO";
+        public override string HelpLink => "https://help.quantower.com/analytics-panels/chart/technical-indicators/oscillators/awesome-oscillator";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorAwesomeOscillator.cs";
 
         private Indicator fastMA;
         private Indicator slowMA;

@@ -45,6 +45,7 @@ namespace Oscillators
         public int MinHistoryDepths => this.Period;
         public override string ShortName => $"CCI ({this.Period}: {this.SourcePrice})";
         public override string HelpLink => "https://help.quantower.com/analytics-panels/chart/technical-indicators/oscillators/commodity-channel-index";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorCommodityChannelIndex.cs";
 
         private Indicator MA;
 

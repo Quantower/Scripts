@@ -51,6 +51,7 @@ namespace Channels
 
         public int MinHistoryDepths => this.Period;
         public override string ShortName => $"MAE ({this.Period}:{this.UpShift}:{this.DownShift})";
+        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorMovingAverageEnvelope.cs";
 
         private Indicator ma;
 
