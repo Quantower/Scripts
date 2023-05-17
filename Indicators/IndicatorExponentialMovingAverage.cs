@@ -113,7 +113,7 @@ public sealed class IndicatorExponentialMovingAverage : Indicator, IWatchlistInd
         if (this.Count <= startOffset + this.MaPeriod)
             return;
 
-        // calcualte start value
+        // Calculate start value
         double ema = this.CalculateSMA(startOffset);
 
         for (int i = startOffset - 1; i >= offset; i--)
