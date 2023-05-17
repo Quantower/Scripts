@@ -1,108 +1,107 @@
-// Copyright QUANTOWER LLC. © 2017-2022. All rights reserved.
+// Copyright QUANTOWER LLC. © 2017-2023. All rights reserved.
 
 using System;
 using System.Drawing;
 using TradingPlatform.BusinessLayer;
 
-namespace Oscillators
+namespace Oscillators;
+
+public sealed class IndicatorMovingAverageOfOscillator : Indicator, IWatchlistIndicator
 {
-    public sealed class IndicatorMovingAverageOfOscillator : Indicator, IWatchlistIndicator
+    // Displays Input Parameter as input field (or checkbox if value type is bolean).
+    [InputParameter("Period of fast EMA", 0, 1, 999, 1, 0)]
+    public int FastPeriod = 12;
+
+    [InputParameter("Period of slow EMA", 1, 1, 999, 1, 0)]
+    public int SlowPeriod = 26;
+
+    [InputParameter("Period of signal EMA", 2, 1, 999, 1, 0)]
+    public int SignalPeriod = 9;
+
+    //
+    [InputParameter("Calculation type", 10, variants: new object[]
     {
-        // Displays Input Parameter as input field (or checkbox if value type is bolean).
-        [InputParameter("Period of fast EMA", 0, 1, 999, 1, 0)]
-        public int FastPeriod = 12;
+        "All available data", IndicatorCalculationType.AllAvailableData,
+        "By period", IndicatorCalculationType.ByPeriod,
+    })]
+    public IndicatorCalculationType CalculationType = Indicator.DEFAULT_CALCULATION_TYPE;
 
-        [InputParameter("Period of slow EMA", 1, 1, 999, 1, 0)]
-        public int SlowPeriod = 26;
+    private int MaxEMAPeriod => Math.Max(this.FastPeriod, this.SlowPeriod);
+    public int MinHistoryDepths => this.MaxEMAPeriod + this.SignalPeriod;
+    public override string ShortName => $"OsMA ({this.FastPeriod}:{this.SlowPeriod}:{this.SignalPeriod})";
+    public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorMovingAverageOfOscillator.cs";
 
-        [InputParameter("Period of signal EMA", 2, 1, 999, 1, 0)]
-        public int SignalPeriod = 9;
+    private Indicator fastEMA;
+    private Indicator slowEMA;
+    private Indicator sma;
+    private HistoricalDataCustom customHD;
 
-        //
-        [InputParameter("Calculation type", 10, variants: new object[]
-        {
-            "All available data", IndicatorCalculationType.AllAvailableData,
-            "By period", IndicatorCalculationType.ByPeriod,
-        })]
-        public IndicatorCalculationType CalculationType = Indicator.DEFAULT_CALCULATION_TYPE;
+    /// <summary>
+    /// Indicator's constructor. Contains general information: name, description, LineSeries etc. 
+    /// </summary>
+    public IndicatorMovingAverageOfOscillator()
+        : base()
+    {
+        // Defines indicator's name and description.
+        this.Name = "Moving Average of Oscillator";
+        this.Description = "Reflects the difference between an oscillator (MACD) and its moving average (signal line).";
 
-        private int MaxEMAPeriod => Math.Max(this.FastPeriod, this.SlowPeriod);
-        public int MinHistoryDepths => this.MaxEMAPeriod + this.SignalPeriod;
-        public override string ShortName => $"OsMA ({this.FastPeriod}:{this.SlowPeriod}:{this.SignalPeriod})";
-        public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorMovingAverageOfOscillator.cs";
+        // Defines line on demand with particular parameters.
+        this.AddLineSeries("OsMA", Color.Green, 4, LineStyle.Histogramm);
 
-        private Indicator fastEMA;
-        private Indicator slowEMA;
-        private Indicator sma;
-        private HistoricalDataCustom customHD;
+        this.SeparateWindow = true;
+    }
 
-        /// <summary>
-        /// Indicator's constructor. Contains general information: name, description, LineSeries etc. 
-        /// </summary>
-        public IndicatorMovingAverageOfOscillator()
-            : base()
-        {
-            // Defines indicator's name and description.
-            this.Name = "Moving Average of Oscillator";
-            this.Description = "Reflects the difference between an oscillator (MACD) and its moving average (signal line).";
+    /// <summary>
+    /// This function will be called after creating an indicator as well as after its input params reset or chart (symbol or timeframe) updates.
+    /// </summary>
+    protected override void OnInit()
+    {
+        // Get two EMA and one SMA indicators from built-in indicator collection 
+        this.fastEMA = Core.Indicators.BuiltIn.EMA(this.FastPeriod, PriceType.Typical, this.CalculationType);
+        this.slowEMA = Core.Indicators.BuiltIn.EMA(this.SlowPeriod, PriceType.Typical, this.CalculationType);
+        this.sma = Core.Indicators.BuiltIn.SMA(this.SignalPeriod, PriceType.Close);
 
-            // Defines line on demand with particular parameters.
-            this.AddLineSeries("OsMA", Color.Green, 4, LineStyle.Histogramm);
+        // Create a custom HistoricalData and syncronize it with this(MACD) indicator.
+        this.customHD = new HistoricalDataCustom(this);
 
-            this.SeparateWindow = true;
-        }
+        // Attach SMA indicator to custom HistoricalData. The SMA will calculate on the data, which will store in custom HD. 
+        this.customHD.AddIndicator(this.sma);
 
-        /// <summary>
-        /// This function will be called after creating an indicator as well as after its input params reset or chart (symbol or timeframe) updates.
-        /// </summary>
-        protected override void OnInit()
-        {
-            // Get two EMA and one SMA indicators from built-in indicator collection 
-            this.fastEMA = Core.Indicators.BuiltIn.EMA(this.FastPeriod, PriceType.Typical, this.CalculationType);
-            this.slowEMA = Core.Indicators.BuiltIn.EMA(this.SlowPeriod, PriceType.Typical, this.CalculationType);
-            this.sma = Core.Indicators.BuiltIn.SMA(this.SignalPeriod, PriceType.Close);
+        // Add auxiliary EMA indicators to the current one. 
+        this.AddIndicator(this.fastEMA);
+        this.AddIndicator(this.slowEMA);
+    }
 
-            // Create a custom HistoricalData and syncronize it with this(MACD) indicator.
-            this.customHD = new HistoricalDataCustom(this);
+    /// <summary>
+    /// Calculation entry point. This function is called when a price data updates. 
+    /// Will be runing under the HistoricalBar mode during history loading. 
+    /// Under NewTick during realtime. 
+    /// Under NewBar if start of the new bar is required.
+    /// </summary>
+    /// <param name="args">Provides data of updating reason and incoming price.</param>
+    protected override void OnUpdate(UpdateArgs args)
+    {
+        // Skip max period for correct calculation.  
+        if (this.Count < this.MaxEMAPeriod)
+            return;
 
-            // Attach SMA indicator to custom HistoricalData. The SMA will calculate on the data, which will store in custom HD. 
-            this.customHD.AddIndicator(this.sma);
+        // Calculate a difference bettwen two EMA indicators.
+        double differ = this.fastEMA.GetValue() - this.slowEMA.GetValue();
 
-            // Add auxiliary EMA indicators to the current one. 
-            this.AddIndicator(this.fastEMA);
-            this.AddIndicator(this.slowEMA);
-        }
+        // The calculated value must be set as close price against the custom HistoricalData,
+        // because the SMA indicator was initialized with the source price - PriceType.Close. 
+        this.customHD[PriceType.Close, 0] = differ;
 
-        /// <summary>
-        /// Calculation entry point. This function is called when a price data updates. 
-        /// Will be runing under the HistoricalBar mode during history loading. 
-        /// Under NewTick during realtime. 
-        /// Under NewBar if start of the new bar is required.
-        /// </summary>
-        /// <param name="args">Provides data of updating reason and incoming price.</param>
-        protected override void OnUpdate(UpdateArgs args)
-        {
-            // Skip max period for correct calculation.  
-            if (this.Count < this.MaxEMAPeriod)
-                return;
+        if (this.Count < this.MinHistoryDepths)
+            return;
 
-            // Calculate a difference bettwen two EMA indicators.
-            double differ = this.fastEMA.GetValue() - this.slowEMA.GetValue();
+        // Get value from SMA indicator, which is calculated based on custom HistoricalData.
+        double signal = this.sma.GetValue();
+        if (double.IsNaN(signal))
+            return;
 
-            // The calculated value must be set as close price against the custom HistoricalData,
-            // because the SMA indicator was initialized with the source price - PriceType.Close. 
-            this.customHD[PriceType.Close, 0] = differ;
-
-            if (this.Count < this.MinHistoryDepths)
-                return;
-
-            // Get value from SMA indicator, which is calculated based on custom HistoricalData.
-            double signal = this.sma.GetValue();
-            if (double.IsNaN(signal))
-                return;
-
-            // Set value to the 'OsMA' line buffer.
-            this.SetValue(differ - signal);
-        }
+        // Set value to the 'OsMA' line buffer.
+        this.SetValue(differ - signal);
     }
 }
