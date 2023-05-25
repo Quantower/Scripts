@@ -19,6 +19,22 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
     private const string CALCULATION_METHOD_INPUT_PARAMETER = "Calculation method";
     private const int MIN_HISTORY_COUNT = 3;
 
+    private const int PP_LINE_INDEX = 0;
+
+    private const int R1_LINE_INDEX = 1;
+    private const int R2_LINE_INDEX = 2;
+    private const int R3_LINE_INDEX = 3;
+    private const int R4_LINE_INDEX = 4;
+    private const int R5_LINE_INDEX = 5;
+    private const int R6_LINE_INDEX = 6;
+
+    private const int S1_LINE_INDEX = 7;
+    private const int S2_LINE_INDEX = 8;
+    private const int S3_LINE_INDEX = 9;
+    private const int S4_LINE_INDEX = 10;
+    private const int S5_LINE_INDEX = 11;
+    private const int S6_LINE_INDEX = 12;
+
     [InputParameter(CURRENT_PERIOD_INPUT_PARAMETER, 0)]
     public bool OnlyCurrentPeriod = false;
 
@@ -97,15 +113,20 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
     {
         this.Name = "Pivot Point";
 
-        this.AddLineSeries("PP", Color.Gray, 1, LineStyle.Solid);
-        this.AddLineSeries("R1", Color.Red, 1, LineStyle.Solid);
-        this.AddLineSeries("R2", Color.Red, 1, LineStyle.Solid);
-        this.AddLineSeries("R3", Color.Red, 1, LineStyle.Solid);
-        this.AddLineSeries("R4", Color.Red, 1, LineStyle.Solid);
-        this.AddLineSeries("S1", Color.DodgerBlue, 1, LineStyle.Solid);
-        this.AddLineSeries("S2", Color.DodgerBlue, 1, LineStyle.Solid);
-        this.AddLineSeries("S3", Color.DodgerBlue, 1, LineStyle.Solid);
-        this.AddLineSeries("S4", Color.DodgerBlue, 1, LineStyle.Solid);
+        this.AddLineSeries("PP", Color.Gray, 1, LineStyle.Solid);   // 0
+        this.AddLineSeries("R1", Color.Red, 1, LineStyle.Solid);    // 1
+        this.AddLineSeries("R2", Color.Red, 1, LineStyle.Solid);    // 2
+        this.AddLineSeries("R3", Color.Red, 1, LineStyle.Solid);    // 3
+        this.AddLineSeries("R4", Color.Red, 1, LineStyle.Solid);    // 4
+        this.AddLineSeries("R5", Color.Red, 1, LineStyle.Solid);    // 5
+        this.AddLineSeries("R6", Color.Red, 1, LineStyle.Solid);    // 6
+
+        this.AddLineSeries("S1", Color.DodgerBlue, 1, LineStyle.Solid); // 7
+        this.AddLineSeries("S2", Color.DodgerBlue, 1, LineStyle.Solid); // 8
+        this.AddLineSeries("S3", Color.DodgerBlue, 1, LineStyle.Solid); // 9
+        this.AddLineSeries("S4", Color.DodgerBlue, 1, LineStyle.Solid); // 10
+        this.AddLineSeries("S5", Color.DodgerBlue, 1, LineStyle.Solid); // 11
+        this.AddLineSeries("S6", Color.DodgerBlue, 1, LineStyle.Solid); // 12
 
         this.SeparateWindow = false;
 
@@ -299,22 +320,23 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
 
         var currentItem = hd[hdOffset + 1];
 
-        var open = currentItem[PriceType.Open];
         var close = currentItem[PriceType.Close];
         var high = currentItem[PriceType.High];
         var low = currentItem[PriceType.Low];
 
-        double pp, r1, r2, r3, r4, s1, s2, s3, s4;
-        pp = r1 = r2 = r3 = r4 = s1 = s2 = s3 = s4 = 0;
+        double pp, r1, r2, r3, r4, r5, r6, s1, s2, s3, s4, s5, s6;
+        pp = r1 = r2 = r3 = r4 = r5 = r6 = s1 = s2 = s3 = s4 = s5 = s6 = 0;
 
         switch (this.IndicatorCalculationMethod)
         {
             case CalculationMethod.Classic:
                 {
                     pp = (high + low + close) / 3;
+
                     r1 = 2 * pp - low;
                     r2 = pp + high - low;
                     r3 = 2 * pp + high - 2 * low;
+
                     s1 = 2 * pp - high;
                     s2 = pp + low - high;
                     s3 = 2 * pp + low - 2 * high;
@@ -323,22 +345,30 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
             case CalculationMethod.Camarilla:
                 {
                     pp = (high + low + close) / 3;
+
                     r1 = close + 0.0916 * (high - low);
                     r2 = close + 0.183 * (high - low);
                     r3 = close + 0.275 * (high - low);
                     r4 = close + 0.55 * (high - low);
+                    r5 = high / low + close;
+                    r6 = r5 + 1.168 * (r5 - r4);
+
                     s1 = close - 0.0916 * (high - low);
                     s2 = close - 0.183 * (high - low);
                     s3 = close - 0.275 * (high - low);
                     s4 = close - 0.55 * (high - low);
+                    s5 = close - (r5 - close);
+                    s6 = close - (r6 - close);
                 }
                 break;
             case CalculationMethod.Fibonacci:
                 {
                     pp = (high + low + close) / 3;
+
                     r1 = pp + 0.382 * (high - low);
                     r2 = pp + 0.618 * (high - low);
                     r3 = pp + (high - low);
+
                     s1 = pp - 0.382 * (high - low);
                     s2 = pp - 0.618 * (high - low);
                     s3 = pp - (high - low);
@@ -347,9 +377,11 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
             case CalculationMethod.Woodie:
                 {
                     pp = (high + low + 2 * close) / 4;
+
                     r1 = 2 * pp - low;
                     r2 = pp + high - low;
                     r3 = high + 2 * (pp - low);
+
                     s1 = 2 * pp - high;
                     s2 = pp + low - high;
                     s3 = low - 2 * (high - pp);
@@ -378,7 +410,8 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
                 break;
         }
 
-        return new PivotPointCalculationResponce(hd[hdOffset].TimeLeft, new DateTime(hd[hdOffset].TicksRight))
+        var historyItem = hd[hdOffset, SeekOriginHistory.End];
+        return new PivotPointCalculationResponce(historyItem.TimeLeft, new DateTime(historyItem.TicksRight, DateTimeKind.Utc))
         {
             PP = pp,
             R1 = r1,
@@ -389,6 +422,10 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
             S2 = s2,
             S3 = s3,
             S4 = s4,
+            S5 = s5,
+            S6 = s6,
+            R5 = r5,
+            R6 = r6,
             Method = this.IndicatorCalculationMethod,
             Period = new Period(this.BasePeriod, this.PeriodValue)
         };
@@ -398,12 +435,12 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
         this.lastPivotPeriod = this.CalculatePivotPoint(this.history, 0);
 
         if (this.lastPivotPeriod != null)
-            this.DrawIndicator(new PivotPointCalculationResponce[] { this.lastPivotPeriod });
+            this.DrawIndicator(this.lastPivotPeriod);
     }
     #endregion Calculation 
 
     #region Drawing
-    private void DrawIndicator(PivotPointCalculationResponce[] pivotPointValues)
+    private void DrawIndicator(params PivotPointCalculationResponce[] pivotPointValues)
     {
         // 
         if (this.HistoricalData == null)
@@ -432,22 +469,27 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
 
         for (int y = fromIndex; y >= toIndex; y--)
         {
-            this.SetValue(ppItem.PP, 0, y);
-            this.SetValue(ppItem.R1, 1, y);
-            this.SetValue(ppItem.S1, 5, y);
+            this.SetValue(ppItem.PP, PP_LINE_INDEX, y);
+            this.SetValue(ppItem.R1, R1_LINE_INDEX, y);
+            this.SetValue(ppItem.S1, S1_LINE_INDEX, y);
 
             if (ppItem.Method != CalculationMethod.DeMark)
             {
-                this.SetValue(ppItem.R2, 2, y);
-                this.SetValue(ppItem.R3, 3, y);
-                this.SetValue(ppItem.S2, 6, y);
-                this.SetValue(ppItem.S3, 7, y);
+                this.SetValue(ppItem.R2, R2_LINE_INDEX, y);
+                this.SetValue(ppItem.R3, R3_LINE_INDEX, y);
+                this.SetValue(ppItem.S2, S2_LINE_INDEX, y);
+                this.SetValue(ppItem.S3, S3_LINE_INDEX, y);
             }
 
             if (ppItem.Method == CalculationMethod.Camarilla)
             {
-                this.SetValue(ppItem.R4, 4, y);
-                this.SetValue(ppItem.S4, 8, y);
+                this.SetValue(ppItem.R4, R4_LINE_INDEX, y);
+                this.SetValue(ppItem.R5, R5_LINE_INDEX, y);
+                this.SetValue(ppItem.R6, R6_LINE_INDEX, y);
+
+                this.SetValue(ppItem.S4, S4_LINE_INDEX, y);
+                this.SetValue(ppItem.S5, S5_LINE_INDEX, y);
+                this.SetValue(ppItem.S6, S6_LINE_INDEX, y);
             }
         }
     }
@@ -505,10 +547,14 @@ internal class PivotPointCalculationResponce
     public double R2 { get; set; }
     public double R3 { get; set; }
     public double R4 { get; set; }
+    public double R5 { get; set; }
+    public double R6 { get; set; }
     public double S1 { get; set; }
     public double S2 { get; set; }
     public double S3 { get; set; }
     public double S4 { get; set; }
+    public double S5 { get; set; }
+    public double S6 { get; set; }
     public DateTime From { get; private set; }
     public DateTime To { get; private set; }
     public Period Period { get; set; }
