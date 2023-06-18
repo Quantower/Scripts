@@ -10,25 +10,25 @@ public class IndicatorAbnormalVolume : Indicator, IWatchlistIndicator
     [InputParameter]
     public int Period = 60;
 
+    [InputParameter]
+    public double SignalLine = 2.0;
+
+    [InputParameter]
+    public Color MarkerColor = Color.Green;
+
     public int MinHistoryDepths => Period;
     public override string ShortName => "AV";
 
     public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorAbnormalVolume.cs";
 
-    /// <summary>
-    /// Indicator's constructor. Contains general information: name, description, LineSeries etc. 
-    /// </summary>
     public IndicatorAbnormalVolume()
         : base()
     {
-        // Defines indicator's name and description.
         this.Name = "Abnormal Volume";
         this.Description = "Shows the ratio of the volume of the current bar to the 'Period' of the previous ones";
 
-        // Defines line on demand with particular parameters.
-        this.AddLineSeries("line1", Color.CadetBlue, 1, LineStyle.Solid);
-
-        // By default indicator will be applied on main window of the chart
+        this.AddLineSeries("Main Line", Color.CadetBlue, 1, LineStyle.Histogramm);
+        this.AddLineSeries("Signal Line", Color.CadetBlue, 1, LineStyle.Solid);
         this.SeparateWindow = true;
     }
 
@@ -47,7 +47,13 @@ public class IndicatorAbnormalVolume : Indicator, IWatchlistIndicator
             sum += this.Volume(i);
 
         double averageVolume = sum / this.Period;
-
-        this.SetValue(this.Volume() / averageVolume);
+        double value = this.Volume() / averageVolume;
+        this.SetValue(value);
+        this.SetValue(this.SignalLine, 1);
+        LinesSeries[0].RemoveMarker(0);
+        if (GetValue() >= GetValue(0, 1))
+        {
+            LinesSeries[0].SetMarker(0, new IndicatorLineMarker(MarkerColor, IndicatorLineMarkerIconType.DownArrow));
+        }
     }
 }
