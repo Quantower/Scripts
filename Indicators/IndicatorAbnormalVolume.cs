@@ -11,7 +11,7 @@ public class IndicatorAbnormalVolume : Indicator, IWatchlistIndicator
     public int Period = 60;
 
     [InputParameter]
-    public double SignalLine = 2.0;
+    public double SignalLine = 5.0;
 
     [InputParameter]
     public Color MarkerColor = Color.Green;
