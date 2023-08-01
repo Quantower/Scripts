@@ -153,7 +153,6 @@ public class IndicatorCumulativeDelta : CandleDrawIndicator, IVolumeAnalysisIndi
                     break;
                 }
         }
-
         base.OnInit();
     }
     protected override void OnUpdate(UpdateArgs args)
@@ -161,13 +160,38 @@ public class IndicatorCumulativeDelta : CandleDrawIndicator, IVolumeAnalysisIndi
         if (this.IsLoading)
             return;
 
-        var currentItem = this.GetVolumeAnalysisData(0);
-        var isNewBar = args.Reason == UpdateReason.NewBar || args.Reason == UpdateReason.HistoricalBar;
+        var currentVolumeData = this.GetVolumeAnalysisData(0);
 
-        if (currentItem?.Total == null)
-            this.CalculateIndicatorByOffset(1, true, true);
+        //
+        // Try to recalculate prev items
+        //
+        if (currentVolumeData?.Total == null)
+        {
+            var currentIndex = Math.Max(0, this.Count - 1);
+
+            if (this.currentAreaBuider.Index != currentIndex)
+            {
+                for (int i = this.currentAreaBuider.Index; i < this.Count; i++)
+                {
+                    var offset = Math.Max(0, this.Count - i - 1);
+
+                    var prevVolumeDataItem = this.GetVolumeAnalysisData(offset);
+                    if (prevVolumeDataItem == null)
+                        continue;
+
+                    this.CalculateIndicatorByOffset(offset, true, true);
+                }
+            }
+        }
+        //
+        // Try to calculate current item
+        //
         else
+        {
+            var isNewBar = args.Reason == UpdateReason.NewBar || args.Reason == UpdateReason.HistoricalBar;
             this.CalculateIndicatorByOffset(0, isNewBar, false);
+        }
+
     }
     protected override void OnClear()
     {
@@ -323,6 +347,7 @@ public class IndicatorCumulativeDelta : CandleDrawIndicator, IVolumeAnalysisIndi
             this.currentAreaBuider.StartNew();
 
         this.currentAreaBuider.Update(currentItem.Total);
+        
         this.SetValues(this.currentAreaBuider.Bar.Open, this.currentAreaBuider.Bar.High, this.currentAreaBuider.Bar.Low, this.currentAreaBuider.Bar.Close, offset);
 
         if (isNewBar && createAfterUpdate)
@@ -394,6 +419,7 @@ public class IndicatorCumulativeDelta : CandleDrawIndicator, IVolumeAnalysisIndi
     {
         internal Interval<DateTime> Range { get; }
         internal BarBuilder Bar { get; private set; }
+        internal int Index { get; private set; }
 
         public AreaBuilder(Interval<DateTime> range)
         {
@@ -401,6 +427,7 @@ public class IndicatorCumulativeDelta : CandleDrawIndicator, IVolumeAnalysisIndi
 
             this.Bar = new BarBuilder();
             this.StartNew();
+            this.Index = -1;
         }
 
         internal void Update(VolumeAnalysisItem total)
@@ -423,6 +450,7 @@ public class IndicatorCumulativeDelta : CandleDrawIndicator, IVolumeAnalysisIndi
 
             this.Bar.Clear();
             this.Bar.Open = prevClose;
+            this.Index++;
         }
         internal bool Contains(DateTime dt)
         {
