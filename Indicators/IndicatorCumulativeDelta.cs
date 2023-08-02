@@ -169,9 +169,9 @@ public class IndicatorCumulativeDelta : CandleDrawIndicator, IVolumeAnalysisIndi
         {
             var currentIndex = Math.Max(0, this.Count - 1);
 
-            if (this.currentAreaBuider.Index != currentIndex)
+            if (this.currentAreaBuider.BarIndex != currentIndex)
             {
-                for (int i = this.currentAreaBuider.Index; i < this.Count; i++)
+                for (int i = this.currentAreaBuider.BarIndex; i < this.Count; i++)
                 {
                     var offset = Math.Max(0, this.Count - i - 1);
 
@@ -343,15 +343,18 @@ public class IndicatorCumulativeDelta : CandleDrawIndicator, IVolumeAnalysisIndi
             return;
 
         //
+
+        var index = Math.Max(this.Count - offset - 1, 0);
+
         if (isNewBar && !createAfterUpdate)
-            this.currentAreaBuider.StartNew();
+            this.currentAreaBuider.StartNew(index);
 
         this.currentAreaBuider.Update(currentItem.Total);
         
         this.SetValues(this.currentAreaBuider.Bar.Open, this.currentAreaBuider.Bar.High, this.currentAreaBuider.Bar.Low, this.currentAreaBuider.Bar.Close, offset);
 
         if (isNewBar && createAfterUpdate)
-            this.currentAreaBuider.StartNew();
+            this.currentAreaBuider.StartNew(++index);
     }
     private Interval<DateTime> GetFullDayTimeInterval(TradingPlatform.BusinessLayer.TimeZone timeZone)
     {
@@ -419,15 +422,14 @@ public class IndicatorCumulativeDelta : CandleDrawIndicator, IVolumeAnalysisIndi
     {
         internal Interval<DateTime> Range { get; }
         internal BarBuilder Bar { get; private set; }
-        internal int Index { get; private set; }
+        internal int BarIndex { get; private set; }
 
         public AreaBuilder(Interval<DateTime> range)
         {
             this.Range = range;
 
             this.Bar = new BarBuilder();
-            this.StartNew();
-            this.Index = -1;
+            this.StartNew(0);
         }
 
         internal void Update(VolumeAnalysisItem total)
@@ -442,7 +444,7 @@ public class IndicatorCumulativeDelta : CandleDrawIndicator, IVolumeAnalysisIndi
                 ? this.Bar.Open - Math.Abs(total.MinDelta)
                 : Math.Min(this.Bar.Close, this.Bar.Open);
         }
-        internal void StartNew()
+        internal void StartNew(int barIndex)
         {
             var prevClose = !double.IsNaN(this.Bar.Close)
                 ? this.Bar.Close
@@ -450,7 +452,7 @@ public class IndicatorCumulativeDelta : CandleDrawIndicator, IVolumeAnalysisIndi
 
             this.Bar.Clear();
             this.Bar.Open = prevClose;
-            this.Index++;
+            this.BarIndex = barIndex;
         }
         internal bool Contains(DateTime dt)
         {
