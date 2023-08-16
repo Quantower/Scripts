@@ -12,7 +12,7 @@ public sealed class IndicatorZigZag : Indicator
 {
     // Displays Input Parameter as input field (or checkbox if value type is bolean).
     [InputParameter("Percent Deviation", 0, 0.01, 100.0, 0.01, 2)]
-    public double deviation = 5;
+    public double deviation = 0.1;
 
     // Defines ZigZag calculation variables.
     private int trendLineLenght;
