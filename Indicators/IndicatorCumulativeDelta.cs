@@ -302,13 +302,18 @@ public class IndicatorCumulativeDelta : CandleDrawIndicator, IVolumeAnalysisIndi
 
         var time = this.Time(offset);
 
+        var index = Math.Max(this.Count - offset - 1, 0);
+
         //
         // Check session
         //
         if (this.SessionMode == CumulativeDeltaSessionMode.SpecifiedSession || this.SessionMode == CumulativeDeltaSessionMode.CustomRange)
         {
             if (!this.SessionContainer.ContainsDate(time.Ticks))
+            {
+                this.currentAreaBuider?.Reset(index);
                 return;
+            }
         }
 
         //
@@ -344,7 +349,6 @@ public class IndicatorCumulativeDelta : CandleDrawIndicator, IVolumeAnalysisIndi
 
         //
 
-        var index = Math.Max(this.Count - offset - 1, 0);
 
         if (isNewBar && !createAfterUpdate)
             this.currentAreaBuider.StartNew(index);
@@ -463,6 +467,12 @@ public class IndicatorCumulativeDelta : CandleDrawIndicator, IVolumeAnalysisIndi
                 return false;
 
             return true;
+        }
+        internal void Reset(int barIndex)
+        {
+            this.Bar.Clear();
+            this.Bar.Open = 0;
+            this.BarIndex = barIndex;
         }
 
         public void Dispose()
