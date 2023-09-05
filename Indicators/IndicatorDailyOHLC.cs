@@ -478,12 +478,14 @@ public class IndicatorDailyOHLC : Indicator
             settings.Add(new SettingItemLineOptions("OpenLineOptions", this.OpenLineOptions, 60)
             {
                 SeparatorGroup = openLineStyleSeparator,
-                Text = loc._("Main line style")
+                Text = loc._("Main line style"),
+                ExcludedStyles = new LineStyle[] { LineStyle.Points }
             });
             settings.Add(new SettingItemLineOptions("OpenExtendLineOptions", this.OpenExtendLineOptions, 60)
             {
                 SeparatorGroup = openLineStyleSeparator,
-                Text = loc._("Extend line style")
+                Text = loc._("Extend line style"),
+                ExcludedStyles = new LineStyle[] { LineStyle.Points }
             });
             settings.Add(new SettingItemBoolean("ShowOpenLineLabel", this.ShowOpenLineLabel, 60)
             {
@@ -496,12 +498,14 @@ public class IndicatorDailyOHLC : Indicator
             settings.Add(new SettingItemLineOptions("HighLineOptions", this.HighLineOptions, 60)
             {
                 SeparatorGroup = highLineStyleSeparator,
-                Text = loc._("Main line style")
+                Text = loc._("Main line style"),
+                ExcludedStyles = new LineStyle[] { LineStyle.Points }
             });
             settings.Add(new SettingItemLineOptions("HighExtendLineOptions", this.HighExtendLineOptions, 60)
             {
                 SeparatorGroup = highLineStyleSeparator,
-                Text = loc._("Extend line style")
+                Text = loc._("Extend line style"),
+                ExcludedStyles = new LineStyle[] { LineStyle.Points }
             });
             settings.Add(new SettingItemBoolean("ShowHighLineLabel", this.ShowHighLineLabel, 60)
             {
@@ -514,12 +518,14 @@ public class IndicatorDailyOHLC : Indicator
             settings.Add(new SettingItemLineOptions("LowLineOptions", this.LowLineOptions, 60)
             {
                 SeparatorGroup = lowLineStyleSeparator,
-                Text = loc._("Main line style")
+                Text = loc._("Main line style"),
+                ExcludedStyles = new LineStyle[] { LineStyle.Points }
             });
             settings.Add(new SettingItemLineOptions("LowExtendLineOptions", this.LowExtendLineOptions, 60)
             {
                 SeparatorGroup = lowLineStyleSeparator,
-                Text = loc._("Extend line style")
+                Text = loc._("Extend line style"),
+                ExcludedStyles = new LineStyle[] { LineStyle.Points }
             });
             settings.Add(new SettingItemBoolean("ShowLowLineLabel", this.ShowLowLineLabel, 60)
             {
@@ -532,12 +538,14 @@ public class IndicatorDailyOHLC : Indicator
             settings.Add(new SettingItemLineOptions("CloseLineOptions", this.CloseLineOptions, 60)
             {
                 SeparatorGroup = closeLineStyleSeparator,
-                Text = loc._("Main line style")
+                Text = loc._("Main line style"),
+                ExcludedStyles = new LineStyle[] { LineStyle.Points }
             });
             settings.Add(new SettingItemLineOptions("CloseExtendLineOptions", this.CloseExtendLineOptions, 60)
             {
                 SeparatorGroup = closeLineStyleSeparator,
-                Text = loc._("Extend line style")
+                Text = loc._("Extend line style"),
+                ExcludedStyles = new LineStyle[] { LineStyle.Points }
             });
             settings.Add(new SettingItemBoolean("ShowCloseLineLabel", this.ShowCloseLineLabel, 60)
             {
@@ -550,12 +558,14 @@ public class IndicatorDailyOHLC : Indicator
             settings.Add(new SettingItemLineOptions("MiddleLineOptions", this.MiddleLineOptions, 60)
             {
                 SeparatorGroup = middleLineStyleSeparator,
-                Text = loc._("Main line style")
+                Text = loc._("Main line style"),
+                ExcludedStyles = new LineStyle[] { LineStyle.Points }
             });
             settings.Add(new SettingItemLineOptions("MiddleExtendLineOptions", this.MiddleExtendLineOptions, 60)
             {
                 SeparatorGroup = middleLineStyleSeparator,
-                Text = loc._("Extend line style")
+                Text = loc._("Extend line style"),
+                ExcludedStyles = new LineStyle[] { LineStyle.Points }
             });
             settings.Add(new SettingItemBoolean("ShowMiddleLineLabel", this.ShowMiddleLineLabel, 60)
             {

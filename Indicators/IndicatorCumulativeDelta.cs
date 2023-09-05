@@ -18,6 +18,8 @@ public class IndicatorCumulativeDelta : CandleDrawIndicator, IVolumeAnalysisIndi
 
     private const string CUSTOM_OPEN_SESSION_NAME_SI = "Open time";
     private const string CUSTOM_CLOSE_SESSION_NAME_SI = "Close time";
+    private const string RESET_PERIOD_NAME_SI = "ResetPeriod";
+    private const string SESSION_TEMPLATE_NAME_SI = "sessionsTemplate";
 
     private const string RESET_TYPE_NAME_SI = "Reset type";
     private const string BY_PERIOD_SESSION_TYPE = "By period";
@@ -71,7 +73,6 @@ public class IndicatorCumulativeDelta : CandleDrawIndicator, IVolumeAnalysisIndi
     private ISessionsContainer fullDaySessionContainer;
     private ISessionsContainer selectedSessionContainer;
 
-    [InputParameter(CUSTOM_OPEN_SESSION_NAME_SI, 20)]
     public DateTime CustomRangeStartTime
     {
         get
@@ -87,7 +88,6 @@ public class IndicatorCumulativeDelta : CandleDrawIndicator, IVolumeAnalysisIndi
     }
     private DateTime customRangeStartTime;
 
-    [InputParameter(CUSTOM_CLOSE_SESSION_NAME_SI, 20)]
     public DateTime CustomRangeEndTime
     {
         get
@@ -220,7 +220,7 @@ public class IndicatorCumulativeDelta : CandleDrawIndicator, IVolumeAnalysisIndi
 
             var selectedItem = items.FirstOrDefault(i => i.Value.Equals(this.specifiedSessionContainerId)) ?? items.First();
 
-            settings.Add(new SettingItemSelectorLocalized("sessionsTemplate", selectedItem, items, 20)
+            settings.Add(new SettingItemSelectorLocalized(SESSION_TEMPLATE_NAME_SI, selectedItem, items, 20)
             {
                 Text = loc._("Sessions template"),
                 SeparatorGroup = separ,
@@ -230,23 +230,25 @@ public class IndicatorCumulativeDelta : CandleDrawIndicator, IVolumeAnalysisIndi
             //
             //
             //
-            if (settings.GetItemByName(CUSTOM_OPEN_SESSION_NAME_SI) is SettingItemDateTime openTime)
+            settings.Add(new SettingItemDateTime(CUSTOM_OPEN_SESSION_NAME_SI, this.CustomRangeStartTime, 30)
             {
-                openTime.ApplyingType = SettingItemApplyingType.Manually;
-                openTime.Format = DatePickerFormat.Time;
-                openTime.Relation = new SettingItemRelationVisibility(RESET_TYPE_NAME_SI, new SelectItem("", (int)CumulativeDeltaSessionMode.CustomRange));
-            }
-            if (settings.GetItemByName(CUSTOM_CLOSE_SESSION_NAME_SI) is SettingItemDateTime closeTime)
+                ApplyingType = SettingItemApplyingType.Manually,
+                Format = DatePickerFormat.Time,
+                SeparatorGroup = separ,
+                Relation = new SettingItemRelationVisibility(RESET_TYPE_NAME_SI, new SelectItem("", (int)CumulativeDeltaSessionMode.CustomRange))
+            });
+            settings.Add(new SettingItemDateTime(CUSTOM_CLOSE_SESSION_NAME_SI, this.CustomRangeEndTime, 30)
             {
-                closeTime.ApplyingType = SettingItemApplyingType.Manually;
-                closeTime.Format = DatePickerFormat.Time;
-                closeTime.Relation = new SettingItemRelationVisibility(RESET_TYPE_NAME_SI, new SelectItem("", (int)CumulativeDeltaSessionMode.CustomRange));
-            }
+                ApplyingType = SettingItemApplyingType.Manually,
+                Format = DatePickerFormat.Time,
+                SeparatorGroup = separ,
+                Relation = new SettingItemRelationVisibility(RESET_TYPE_NAME_SI, new SelectItem("", (int)CumulativeDeltaSessionMode.CustomRange))
+            });
 
             //
             //
             //
-            settings.Add(new SettingItemPeriod("ResetPeriod", this.ResetPeriod, 30)
+            settings.Add(new SettingItemPeriod(RESET_PERIOD_NAME_SI, this.ResetPeriod, 30)
             {
                 Text = loc._("Period"),
                 ExcludedPeriods = new BasePeriod[] { BasePeriod.Tick, BasePeriod.Second, BasePeriod.Minute, BasePeriod.Hour, BasePeriod.Year },
@@ -261,33 +263,56 @@ public class IndicatorCumulativeDelta : CandleDrawIndicator, IVolumeAnalysisIndi
             var holder = new SettingsHolder(value);
             base.Settings = value;
 
-            if (holder.TryGetValue("sessionsTemplate", out var item))
+            var needRefresh = false;
+
+            if (holder.TryGetValue(SESSION_TEMPLATE_NAME_SI, out var item))
             {
                 var newContainerId = item.GetValue<string>();
 
                 if (newContainerId != this.specifiedSessionContainerId)
                 {
                     this.specifiedSessionContainerId = newContainerId;
-
                     this.selectedSessionContainer = Core.Instance.CustomSessions[this.specifiedSessionContainerId];
-
-                    if (item.WasChangedManually)
-                        this.Refresh();
+                    needRefresh = needRefresh || item.WasChangedManually;
                 }
             }
 
-            if (holder.TryGetValue("ResetPeriod", out item))
+            if (holder.TryGetValue(RESET_PERIOD_NAME_SI, out item))
             {
                 var newValue = item.GetValue<Period>();
 
                 if (this.ResetPeriod != newValue)
                 {
                     this.ResetPeriod = newValue;
-
-                    if (item.WasChangedManually)
-                        this.Refresh();
+                    needRefresh = needRefresh || item.WasChangedManually;
                 }
             }
+
+            if (holder.TryGetValue(CUSTOM_OPEN_SESSION_NAME_SI, out item))
+            {
+                var newValue = item.GetValue<DateTime>();
+
+                if (this.CustomRangeStartTime != newValue)
+                {
+                    this.CustomRangeStartTime = newValue;
+                    needRefresh = needRefresh || item.WasChangedManually;
+                }
+            }
+
+            if (holder.TryGetValue(CUSTOM_CLOSE_SESSION_NAME_SI, out item))
+            {
+                var newValue = item.GetValue<DateTime>();
+
+                if (this.CustomRangeEndTime != newValue)
+                {
+                    this.CustomRangeEndTime = newValue;
+                    needRefresh = needRefresh || item.WasChangedManually;
+                }
+            }
+
+            //
+            if (needRefresh)
+                this.Refresh();
         }
     }
 
