@@ -5,11 +5,14 @@ using System.Drawing;
 
 namespace MovingAverages;
 
-public class IndicatorFYL : Indicator, IWatchlistIndicator
+#warning Не використовуйте абревіатури у назвах, особливо якщо якщо вони не загальноприйняті
+public sealed class IndicatorFYL : Indicator, IWatchlistIndicator
 {
     #region Parameters
+
     [InputParameter("Period of Linear Regression", 10, 2, 9999)]
-    public int Period = 20;
+    public int Period;
+
     [InputParameter("Sources prices for the regression line", 20, variants: new object[] {
          "Close", PriceType.Close,
          "Open", PriceType.Open,
@@ -21,7 +24,8 @@ public class IndicatorFYL : Indicator, IWatchlistIndicator
          "Volume", PriceType.Volume,
          "Open interest", PriceType.OpenInterest
     })]
-    public PriceType SourcePrice = PriceType.Close;
+    public PriceType SourcePrice;
+
     public int MinHistoryDepths => this.Period;
     public override string ShortName => $"FYL ({this.Period})";
 
@@ -39,25 +43,28 @@ public class IndicatorFYL : Indicator, IWatchlistIndicator
         this.Name = "FYL";
         this.Description = "Regression line";
 
-        // Defines line on demand with particular parameters.
-        this.AddLineSeries("line1", Color.CadetBlue, 1, LineStyle.Solid);
+        this.Period = 20;
+        this.SourcePrice = PriceType.Close;
 
         // By default indicator will be applied on main window of the chart
         this.SeparateWindow = false;
+
+        // Defines line on demand with particular parameters.
+        this.AddLineSeries("line1", Color.CadetBlue, 1, LineStyle.Solid);
     }
 
     protected override void OnInit()
     {
-        this.sumX = (double)Period * (Period - 1) * 0.5;
-        this.divisor = sumX * sumX - (double)Period * Period * (Period - 1) * (2 * Period - 1) / 6;
+        this.sumX = (double)this.Period * (this.Period - 1) * 0.5;
+        this.divisor = this.sumX * this.sumX - (double)this.Period * this.Period * (this.Period - 1) * (2 * this.Period - 1) / 6;
     }
     protected override void OnUpdate(UpdateArgs args)
     {
         //Проверяем что истории достаточно
-        if (Count < MinHistoryDepths)
+        if (this.Count < this.MinHistoryDepths)
         {
-            double price = GetPrice(SourcePrice);
-            SetValue(price);
+            double price = this.GetPrice(this.SourcePrice);
+            this.SetValue(price);
             return;
         }
 
@@ -65,18 +72,18 @@ public class IndicatorFYL : Indicator, IWatchlistIndicator
         double sumXY = 0.0;
 
         // Calculation of sum
-        for (int i = 0; i < Period; i++)
+        for (int i = 0; i < this.Period; i++)
         {
-            double price = this.GetPrice(SourcePrice, i);
+            double price = this.GetPrice(this.SourcePrice, i);
             sumY += price;
             sumXY += i * price;
         }
 
         // Calculation of coefficients
-        double a = (Period * sumXY - sumX * sumY) / divisor;
-        double b = (sumY - a * sumX) / Period;
+        double a = (this.Period * sumXY - this.sumX * sumY) / this.divisor;
+        double b = (sumY - a * this.sumX) / this.Period;
 
         // Setting of current value
-        this.SetValue(a * (Period - 1) + b);
+        this.SetValue(a * (this.Period - 1) + b);
     }
 }

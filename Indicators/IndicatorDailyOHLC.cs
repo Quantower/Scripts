@@ -453,14 +453,14 @@ public class IndicatorDailyOHLC : Indicator
 
             if (settings.GetItemByName(CUSTOM_SESSION_NAME_SI) is SettingItem si)
             {
-                si.ApplyingType = SettingItemApplyingType.Manually;
+                si.ValueChangingBehavior = SettingItemValueChangingBehavior.WithConfirmation;
                 si.Relation = new SettingItemRelationVisibility(SESSION_TYPE_NAME_SI, new SelectItem(SPECIFIED_SESSION_TYPE, (int)DailyOHLCSessionType.SpecifiedSession));
             }
             if (settings.GetItemByName(START_TIME_SI) is SettingItemDateTime startTimeSi && settings.GetItemByName(END_TIME_SI) is SettingItemDateTime endTimeSi)
             {
                 endTimeSi.Relation = startTimeSi.Relation = new SettingItemRelationVisibility(SESSION_TYPE_NAME_SI, new SelectItem(CUSTOM_RANGE_SESSION_TYPE, (int)DailyOHLCSessionType.CustomRange));
                 endTimeSi.Format = startTimeSi.Format = DatePickerFormat.LongTime;
-                endTimeSi.ApplyingType = startTimeSi.ApplyingType = SettingItemApplyingType.Manually;
+                endTimeSi.ValueChangingBehavior = startTimeSi.ValueChangingBehavior = SettingItemValueChangingBehavior.WithConfirmation;
             }
 
             if (settings.GetItemByName(SHOW_EXTEND_LINES_NAME_SI) is SettingItem showExtendSI)
@@ -470,7 +470,7 @@ public class IndicatorDailyOHLC : Indicator
             {
                 startExtendTimeSi.Relation = endExtendTimeSi.Relation = new SettingItemRelationVisibility(SHOW_EXTEND_LINES_NAME_SI, true);
                 startExtendTimeSi.Format = endExtendTimeSi.Format = DatePickerFormat.LongTime;
-                startExtendTimeSi.ApplyingType = endExtendTimeSi.ApplyingType = SettingItemApplyingType.Manually;
+                startExtendTimeSi.ValueChangingBehavior = endExtendTimeSi.ValueChangingBehavior = SettingItemValueChangingBehavior.WithConfirmation;
             }
 
             //

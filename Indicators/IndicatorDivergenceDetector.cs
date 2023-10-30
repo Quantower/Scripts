@@ -357,7 +357,7 @@ public class IndicatorDivergenceDetector : Indicator
             {
                 this.selectedIndicatorName = indicatorNameSI.Value.ToString();
                 if (!needRefresh)
-                    needRefresh = indicatorNameSI.WasChangedManually;
+                    needRefresh = indicatorNameSI.ValueChangingReason == SettingItemValueChangingReason.Manually;
             }
 
             //
@@ -368,7 +368,7 @@ public class IndicatorDivergenceDetector : Indicator
                 var newValue = (int)rsiPeriodSI.Value;
 
                 if (!needRefresh)
-                    needRefresh = rsiPeriodSI.WasChangedManually && this.rsiPeriod != newValue;
+                    needRefresh = rsiPeriodSI.ValueChangingReason == SettingItemValueChangingReason.Manually && this.rsiPeriod != newValue;
 
                 this.rsiPeriod = newValue;
             }
@@ -377,7 +377,7 @@ public class IndicatorDivergenceDetector : Indicator
                 var newValue = (PriceType)((SelectItem)rsiSourcePriceSI.Value).Value;
 
                 if (!needRefresh)
-                    needRefresh = rsiSourcePriceSI.WasChangedManually && newValue != this.rsiSourcePrice;
+                    needRefresh = rsiSourcePriceSI.ValueChangingReason == SettingItemValueChangingReason.Manually && newValue != this.rsiSourcePrice;
 
                 this.rsiSourcePrice = newValue;
             }
@@ -386,7 +386,7 @@ public class IndicatorDivergenceDetector : Indicator
                 var newValue = (RSIMode)((SelectItem)rsiModeSI.Value).Value;
 
                 if (!needRefresh)
-                    needRefresh = rsiModeSI.WasChangedManually && newValue != this.rsiMode;
+                    needRefresh = rsiModeSI.ValueChangingReason == SettingItemValueChangingReason.Manually && newValue != this.rsiMode;
 
                 this.rsiMode = newValue;
             }
@@ -395,7 +395,7 @@ public class IndicatorDivergenceDetector : Indicator
                 var newValue = (IndicatorCalculationType)((SelectItem)rsiCalculationTypeSI.Value).Value;
 
                 if (!needRefresh)
-                    needRefresh = rsiCalculationTypeSI.WasChangedManually && newValue != this.rsiCalculationType;
+                    needRefresh = rsiCalculationTypeSI.ValueChangingReason == SettingItemValueChangingReason.Manually && newValue != this.rsiCalculationType;
 
                 this.rsiCalculationType = newValue;
             }
@@ -408,7 +408,7 @@ public class IndicatorDivergenceDetector : Indicator
                 var newValue = (int)macdFastPeriodSI.Value;
 
                 if (!needRefresh)
-                    needRefresh = macdFastPeriodSI.WasChangedManually && newValue != this.macdFastPeriod;
+                    needRefresh = macdFastPeriodSI.ValueChangingReason == SettingItemValueChangingReason.Manually && newValue != this.macdFastPeriod;
 
                 this.macdFastPeriod = newValue;
             }
@@ -417,7 +417,7 @@ public class IndicatorDivergenceDetector : Indicator
                 var newValue = (int)macdSlowPeriodSI.Value;
 
                 if (!needRefresh)
-                    needRefresh = macdSlowPeriodSI.WasChangedManually && newValue != this.macdSlowPeriod;
+                    needRefresh = macdSlowPeriodSI.ValueChangingReason == SettingItemValueChangingReason.Manually && newValue != this.macdSlowPeriod;
 
                 this.macdSlowPeriod = newValue;
             }
@@ -426,7 +426,7 @@ public class IndicatorDivergenceDetector : Indicator
                 var newValue = (IndicatorCalculationType)((SelectItem)macdCalculationTypeSI.Value).Value;
 
                 if (!needRefresh)
-                    needRefresh = macdCalculationTypeSI.WasChangedManually && newValue != this.macdCalculationType;
+                    needRefresh = macdCalculationTypeSI.ValueChangingReason == SettingItemValueChangingReason.Manually && newValue != this.macdCalculationType;
 
                 this.macdCalculationType = newValue;
             }

@@ -6,29 +6,30 @@ using System.Linq;
 
 namespace MovingAverages;
 
+#warning Не використовуйте абревіатури у назвах, особливо якщо якщо вони не загальноприйняті
 public sealed class Indicator3MASignal : Indicator, IWatchlistIndicator
 {
+    private const int UP = 1; // Up trend
+    private const int DOWN = -1; // Down trend
+    private const int NONE = 0; // No trend
+
     //Defines input parameters as input fields     
     [InputParameter("Short Moving Average Period", 0, 1, 999, 1, 0)]
-    public int ShortMaPeriod = 5;
+    public int ShortMaPeriod;
 
     [InputParameter("Middle Moving Average Period", 1, 1, 999, 1, 0)]
-    public int MiddleMaPeriod = 10;
+    public int MiddleMaPeriod;
 
     [InputParameter("Long Moving Average Period", 2, 1, 999, 1, 0)]
-    public int LongMaPeriod = 25;
+    public int LongMaPeriod;
 
     [InputParameter("Amount of bars passed before opening position", 3, 1, 999, 1, 0)]
-    public int BarsInterval = 1;
+    public int BarsInterval;
 
     private Indicator shortMa;
     private Indicator middleMa;
     private Indicator longMa;
     private int currentTrend;
-
-    private const int UP = 1; // Up trend
-    private const int DOWN = -1; // Down trend
-    private const int NONE = 0; // No trend
 
     public int MinHistoryDepths => Enumerable.Max(new int[] { this.ShortMaPeriod, this.MiddleMaPeriod, this.LongMaPeriod });
     public override string ShortName => $"MAS3 ({this.ShortMaPeriod}:{this.MiddleMaPeriod}:{this.LongMaPeriod}:{this.BarsInterval})";
@@ -43,10 +44,15 @@ public sealed class Indicator3MASignal : Indicator, IWatchlistIndicator
         this.Name = "3MASignal";
         this.Description = "Offers buy and sell signals according to intersections of three moving averages";
 
-        // Define one line with particular parameters 
-        this.AddLineSeries("3MASignal", Color.Orange, 5, LineStyle.Histogramm);
+        this.ShortMaPeriod = 5;
+        this.MiddleMaPeriod = 10;
+        this.LongMaPeriod = 25;
+        this.BarsInterval = 1;
 
         this.SeparateWindow = true;
+
+        // Define one line with particular parameters 
+        this.AddLineSeries("3MASignal", Color.Orange, 5, LineStyle.Histogramm);
     }
 
     /// <summary>
@@ -85,11 +91,11 @@ public sealed class Indicator3MASignal : Indicator, IWatchlistIndicator
             if (shift == 0)
             {
                 // Calculate the initial state
-                this.currentTrend = this.CompareMA(this.shortMa.GetValue(shift, 0), this.middleMa.GetValue(shift, 0), this.longMa.GetValue(shift, 0));
+                this.currentTrend = CompareMA(this.shortMa.GetValue(shift, 0), this.middleMa.GetValue(shift, 0), this.longMa.GetValue(shift, 0));
             }
             else
             {
-                int trend = this.CompareMA(this.shortMa.GetValue(shift, 0), this.middleMa.GetValue(shift, 0), this.longMa.GetValue(shift, 0));
+                int trend = CompareMA(this.shortMa.GetValue(shift, 0), this.middleMa.GetValue(shift, 0), this.longMa.GetValue(shift, 0));
 
                 if (trend != this.currentTrend)
                 {
@@ -109,7 +115,7 @@ public sealed class Indicator3MASignal : Indicator, IWatchlistIndicator
     /// <param name="midMA">MiddleMa value</param>
     /// <param name="lgMa">LongMa value</param>
     /// <returns>Current trend (as int)</returns>
-    private int CompareMA(double shMa, double midMA, double lgMa)
+    private static int CompareMA(double shMa, double midMA, double lgMa)
     {
         if (midMA > lgMa && midMA < shMa)
             return UP;

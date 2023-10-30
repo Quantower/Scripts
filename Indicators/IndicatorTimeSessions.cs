@@ -119,7 +119,7 @@ public sealed class IndicatorTimeSessions : Indicator
     }
 }
 
-internal sealed class Session : ExecutionEntity
+internal sealed class Session : ICustomizable
 {
     public DateTime SessionFirstTime { get; set; }
     public DateTime SessionSecondTime { get; set; }
@@ -138,11 +138,11 @@ internal sealed class Session : ExecutionEntity
         this.SessionVisibility = false;
         this.sessionBrush = new SolidBrush(this.SessionColor);
     }
-    public override IList<SettingItem> Settings
+    public IList<SettingItem> Settings
     {
         get
         {
-            var settings = base.Settings;
+            var settings = new List<SettingItem>();
             var separatorGroup1 = new SettingItemSeparatorGroup(this.SessionName, this.sessionSortIndex);
 
             string relationName = $"{this.SessionName}SessionVisibility";

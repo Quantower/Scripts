@@ -9,37 +9,29 @@ namespace TrendIndicators;
 
 public class IndicatorTDSequential : Indicator
 {
-    #region Parameters
+    #region Consts
 
-    public const byte TDS_NAN = byte.MaxValue;
     private const int MIN_PERIOD = 6;
     private const int MAX_TREND_COUNTER = 9;
     private const string SHOW_NUMBERS_SI = "Show numbers";
     private const string FROM_VALUE_SI = "Value";
 
-    public IList<byte> UpValueBuffer { get; private set; }
-    public IList<byte> DownValueBuffer { get; private set; }
+    private const int ZERO = 0;
+    private const int ONE = 1;
+    private const int FIVE = 5;
+    private const int TEN = 10;
+
+    #endregion Consts
+
+    #region Parameters
 
     private byte upValue;
     private byte downValue;
-    private Point downCenterPoint;
-    private Point upCenterPoint;
 
     private readonly Font defaultFont;
     private readonly Font extraFont;
 
-    [InputParameter(SHOW_NUMBERS_SI, 10, variants: new object[]
-    {
-        "None", TDSVisualMode.None,
-        "All", TDSVisualMode.All,
-        "From value", TDSVisualMode.FromValue,
-    })]
-    public TDSVisualMode VisualMode = TDSVisualMode.All;
-
-    [InputParameter(FROM_VALUE_SI, 20, 1, 9, 1, 0)]
-    public int FromValue = 8;
-
-    [InputParameter("Up color")]
+    [InputParameter("Up color", 10)]
     public Color DefaultUpColor
     {
         get => this.defaultUpColor;
@@ -52,7 +44,7 @@ public class IndicatorTDSequential : Indicator
     private Color defaultUpColor;
     private Pen defaultUpPen;
 
-    [InputParameter("Down color")]
+    [InputParameter("Down color", 20)]
     public Color DefaultDownColor
     {
         get => this.defaultDownColor;
@@ -65,7 +57,22 @@ public class IndicatorTDSequential : Indicator
     private Color defaultDownColor;
     private Pen defaultDownPen;
 
-    private readonly StringFormat centerCenterSF;
+    [InputParameter(SHOW_NUMBERS_SI, 30, variants: new object[]
+    {
+        "None", TDSVisualMode.None,
+        "All", TDSVisualMode.All,
+        "From value", TDSVisualMode.FromValue,
+    })]
+    public TDSVisualMode VisualMode = TDSVisualMode.All;
+
+    [InputParameter(FROM_VALUE_SI, 40, 1, MAX_TREND_COUNTER, 1, 0)]
+    public int FromValue = 8;
+
+    private static readonly StringFormat centerCenterSF = new()
+    {
+        Alignment = StringAlignment.Center,
+        LineAlignment = StringAlignment.Center
+    };
 
     public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorTDSequential.cs";
 
@@ -81,50 +88,49 @@ public class IndicatorTDSequential : Indicator
         this.DefaultUpColor = Color.FromArgb(55, 219, 186); // dark green
         this.DefaultDownColor = Color.FromArgb(235, 96, 47); // dark red
 
-        this.centerCenterSF = new StringFormat() { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+        this.AddLineSeries("Up", this.DefaultUpColor, 1, LineStyle.Histogramm).Visible = false;
+        this.AddLineSeries("Down", this.DefaultDownColor, 1, LineStyle.Histogramm).Visible = false;
     }
 
     #region Overrides
 
     protected override void OnInit()
     {
-        this.UpValueBuffer = new List<byte>()
-        {
-            new byte()
-        };
-        this.DownValueBuffer = new List<byte>()
-        {
-            new byte()
-        };
+        this.upValue = default;
+        this.downValue = default;
     }
     protected override void OnUpdate(UpdateArgs args)
     {
         if (this.Count < MIN_PERIOD)
             return;
 
-        if (args.Reason == UpdateReason.NewBar || args.Reason == UpdateReason.HistoricalBar)
-        {
-            this.UpValueBuffer.Insert(0, TDS_NAN);
-            this.DownValueBuffer.Insert(0, TDS_NAN);
+        if (args.Reason != UpdateReason.NewBar && args.Reason != UpdateReason.HistoricalBar)
+            return;
 
-            // up values
-            if (this.Close(1) > this.Close(5))
-                this.upValue += 1;
-            else
-                this.upValue = 0;
+        var prevClose = this.Close(ONE);
+        var prevFiveClose = this.Close(FIVE);
 
-            if (this.upValue > 0 && this.upValue < 10)
-                this.UpValueBuffer[1] = this.upValue;
+        //
+        // up values
+        //
+        if (prevClose > prevFiveClose)
+            this.upValue += ONE;
+        else
+            this.upValue = ZERO;
 
-            // down values
-            if (this.Close(1) < this.Close(5))
-                this.downValue += 1;
-            else
-                this.downValue = 0;
+        if (this.IsCorrectValue(this.upValue))
+            this.SetValue(this.upValue, ZERO, ONE);
 
-            if (this.downValue > 0 && this.downValue < 10)
-                this.DownValueBuffer[1] = this.downValue;
-        }
+        //
+        // down values
+        //
+        if (prevClose < prevFiveClose)
+            this.downValue += ONE;
+        else
+            this.downValue = ZERO;
+
+        if (this.IsCorrectValue(this.downValue))
+            this.SetValue(this.downValue, ONE, ONE);
     }
     public override IList<SettingItem> Settings
     {
@@ -141,105 +147,127 @@ public class IndicatorTDSequential : Indicator
     public override void OnPaintChart(PaintChartEventArgs args)
     {
         var gr = args.Graphics;
-        gr.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+        var prevClip = gr.ClipBounds;
+        var prevTextHint = gr.TextRenderingHint;
 
-        gr.SetClip(this.CurrentChart.MainWindow.ClientRectangle);
-
-        var endUpLinePointX = double.NaN;
-        var endDownLinePointX = double.NaN;
-
-        // find correct right offset
-        var t1 = this.CurrentChart.MainWindow.CoordinatesConverter.GetTime(args.Rectangle.Right);
-        var rightIndex = (int)this.CurrentChart.MainWindow.CoordinatesConverter.GetBarIndex(t1);
-        var startOffset = Math.Max(this.HistoricalData.Count - rightIndex - 1, 0);
-
-        // from right to left
-        for (int i = startOffset; i < this.HistoricalData.Count - MIN_PERIOD - 1; i++)
+        try
         {
-            if (this.HistoricalData[i] is not HistoryItemBar item)
-                break;
+            gr.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+            gr.SetClip(this.CurrentChart.MainWindow.ClientRectangle);
 
-            var startBarPointX = this.CurrentChart.MainWindow.CoordinatesConverter.GetChartX(item.TimeLeft);
-            var endBarPointX = this.CurrentChart.MainWindow.CoordinatesConverter.GetChartX(item.TimeRight);
+            var endUpLinePointX = double.NaN;
+            var endDownLinePointX = double.NaN;
+            var point = default(Point);
 
-            //
-            // Draw numbers. Only on visible chart area
-            //
-            if (endBarPointX > 0 && endBarPointX <= this.CurrentChart.MainWindow.ClientRectangle.Right)
+            // find correct right offset
+            var t1 = this.CurrentChart.MainWindow.CoordinatesConverter.GetTime(this.CurrentChart.MainWindow.ClientRectangle.Right);
+            var rightIndex = (int)this.CurrentChart.MainWindow.CoordinatesConverter.GetBarIndex(t1);
+            var startOffset = Math.Max(this.HistoricalData.Count - rightIndex - 1, 0);
+
+
+            // from right to left
+            for (int i = startOffset; i < this.HistoricalData.Count - MIN_PERIOD - 1; i++)
             {
-                if (this.IsCorrectValue(this.DownValueBuffer[i]))
+                if (this.HistoricalData[i, SeekOriginHistory.End] is not HistoryItemBar item)
+                    break;
+
+                var startBarPointX = this.CurrentChart.MainWindow.CoordinatesConverter.GetChartX(item.TimeLeft);
+                var endBarPointX = startBarPointX + this.CurrentChart.BarsWidth;
+
+                var upValue = this.GetValue(i, ZERO);
+                var downValue = this.GetValue(i, ONE);
+
+                //
+                // Draw numbers. Only on visible chart area
+                //
+                if (endBarPointX > ZERO && endBarPointX <= this.CurrentChart.MainWindow.ClientRectangle.Right)
                 {
-                    var value = this.DownValueBuffer[i].ToString();
-                    var font = this.DownValueBuffer[i] != MAX_TREND_COUNTER ? this.defaultFont : this.extraFont;
-                    var height = (int)gr.MeasureString(value, font).Height;
+                    if (this.IsCorrectValue(downValue))
+                    {
+                        var value = downValue.ToString();
+                        var font = downValue != MAX_TREND_COUNTER ? this.defaultFont : this.extraFont;
+                        var height = (int)gr.MeasureString(value, font).Height;
 
-                    this.downCenterPoint.X = (int)(startBarPointX + this.CurrentChart.BarsWidth / 2);
-                    this.downCenterPoint.Y = (int)this.CurrentChart.MainWindow.CoordinatesConverter.GetChartY(item.Low) + height / 2;
+                        point.X = (int)(startBarPointX + this.CurrentChart.BarsWidth / 2);
+                        point.Y = (int)this.CurrentChart.MainWindow.CoordinatesConverter.GetChartY(item.Low) + height / 2;
 
-                    gr.DrawString(value, font, this.defaultDownPen.Brush, this.downCenterPoint, this.centerCenterSF);
+                        gr.DrawString(value, font, this.defaultDownPen.Brush, point, centerCenterSF);
+                    }
+                    else if (this.IsCorrectValue(upValue))
+                    {
+                        var value = upValue.ToString();
+                        var font = upValue != MAX_TREND_COUNTER ? this.defaultFont : this.extraFont;
+                        var height = (int)gr.MeasureString(value, font).Height;
+
+                        point.X = (int)(startBarPointX + this.CurrentChart.BarsWidth / 2);
+                        point.Y = (int)this.CurrentChart.MainWindow.CoordinatesConverter.GetChartY(item.High) - height / 2;
+
+                        gr.DrawString(value, font, this.defaultUpPen.Brush, point, centerCenterSF);
+                    }
                 }
-                else if (this.IsCorrectValue(this.UpValueBuffer[i]))
+
+                //
+                // Draw lines
+                //
+                if (double.IsNaN(endUpLinePointX))
                 {
-                    var value = this.UpValueBuffer[i].ToString();
-                    var font = this.UpValueBuffer[i] != MAX_TREND_COUNTER ? this.defaultFont : this.extraFont;
-                    var height = (int)gr.MeasureString(value, font).Height;
-
-                    this.upCenterPoint.X = (int)(startBarPointX + this.CurrentChart.BarsWidth / 2);
-                    this.upCenterPoint.Y = (int)this.CurrentChart.MainWindow.CoordinatesConverter.GetChartY(item.High) - height / 2;
-
-                    gr.DrawString(value, font, this.defaultUpPen.Brush, this.upCenterPoint, this.centerCenterSF);
+                    endUpLinePointX = endBarPointX;
+                    endDownLinePointX = endBarPointX;
                 }
-            }
 
-            //
-            // Draw lines
-            //
-            if (double.IsNaN(endUpLinePointX))
-            {
-                endUpLinePointX = endBarPointX;
-                endDownLinePointX = endBarPointX;
-            }
+                if (startBarPointX < this.CurrentChart.MainWindow.ClientRectangle.Left)
+                    startBarPointX = this.CurrentChart.MainWindow.ClientRectangle.Left - TEN;
 
-            if (this.DownValueBuffer[i] == MAX_TREND_COUNTER && endDownLinePointX > 0 && startBarPointX < this.CurrentChart.MainWindow.ClientRectangle.Right)
-            {
-                var pointY = (int)this.CurrentChart.MainWindow.CoordinatesConverter.GetChartY(item.Low);
-                gr.DrawLine(this.defaultDownPen, (int)startBarPointX, pointY, (int)endDownLinePointX, pointY);
-                endDownLinePointX = endBarPointX;
-            }
-            else if (this.UpValueBuffer[i] == MAX_TREND_COUNTER && endUpLinePointX > 0 && startBarPointX < this.CurrentChart.MainWindow.ClientRectangle.Right)
-            {
-                var pointY = (int)this.CurrentChart.MainWindow.CoordinatesConverter.GetChartY(item.High);
-                gr.DrawLine(this.defaultUpPen, (int)startBarPointX, pointY, (int)endUpLinePointX, pointY);
-                endUpLinePointX = endBarPointX;
-            }
+                if (endDownLinePointX > this.CurrentChart.MainWindow.ClientRectangle.Right + TEN)
+                    endDownLinePointX = this.CurrentChart.MainWindow.ClientRectangle.Right + TEN;
 
-            // all elements are outside.
-            if (endBarPointX < 0 && endDownLinePointX < 0 && endUpLinePointX < 0)
-                break;
+                if (endUpLinePointX > this.CurrentChart.MainWindow.ClientRectangle.Right + TEN)
+                    endUpLinePointX = this.CurrentChart.MainWindow.ClientRectangle.Right + TEN;
+
+                if (downValue == MAX_TREND_COUNTER && endDownLinePointX > ZERO && startBarPointX < this.CurrentChart.MainWindow.ClientRectangle.Right)
+                {
+                    var pointY = (int)this.CurrentChart.MainWindow.CoordinatesConverter.GetChartY(item.Low);
+                    gr.DrawLine(this.defaultDownPen, (int)startBarPointX, pointY, (int)endDownLinePointX, pointY);
+                    endDownLinePointX = startBarPointX;
+                }
+                else if (upValue == MAX_TREND_COUNTER && endUpLinePointX > ZERO && startBarPointX < this.CurrentChart.MainWindow.ClientRectangle.Right)
+                {
+                    var pointY = (int)this.CurrentChart.MainWindow.CoordinatesConverter.GetChartY(item.High);
+                    gr.DrawLine(this.defaultUpPen, (int)startBarPointX, pointY, (int)endUpLinePointX, pointY);
+                    endUpLinePointX = startBarPointX;
+                }
+
+                //
+                // all elements are outside.
+                //
+                if (endBarPointX < ZERO && endDownLinePointX < ZERO && endUpLinePointX < ZERO)
+                    break;
+            }
         }
-
-        gr.ResetClip();
-    }
-
-    private bool IsCorrectValue(byte value)
-    {
-        if (value == TDS_NAN || value <= 0)
-            return false;
-
-        switch (this.VisualMode)
+        catch { }
+        finally
         {
-            case TDSVisualMode.All:
-                return true;
-            case TDSVisualMode.None:
-                return false;
-            case TDSVisualMode.FromValue:
-                return value >= this.FromValue;
+            gr.TextRenderingHint = prevTextHint;
+            gr.SetClip(prevClip);
         }
-
-        return true;
     }
 
     #endregion Overrides
+
+    private bool IsCorrectValue(double value)
+    {
+        if (double.IsNaN(value) || value <= 0 || value > MAX_TREND_COUNTER)
+            return false;
+
+        return this.VisualMode switch
+        {
+            TDSVisualMode.All => true,
+            TDSVisualMode.None => false,
+            TDSVisualMode.FromValue => value >= this.FromValue,
+
+            _ => true,
+        };
+    }
 
     public enum TDSVisualMode { All, None, FromValue }
 }

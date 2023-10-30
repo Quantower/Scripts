@@ -199,7 +199,7 @@ public class IndicatorPriceActionZones : Indicator
             {
                 if (holder.TryGetValue(setItem, out SettingItem item))
                 {
-                    item.ApplyingType = SettingItemApplyingType.Manually;
+                    item.ValueChangingBehavior = SettingItemValueChangingBehavior.WithConfirmation;
                 }
             }
 

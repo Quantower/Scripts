@@ -10,9 +10,12 @@ using TradingPlatform.BusinessLayer.Utils;
 
 namespace BarsDataIndicators;
 
-public class IndicatorCumulativeDelta : CandleDrawIndicator, IVolumeAnalysisIndicator, ISessionObserverIndicator
+public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysisIndicator, ISessionObserverIndicator
 {
     #region Consts
+
+    private const string BY_VOLUME_TYPE = "By volume";
+    private const string BY_TRADES_TYPE = "By trades";
 
     private const string CHART_SESSION_CONTAINER_SELECT_ITEM = "Chart session";
 
@@ -31,7 +34,14 @@ public class IndicatorCumulativeDelta : CandleDrawIndicator, IVolumeAnalysisIndi
 
     #region Parameters
 
-    [InputParameter(RESET_TYPE_NAME_SI, 10, variants: new object[]
+    [InputParameter("Delta source", 9, variants: new object[]
+    {
+        BY_VOLUME_TYPE, CumulativeDeltaSourceType.Volume,
+        BY_TRADES_TYPE, CumulativeDeltaSourceType.Trades
+    })]
+    public CumulativeDeltaSourceType DeltaSourceType;
+
+    [InputParameter(RESET_TYPE_NAME_SI, 30, variants: new object[]
     {
         BY_PERIOD_SESSION_TYPE, CumulativeDeltaSessionMode.ByPeriod,
         FULL_HISTORY_SESSION_TYPE, CumulativeDeltaSessionMode.FullHistory,
@@ -39,8 +49,6 @@ public class IndicatorCumulativeDelta : CandleDrawIndicator, IVolumeAnalysisIndi
         CUSTOM_RANGE_SESSION_TYPE, CumulativeDeltaSessionMode.CustomRange
     })]
     public CumulativeDeltaSessionMode SessionMode;
-
-    public override string ShortName => this.Name;
 
     public ISessionsContainer SessionContainer
     {
@@ -106,6 +114,20 @@ public class IndicatorCumulativeDelta : CandleDrawIndicator, IVolumeAnalysisIndi
 
     public Period ResetPeriod { get; private set; }
 
+    public override string ShortName
+    {
+        get
+        {
+            return this.DeltaSourceType switch
+            {
+                CumulativeDeltaSourceType.Volume => $"{this.Name} ({BY_VOLUME_TYPE})",
+                CumulativeDeltaSourceType.Trades => $"{this.Name} ({BY_TRADES_TYPE})",
+
+                _ => this.Name,
+            };
+        }
+    }
+
     private AreaBuilder currentAreaBuider;
 
     #endregion Parameters
@@ -121,6 +143,7 @@ public class IndicatorCumulativeDelta : CandleDrawIndicator, IVolumeAnalysisIndi
 
         this.AddLineLevel(0d, "Zero line", Color.Gray, 1, LineStyle.DashDot);
 
+        this.DeltaSourceType = CumulativeDeltaSourceType.Volume;
         this.SessionMode = CumulativeDeltaSessionMode.ByPeriod;
         this.ResetPeriod = Period.DAY1;
 
@@ -232,14 +255,14 @@ public class IndicatorCumulativeDelta : CandleDrawIndicator, IVolumeAnalysisIndi
             //
             settings.Add(new SettingItemDateTime(CUSTOM_OPEN_SESSION_NAME_SI, this.CustomRangeStartTime, 30)
             {
-                ApplyingType = SettingItemApplyingType.Manually,
+                ValueChangingBehavior = SettingItemValueChangingBehavior.WithConfirmation,
                 Format = DatePickerFormat.Time,
                 SeparatorGroup = separ,
                 Relation = new SettingItemRelationVisibility(RESET_TYPE_NAME_SI, new SelectItem("", (int)CumulativeDeltaSessionMode.CustomRange))
             });
             settings.Add(new SettingItemDateTime(CUSTOM_CLOSE_SESSION_NAME_SI, this.CustomRangeEndTime, 30)
             {
-                ApplyingType = SettingItemApplyingType.Manually,
+                ValueChangingBehavior = SettingItemValueChangingBehavior.WithConfirmation,
                 Format = DatePickerFormat.Time,
                 SeparatorGroup = separ,
                 Relation = new SettingItemRelationVisibility(RESET_TYPE_NAME_SI, new SelectItem("", (int)CumulativeDeltaSessionMode.CustomRange))
@@ -273,7 +296,7 @@ public class IndicatorCumulativeDelta : CandleDrawIndicator, IVolumeAnalysisIndi
                 {
                     this.specifiedSessionContainerId = newContainerId;
                     this.selectedSessionContainer = Core.Instance.CustomSessions[this.specifiedSessionContainerId];
-                    needRefresh = needRefresh || item.WasChangedManually;
+                    needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
                 }
             }
 
@@ -284,7 +307,7 @@ public class IndicatorCumulativeDelta : CandleDrawIndicator, IVolumeAnalysisIndi
                 if (this.ResetPeriod != newValue)
                 {
                     this.ResetPeriod = newValue;
-                    needRefresh = needRefresh || item.WasChangedManually;
+                    needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
                 }
             }
 
@@ -295,7 +318,7 @@ public class IndicatorCumulativeDelta : CandleDrawIndicator, IVolumeAnalysisIndi
                 if (this.CustomRangeStartTime != newValue)
                 {
                     this.CustomRangeStartTime = newValue;
-                    needRefresh = needRefresh || item.WasChangedManually;
+                    needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
                 }
             }
 
@@ -306,7 +329,7 @@ public class IndicatorCumulativeDelta : CandleDrawIndicator, IVolumeAnalysisIndi
                 if (this.CustomRangeEndTime != newValue)
                 {
                     this.CustomRangeEndTime = newValue;
-                    needRefresh = needRefresh || item.WasChangedManually;
+                    needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
                 }
             }
 
@@ -342,7 +365,7 @@ public class IndicatorCumulativeDelta : CandleDrawIndicator, IVolumeAnalysisIndi
         }
 
         //
-        // 
+        //
         //
         if (this.currentAreaBuider == null)
         {
@@ -354,7 +377,7 @@ public class IndicatorCumulativeDelta : CandleDrawIndicator, IVolumeAnalysisIndi
             if (range.IsEmpty)
                 return;
 
-            this.currentAreaBuider = new AreaBuilder(range);
+            this.currentAreaBuider = this.CreateAreaBuilder(range);
         }
         else if (!this.currentAreaBuider.Contains(time))
         {
@@ -364,7 +387,7 @@ public class IndicatorCumulativeDelta : CandleDrawIndicator, IVolumeAnalysisIndi
             if (range.IsEmpty)
                 return;
 
-            this.currentAreaBuider = new AreaBuilder(range);
+            this.currentAreaBuider = this.CreateAreaBuilder(range);
         }
 
         //
@@ -379,12 +402,13 @@ public class IndicatorCumulativeDelta : CandleDrawIndicator, IVolumeAnalysisIndi
             this.currentAreaBuider.StartNew(index);
 
         this.currentAreaBuider.Update(currentItem.Total);
-        
+
         this.SetValues(this.currentAreaBuider.Bar.Open, this.currentAreaBuider.Bar.High, this.currentAreaBuider.Bar.Low, this.currentAreaBuider.Bar.Close, offset);
 
         if (isNewBar && createAfterUpdate)
             this.currentAreaBuider.StartNew(++index);
     }
+
     private Interval<DateTime> GetFullDayTimeInterval(TradingPlatform.BusinessLayer.TimeZone timeZone)
     {
         var openTime = new DateTime(DateTime.UtcNow.Date.Ticks, DateTimeKind.Unspecified);
@@ -413,6 +437,15 @@ public class IndicatorCumulativeDelta : CandleDrawIndicator, IVolumeAnalysisIndi
             Name = "Main",
             Days = Enum.GetValues(typeof(DayOfWeek)).Cast<DayOfWeek>().ToArray(),
             Type = SessionType.Main
+        };
+    }
+    private AreaBuilder CreateAreaBuilder(Interval<DateTime> range)
+    {
+        return this.DeltaSourceType switch
+        {
+            CumulativeDeltaSourceType.Trades => new AreaBuilderByTrades(range),
+
+            _ => new AreaBuilderByVolume(range),
         };
     }
 
@@ -446,8 +479,13 @@ public class IndicatorCumulativeDelta : CandleDrawIndicator, IVolumeAnalysisIndi
         SpecifiedSession,
         CustomRange
     }
+    public enum CumulativeDeltaSourceType
+    {
+        Volume,
+        Trades
+    }
 
-    class AreaBuilder : IDisposable
+    abstract class AreaBuilder : IDisposable
     {
         internal Interval<DateTime> Range { get; }
         internal BarBuilder Bar { get; private set; }
@@ -461,18 +499,8 @@ public class IndicatorCumulativeDelta : CandleDrawIndicator, IVolumeAnalysisIndi
             this.StartNew(0);
         }
 
-        internal void Update(VolumeAnalysisItem total)
-        {
-            this.Bar.Close = this.Bar.Open + total.Delta;
+        internal abstract void Update(VolumeAnalysisItem total);
 
-            this.Bar.High = !double.IsNaN(total.MaxDelta) && total.MaxDelta != double.MinValue
-                ? this.Bar.Open + Math.Abs(total.MaxDelta)
-                : Math.Max(this.Bar.Close, this.Bar.Open);
-
-            this.Bar.Low = !double.IsNaN(total.MinDelta) && total.MinDelta != double.MaxValue
-                ? this.Bar.Open - Math.Abs(total.MinDelta)
-                : Math.Min(this.Bar.Close, this.Bar.Open);
-        }
         internal void StartNew(int barIndex)
         {
             var prevClose = !double.IsNaN(this.Bar.Close)
@@ -505,6 +533,39 @@ public class IndicatorCumulativeDelta : CandleDrawIndicator, IVolumeAnalysisIndi
             this.Bar = null;
         }
     }
+    sealed class AreaBuilderByVolume : AreaBuilder
+    {
+        public AreaBuilderByVolume(Interval<DateTime> range)
+            : base(range)
+        { }
+
+        internal override void Update(VolumeAnalysisItem total)
+        {
+            this.Bar.Close = this.Bar.Open + total.Delta;
+
+            this.Bar.High = !double.IsNaN(total.MaxDelta) && total.MaxDelta != double.MinValue
+                ? this.Bar.Open + Math.Abs(total.MaxDelta)
+                : Math.Max(this.Bar.Close, this.Bar.Open);
+
+            this.Bar.Low = !double.IsNaN(total.MinDelta) && total.MinDelta != double.MaxValue
+                ? this.Bar.Open - Math.Abs(total.MinDelta)
+                : Math.Min(this.Bar.Close, this.Bar.Open);
+        }
+    }
+    sealed class AreaBuilderByTrades : AreaBuilder
+    {
+        public AreaBuilderByTrades(Interval<DateTime> range)
+            : base(range)
+        { }
+
+        internal override void Update(VolumeAnalysisItem total)
+        {
+            this.Bar.Close = this.Bar.Open + (total.BuyTrades - total.SellTrades);
+            this.Bar.High = Math.Max(this.Bar.Close, this.Bar.Open);
+            this.Bar.Low = Math.Min(this.Bar.Close, this.Bar.Open);
+        }
+    }
+
     internal class BarBuilder
     {
         public double Open { get; internal set; }

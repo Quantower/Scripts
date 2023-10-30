@@ -94,7 +94,7 @@ public class IndicatorHistoricalMinMaxChange : Indicator, IWatchlistIndicator
             if (settings.GetItemByName(FROM_DATE_SI_NAME) is SettingItemDateTime fromDateSi)
             {
                 fromDateSi.Relation = new SettingItemRelationVisibility(HISTORICAL_DEPTH_SI_NAME, new SelectItem("", (int)HistoricalMinMaxDepthType.FromDate));
-                fromDateSi.ApplyingType = SettingItemApplyingType.Manually;
+                fromDateSi.ValueChangingBehavior = SettingItemValueChangingBehavior.WithConfirmation;
                 fromDateSi.Format = DatePickerFormat.Date;
             }
 

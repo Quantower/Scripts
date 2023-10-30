@@ -47,8 +47,8 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
 
     [InputParameter("Data source", 25, variants: new object[]
     {
-        "LastAvailable", OpeningRangeDataSource.LastAvailable,
-        "CurrentDayOnly", OpeningRangeDataSource.CurrentDayOnly,
+        "Last available", OpeningRangeDataSource.LastAvailable,
+        "Current day only", OpeningRangeDataSource.CurrentDayOnly,
     })]
     public OpeningRangeDataSource DataSource = OpeningRangeDataSource.LastAvailable;
 
@@ -60,6 +60,7 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
     private Session timeRange;
     private SolidBrush highLabelBrush;
     private SolidBrush lowLabelBrush;
+
     private readonly Font font;
     private readonly StringFormat centerNearSF;
 
@@ -68,6 +69,18 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
     private bool inSymbolSession;
 
     public bool IsLoadedSuccessfully { get; private set; }
+    public bool IsLoading { get; private set; }
+
+    public override string ShortName
+    {
+        get
+        {
+            if (this.IsLoading)
+                return $"{base.ShortName} (Loading)";
+            else
+                return base.ShortName;
+        }
+    }
 
     public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorOpeningRange.cs";
 
@@ -96,9 +109,10 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
     }
 
     #region Overrides
+
     protected override void OnInit()
     {
-        this.AbortPreviousTask();
+        this.AbortLoading();
 
         var startTimeUTC = new DateTime(this.StartTime.Ticks, DateTimeKind.Utc);
         var endTimeUTC = new DateTime(this.EndTime.Ticks, DateTimeKind.Utc);
@@ -148,11 +162,11 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
     }
     protected override void OnClear()
     {
-        this.AbortPreviousTask();
+        this.AbortLoading();
     }
     public override void Dispose()
     {
-        this.AbortPreviousTask();
+        this.AbortLoading();
 
         base.Dispose();
     }
@@ -165,7 +179,7 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
             if (settings.GetItemByName(START_TIME_SI) is SettingItemDateTime startSI && settings.GetItemByName(END_TIME_SI) is SettingItemDateTime endSI)
             {
                 startSI.Format = endSI.Format = DatePickerFormat.LongTime;
-                startSI.ApplyingType = endSI.ApplyingType = SettingItemApplyingType.Manually;
+                startSI.ValueChangingBehavior = endSI.ValueChangingBehavior = SettingItemValueChangingBehavior.WithConfirmation;
             }
 
             return settings;
@@ -178,6 +192,7 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
                 base.Settings = value;
         }
     }
+
     #endregion Overrides
 
     #region Drawing
@@ -373,50 +388,88 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
     {
         var token = this.cts.Token;
 
-        var currentTime = this.HistoricalData.Count > 0
-            ? this.HistoricalData[0].TimeLeft
-            : Core.Instance.TimeUtils.DateTimeUtcNow;
-
         Task.Factory.StartNew(() =>
         {
-            this.IsLoadedSuccessfully = false;
-
-            this.loadedHistory = this.Symbol.GetHistory(new HistoryRequestParameters()
+            try
             {
-                Period = Period.MIN1,
-                CancellationToken = token,
-                Aggregation = new HistoryAggregationTime(Period.MIN1),
-                Symbol = this.Symbol,
-                FromTime = currentTime.AddDays(-2),
-                ForceReload = forceReload,
-                HistoryType = this.Symbol.HistoryType
-            });
+                this.IsLoadedSuccessfully = false;
+                this.IsLoading = true;
 
-            for (int i = 0; i < this.loadedHistory.Count; i++)
+                var currentTime = this.HistoricalData.Count > 0
+                    ? this.HistoricalData[0, SeekOriginHistory.End].TimeLeft
+                    : Core.Instance.TimeUtils.DateTimeUtcNow;
+
+                var period = this.HistoricalData.Period <= Period.MIN1
+                    ? Period.SECOND1
+                    : Period.MIN1;
+
+                var history = this.Symbol.GetHistory(new HistoryRequestParameters()
+                {
+                    Period = period,
+                    CancellationToken = token,
+                    Aggregation = new HistoryAggregationTime(period),
+                    Symbol = this.Symbol,
+                    FromTime = currentTime.AddDays(-2),
+                    ForceReload = forceReload,
+                    HistoryType = this.Symbol.HistoryType
+                });
+
+                //
+                if (token.IsCancellationRequested)
+                {
+                    history.Dispose();
+                    history = null;
+                }
+                //
+                else
+                {
+                    for (int i = 0; i < history.Count; i++)
+                    {
+                        if (i % 1000 == 0 && token.IsCancellationRequested)
+                            break;
+
+                        var currentItem = history[i, SeekOriginHistory.Begin];
+                        this.CalculateIndicator(currentItem);
+                    }
+
+                    if (token.IsCancellationRequested)
+                    {
+                        history.Dispose();
+                        history = null;
+                    }
+                    else
+                    {
+                        this.loadedHistory = history;
+                        this.loadedHistory.HistoryItemUpdated += this.LoadedHistory_HistoryItemUpdated;
+                        this.loadedHistory.NewHistoryItem += this.LoadedHistory_NewHistoryItem;
+                    }
+                }
+
+                this.IsLoadedSuccessfully = true;
+            }
+            catch (Exception ex)
             {
-                var currentItem = this.loadedHistory[i, SeekOriginHistory.Begin];
-                this.CalculateIndicator(currentItem);
+                Core.Instance.Loggers.Log(ex, "IndicatorOpeningRange:Reload ");
+            }
+            finally
+            {
+                this.IsLoading = false;
             }
 
-            this.loadedHistory.HistoryItemUpdated += this.LoadedHistory_HistoryItemUpdated;
-            this.loadedHistory.NewHistoryItem += this.LoadedHistory_NewHistoryItem;
-
-            this.IsLoadedSuccessfully = true;
         }, token);
     }
-    private void AbortPreviousTask()
+    private void AbortLoading()
     {
+        this.cts?.Cancel();
+        this.cts = new CancellationTokenSource();
+
         if (this.loadedHistory != null)
         {
             this.loadedHistory.HistoryItemUpdated -= this.LoadedHistory_HistoryItemUpdated;
             this.loadedHistory.NewHistoryItem -= this.LoadedHistory_NewHistoryItem;
             this.loadedHistory.Dispose();
+            this.loadedHistory = null;
         }
-
-        if (this.cts != null)
-            this.cts.Cancel();
-
-        this.cts = new CancellationTokenSource();
     }
 
     #endregion Reload
@@ -425,7 +478,7 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
 
     private class OpeningRange
     {
-        public Symbol Symbol { get; set; }
+        public Symbol Symbol { get; init; }
         public Price HighPrice { get; private set; }
         public Price LowPrice { get; private set; }
         public Price DeltaPrice { get; private set; }
@@ -492,7 +545,6 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
             return this.TryUpdate(close, close, time);
         }
     }
-
     private class Price
     {
         public static Price DefaultHigh => new() { Value = double.MinValue, FormattedValue = string.Empty };

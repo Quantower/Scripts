@@ -5,10 +5,10 @@ using TradingPlatform.BusinessLayer;
 
 namespace BarsDataIndicators;
 
-public class IndicatorOpenInterest : Indicator, IWatchlistIndicator
+public sealed class IndicatorOpenInterest : Indicator, IWatchlistIndicator
 {
     [InputParameter("Smooth period", 10, 1, int.MaxValue, 1, 0)]
-    public int MaPeriod = 10;
+    public int MaPeriod;
 
     public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorOpenInterest.cs";
 
@@ -35,10 +35,12 @@ public class IndicatorOpenInterest : Indicator, IWatchlistIndicator
         this.Name = "Open Interest";
         this.Description = "The total number of outstanding derivative contracts";
 
+        this.MaPeriod = 10;
+        this.SeparateWindow = true;
+
         // Defines line on demand with particular parameters.
         this.AddLineSeries("OpenInterest", Color.Green, 2, LineStyle.Solid);
         this.AddLineSeries("Smooth OI", Color.Orange, 2, LineStyle.Solid);
-        this.SeparateWindow = true;
     }
 
     protected override void OnInit()

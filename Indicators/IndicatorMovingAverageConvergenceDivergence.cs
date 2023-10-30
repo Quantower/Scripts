@@ -15,7 +15,7 @@ public sealed class IndicatorMovingAverageConvergenceDivergence : Indicator, IWa
     [InputParameter("Period of slow EMA", 1, 1, 999, 1, 0)]
     public int SlowPeriod = 26;
 
-    [InputParameter("Period of signal EMA", 2, 1, 999, 1, 0)]
+    [InputParameter("Period of signal SMA", 2, 1, 999, 1, 0)]
     public int SignalPeriod = 9;
 
     //

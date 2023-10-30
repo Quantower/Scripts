@@ -225,10 +225,10 @@ public class IndicatorHighLow : Indicator, IWatchlistIndicator
             var settings = base.Settings;
 
             if (settings.GetItemByName(RANGE_INPUT_PARAMETER) is SettingItemInteger rangeSi)
-                rangeSi.ApplyingType = SettingItemApplyingType.Manually;
+                rangeSi.ValueChangingBehavior = SettingItemValueChangingBehavior.WithConfirmation;
 
             if (settings.GetItemByName(PERIOD_INPUT_PARAMETER) is SettingItemSelectorLocalized periodSi)
-                periodSi.ApplyingType = SettingItemApplyingType.Manually;
+                periodSi.ValueChangingBehavior = SettingItemValueChangingBehavior.WithConfirmation;
 
             return settings;
         }

@@ -5,7 +5,7 @@ using TradingPlatform.BusinessLayer;
 
 namespace BarsDataIndicators;
 
-public class IndicatorFundingRates : Indicator
+public sealed class IndicatorFundingRates : Indicator
 {
     public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorFundingRates.cs";
 
