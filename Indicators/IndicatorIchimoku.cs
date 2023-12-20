@@ -15,13 +15,13 @@ public sealed class IndicatorIchimoku : Indicator, IWatchlistIndicator
     private const int CHINKOU_SPAN = 4;
 
     // Displays Input Parameter as input field (or checkbox if value type is bolean).
-    [InputParameter("Tenkan Sen", 0, 1, 999, 1, 0)]
+    [InputParameter("Tenkan Sen", 0, 1, 9999, 1, 0)]
     public int TenkanPeriod = 9;
 
-    [InputParameter("Kijun Sen", 1, 1, 999, 1, 0)]
+    [InputParameter("Kijun Sen", 1, 1, 9999, 1, 0)]
     public int KijunPeriod = 26;
 
-    [InputParameter("Senkou Span B", 2, 1, 999, 1, 0)]
+    [InputParameter("Senkou Span B", 2, 1, 9999, 1, 0)]
     public int SenkouSpanB = 52;
 
     [InputParameter("Cloud up color", 3)]

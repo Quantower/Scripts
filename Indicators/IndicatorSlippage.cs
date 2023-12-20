@@ -4,10 +4,12 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using TradingPlatform.BusinessLayer;
+using TradingPlatform.BusinessLayer.Utils;
 
 namespace OscillatorsIndicators;
 
@@ -68,18 +70,17 @@ public class IndicatorSlippage : Indicator
         this.slippageFinder.OnNewArea += this.SlippageFinder_OnNewArea;
         this.dataExporter.Initialize();
 
-        // prepare time stepper
-        var rangeStepper = new TimeRangeStepper(
-            this.HistoricalData[0, SeekOriginHistory.Begin].TimeLeft, // from (time of first item)
-            Core.TimeUtils.DateTimeUtcNow,                                                     // to (now)
-            this.Symbol.GetHistoryDownloadingStep(Period.TICK1));            // increment
+        // from (time of first item) to (now)
+        var intervalToDownload = new Interval<DateTime>(this.HistoricalData[0, SeekOriginHistory.Begin].TimeLeft, Core.TimeUtils.DateTimeUtcNow)
+           .Split(this.Symbol.GetHistoryDownloadingStep(Period.TICK1))
+           .ToArray();
 
         this.Symbol.NewLast += this.Symbol_NewLast;
         this.loadingTickHistoryTask = Task.Factory.StartNew(() =>
         {
             this.IsLoadedSuccessfully = false;
 
-            while (rangeStepper.MoveNext())
+            for (int j = 0; j < intervalToDownload.Length; j++)
             {
                 if (token.IsCancellationRequested)
                     return;
@@ -88,13 +89,16 @@ public class IndicatorSlippage : Indicator
                 {
                     var tickHistory = this.Symbol.GetHistory(new HistoryRequestParameters()
                     {
-                        CancellationToken = token,
                         Symbol = this.Symbol,
-                        FromTime = rangeStepper.CurrentStep.From,
-                        HistoryType = HistoryType.Last,
-                        Period = Period.TICK1,
+
+                        FromTime = intervalToDownload[j].From,
+                        ToTime = intervalToDownload[j].To,
+
                         Aggregation = new HistoryAggregationTick(1),
-                        ToTime = rangeStepper.CurrentStep.To,
+                        Period = Period.TICK1,
+                        HistoryType = HistoryType.Last,
+
+                        CancellationToken = token,
                         //ForceReload = isForceReload
                     });
 
