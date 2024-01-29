@@ -11,32 +11,35 @@ public sealed class IndicatorTimeSessions : Indicator
 {
     public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorTimeSessions.cs";
 
-    Session[] sessions = new Session[5] { new Session(Color.Green, "First Session", 1), new Session(Color.Red, "Second Session", 2), new Session(Color.GreenYellow, "Third Session", 3), new Session(Color.Blue, "Fourth Session", 4), new Session(Color.Cyan, "Fifth Session", 5) };
+    private Period currentPeriod;
+
+    private readonly Session[] sessions;
 
     public IndicatorTimeSessions()
         : base()
     {
         // Defines indicator's name and description.
         this.Name = "TimeSessions";
+
+        // By default indicator will be applied on main window of the chart
         this.SeparateWindow = false;
         this.OnBackGround = true;
 
+        this.sessions = new Session[]
+        {
+            new Session(Color.Green, "First Session", 1),
+            new Session(Color.Red, "Second Session", 2),
+            new Session(Color.GreenYellow, "Third Session", 3),
+            new Session(Color.Blue, "Fourth Session", 4),
+            new Session(Color.Cyan, "Fifth Session", 5)
+        };
     }
 
+    protected override void OnInit() => this.currentPeriod =this.HistoricalData.Aggregation.TryGetPeriod(out var period) ? period : Period.MIN1;
 
-    protected override void OnInit()
-    {
-        Period currentPeriod = Period.MIN1;
-        if (this.HistoricalData.Aggregation.TryGetPeriod(out Period period))
-            currentPeriod = period;
-    }
+    protected override void OnUpdate(UpdateArgs args) { }
 
 
-    protected override void OnUpdate(UpdateArgs args)
-    {
-    }
-
-    Period currentPeriod;
     public override void OnPaintChart(PaintChartEventArgs args)
     {
         base.OnPaintChart(args);
@@ -44,12 +47,15 @@ public sealed class IndicatorTimeSessions : Indicator
         if (this.CurrentChart == null)
             return;
 
-        Graphics graphics = args.Graphics;
+        if (this.currentPeriod.Duration.Days >= 1)
+            return;
+
+        var graphics = args.Graphics;
 
         var mainWindow = this.CurrentChart.MainWindow;
 
-        var leftBorderTime = Time(Count - 1);
-        var rightBorderTime = Time(0);
+        var leftBorderTime = this.Time(this.Count - 1);
+        var rightBorderTime = this.Time(0);
 
         var bordersSpan = rightBorderTime - leftBorderTime;
         int daysSpan = (int)bordersSpan.TotalDays;
@@ -58,41 +64,40 @@ public sealed class IndicatorTimeSessions : Indicator
 
         DateTime startTime;
         DateTime endTime;
-        if (currentPeriod.Duration.Days < 1)
-            for (int i = 0; i < this.sessions.Length; i++)
+
+        for (int i = 0; i < this.sessions.Length; i++)
+        {
+            if (!this.sessions[i].SessionVisibility)
+                continue;
+
+            var leftTime = this.sessions[i].SessionFirstTime;
+            var rightTime = this.sessions[i].SessionSecondTime;
+
+            startTime = new DateTime(leftBorderTime.Year, leftBorderTime.Month, leftBorderTime.Day, leftTime.Hour, leftTime.Minute, leftTime.Second);
+            endTime = new DateTime(leftBorderTime.Year, leftBorderTime.Month, leftBorderTime.Day, rightTime.Hour, rightTime.Minute, rightTime.Second);
+
+            if (leftTime.Hour > rightTime.Hour)
+                endTime = endTime.AddDays(1);
+
+            for (int j = 0; j <= daysSpan+1; j++)
             {
-                if (sessions[i].SessionVisibility)
+                if (startTime < mainWindow.CoordinatesConverter.GetTime(mainWindow.ClientRectangle.Right) && endTime > mainWindow.CoordinatesConverter.GetTime((int)mainWindow.ClientRectangle.Left))
                 {
+                    if (startTime < mainWindow.CoordinatesConverter.GetTime(mainWindow.ClientRectangle.Left))
+                        leftCoordinate = mainWindow.ClientRectangle.Left;
+                    else
+                        leftCoordinate = (int)mainWindow.CoordinatesConverter.GetChartX(startTime);
+                    if (endTime > mainWindow.CoordinatesConverter.GetTime(mainWindow.ClientRectangle.Right))
+                        rightCoordinate = mainWindow.ClientRectangle.Right;
+                    else
+                        rightCoordinate = (int)mainWindow.CoordinatesConverter.GetChartX(endTime);
 
-                    var leftTime = this.sessions[i].SessionFirstTime;
-                    var rightTime = this.sessions[i].SessionSecondTime;
-
-                    startTime = new DateTime(leftBorderTime.Year, leftBorderTime.Month, leftBorderTime.Day, leftTime.Hour, leftTime.Minute, leftTime.Second);
-                    endTime = new DateTime(leftBorderTime.Year, leftBorderTime.Month, leftBorderTime.Day, rightTime.Hour, rightTime.Minute, rightTime.Second);
-
-                    if (leftTime.Hour > rightTime.Hour)
-                        endTime = endTime.AddDays(1);
-
-                    for (int j = 0; j <= daysSpan+1; j++)
-                    {
-                        if (startTime < (DateTime)mainWindow.CoordinatesConverter.GetTime((int)mainWindow.ClientRectangle.Right) && endTime > (DateTime)mainWindow.CoordinatesConverter.GetTime((int)mainWindow.ClientRectangle.Left))
-                        {
-                            if (startTime < (DateTime)mainWindow.CoordinatesConverter.GetTime((int)mainWindow.ClientRectangle.Left))
-                                leftCoordinate = (int)mainWindow.ClientRectangle.Left;
-                            else
-                                leftCoordinate = (int)mainWindow.CoordinatesConverter.GetChartX(startTime);
-                            if (endTime > (DateTime)mainWindow.CoordinatesConverter.GetTime((int)mainWindow.ClientRectangle.Right))
-                                rightCoordinate = (int)mainWindow.ClientRectangle.Right;
-                            else
-                                rightCoordinate = (int)mainWindow.CoordinatesConverter.GetChartX(endTime);
-
-                            graphics.FillRectangle(sessions[i].sessionBrush, leftCoordinate, 0, rightCoordinate - leftCoordinate, this.CurrentChart.MainWindow.ClientRectangle.Height);
-                        }
-                        startTime = startTime.AddDays(1);
-                        endTime = endTime.AddDays(1);
-                    }
+                    graphics.FillRectangle(this.sessions[i].sessionBrush, leftCoordinate, 0, rightCoordinate - leftCoordinate, this.CurrentChart.MainWindow.ClientRectangle.Height);
                 }
+                startTime = startTime.AddDays(1);
+                endTime = endTime.AddDays(1);
             }
+        }
     }
 
     public override IList<SettingItem> Settings
@@ -143,7 +148,7 @@ internal sealed class Session : ICustomizable
             string relationName = $"{this.SessionName}SessionVisibility";
             settings.Add(new SettingItemBoolean(relationName, this.SessionVisibility)
             {
-                Text = "Session Visibility",
+                Text = "Visible",
                 SortIndex = sessionSortIndex,
                 SeparatorGroup = separatorGroup1,
             });
@@ -152,7 +157,7 @@ internal sealed class Session : ICustomizable
 
             settings.Add(new SettingItemDateTime("SessionFirstTime", this.SessionFirstTime)
             {
-                Text = "Start Session Time",
+                Text = "Start Time",
                 SortIndex = sessionSortIndex,
                 Format = DatePickerFormat.Time,
                 SeparatorGroup = separatorGroup1,
@@ -161,7 +166,7 @@ internal sealed class Session : ICustomizable
 
             settings.Add(new SettingItemDateTime("SessionSecondTime", this.SessionSecondTime)
             {
-                Text = "End Session Time",
+                Text = "End Time",
                 SortIndex = sessionSortIndex,
                 Format = DatePickerFormat.Time,
                 SeparatorGroup = separatorGroup1,
@@ -169,7 +174,7 @@ internal sealed class Session : ICustomizable
             });
             settings.Add(new SettingItemColor("SessionColor", this.SessionColor)
             {
-                Text = "Session Color",
+                Text = "Color",
                 SortIndex = sessionSortIndex,
                 SeparatorGroup = separatorGroup1,
                 Relation = visibleRelation
