@@ -1,4 +1,4 @@
-// Copyright QUANTOWER LLC. © 2017-2023. All rights reserved.
+// Copyright QUANTOWER LLC. © 2017-2024. All rights reserved.
 
 using System;
 using System.Collections.Generic;
@@ -114,22 +114,7 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
     {
         this.AbortLoading();
 
-        var startTimeUTC = new DateTime(this.StartTime.Ticks, DateTimeKind.Utc);
-        var endTimeUTC = new DateTime(this.EndTime.Ticks, DateTimeKind.Utc);
-
-        //
-        // Chart timezone is not equal to terminal timezone
-        //
-        if (this.CurrentChart != null && this.CurrentChart.CurrentTimeZone != Core.Instance.TimeUtils.SelectedTimeZone)
-        {
-            // from 'Utc' to termial timezone
-            startTimeUTC = Core.Instance.TimeUtils.ConvertFromUTCToSelectedTimeZone(startTimeUTC);
-            endTimeUTC = Core.Instance.TimeUtils.ConvertFromUTCToSelectedTimeZone(endTimeUTC);
-
-            // from chart timezone to 'Utc'
-            startTimeUTC = Core.Instance.TimeUtils.ConvertFromTimeZoneToUTC(startTimeUTC, this.CurrentChart.CurrentTimeZone);
-            endTimeUTC = Core.Instance.TimeUtils.ConvertFromTimeZoneToUTC(endTimeUTC, this.CurrentChart.CurrentTimeZone);
-        }
+        var (startTimeUTC, endTimeUTC) = this.GetFullConvertedRangeTimes();
 
         this.openingRange = new OpeningRange()
         {
@@ -154,7 +139,7 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
         }
 
         // for watchlist
-        if (this.openingRange.IsEmpty)
+        if (this.openingRange.IsEmpty && this.CurrentChart == null)
         {
             this.SetValue(0, 0, 0);
             this.SetValue(0, 1, 0);
@@ -163,11 +148,11 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
     protected override void OnClear()
     {
         this.AbortLoading();
+        this.ProcessRealTimeSubscription(false);
     }
     public override void Dispose()
     {
         this.AbortLoading();
-
         base.Dispose();
     }
     public override IList<SettingItem> Settings
@@ -196,6 +181,7 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
     #endregion Overrides
 
     #region Drawing
+
     public override void OnPaintChart(PaintChartEventArgs args)
     {
         if (this.Symbol == null || this.openingRange.IsEmpty || !this.ShowLabels || !this.IsLoadedSuccessfully)
@@ -261,22 +247,54 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
         gr.FillRectangle(backgroundBrush, rect);
         gr.DrawString(label, font, labelBrush, rect, labelSF);
     }
+
+    private void ClearIndicatorLines(OpeningRange openingRange) => this.UpdateIndicatorLines(double.NaN, double.NaN, openingRange.StartIndex, this.Count - 1);
+    private void UpdateIndicatorLines(double high, double low, int startIndex, int endIndex)
+    {
+        if (startIndex < 0)
+            startIndex = 0;
+
+        int startOffset = this.GetOffset(startIndex);
+        int endOffset = this.GetOffset(endIndex);
+
+        for (int i = endOffset; i <= startOffset; i++)
+        {
+            this.SetValue(high, 0, i);
+            this.SetValue(low, 1, i);
+        }
+    }
+
     #endregion Drawing
 
     #region Event handlers
-    private void LoadedHistory_NewHistoryItem(object sender, HistoryEventArgs e) => this.CalculateIndicator(e.HistoryItem);
-    private void LoadedHistory_HistoryItemUpdated(object sender, HistoryEventArgs e) => this.CalculateIndicator(e.HistoryItem);
+
+    private void Symbol_NewMark(Symbol symbol, Mark mark) => this.CalculateIndicator(mark.Time, mark.Price, mark.Price);
+    private void Symbol_NewLast(Symbol symbol, Last last) => this.CalculateIndicator(last.Time, last.Price, last.Price);
+    private void Symbol_NewQuote(Symbol symbol, Quote quote)
+    {
+        switch (symbol.HistoryType)
+        {
+            case HistoryType.Bid:
+                this.CalculateIndicator(quote.Time, quote.Bid, quote.Bid);
+                break;
+            case HistoryType.Ask:
+                this.CalculateIndicator(quote.Time, quote.Ask, quote.Ask);
+                break;
+        }
+    }
+
     #endregion Event handlers
 
     #region Misc
 
-    private void CalculateIndicator(IHistoryItem currentItem)
+    private void CalculateIndicator(IHistoryItem currentItem) => this.CalculateIndicator(currentItem.TimeLeft, currentItem[PriceType.High], currentItem[PriceType.Low]);
+    private void CalculateIndicator(DateTime itemTime, double highPrice, double lowPrice)
     {
         if (this.HistoricalData == null)
             return;
 
-        bool hasTime = this.timeRange.ContainsTime(currentItem.TimeLeft.TimeOfDay);
-        bool inSymbolSession = this.DataSource != OpeningRangeDataSource.CurrentDayOnly || (this.Symbol.CurrentSessionsInfo?.ContainsDate(currentItem.TimeLeft) ?? false);
+        bool hasTime = this.timeRange.ContainsTime(itemTime.TimeOfDay);
+        bool inSymbolSession = this.DataSource != OpeningRangeDataSource.CurrentDayOnly || (this.Symbol.CurrentSessionsInfo?.ContainsDate(itemTime) ?? false);
 
         bool isOut = !hasTime;
         bool needFindStartIndex = false;
@@ -285,7 +303,7 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
         {
             if (!this.openingRange.IsEmpty)
             {
-                if (currentItem.TimeLeft > this.openingRange.RightTime)
+                if (itemTime > this.openingRange.RightTime)
                     this.isOutRange = true;
             }
         }
@@ -315,16 +333,16 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
         //
         if (hasTime)
         {
-            if (this.openingRange.TryUpdate(currentItem[PriceType.High], currentItem[PriceType.Low], currentItem.TimeLeft))
+            if (this.openingRange.TryUpdate(highPrice, lowPrice, itemTime))
             {
                 // щоб постійно не вираховувати в "OnPaint".
-                if (needFindStartIndex)
+                if (needFindStartIndex || this.openingRange.StartIndex == -1)
                 {
                     // populate
                     if (this.openingRange.LeftTime == default)
                     {
-                        var startArea = new DateTime(currentItem.TimeLeft.Date.Ticks + this.timeRange.OpenTime.Ticks, DateTimeKind.Utc);
-                        var endArea = new DateTime(currentItem.TimeLeft.Date.Ticks + this.timeRange.CloseTime.Ticks, DateTimeKind.Utc);
+                        var startArea = new DateTime(itemTime.Date.Ticks + this.timeRange.OpenTime.Ticks, DateTimeKind.Utc);
+                        var endArea = new DateTime(itemTime.Date.Ticks + this.timeRange.CloseTime.Ticks, DateTimeKind.Utc);
 
                         if (this.timeRange.OpenTime > this.timeRange.CloseTime)
                             startArea = startArea.AddDays(-1);
@@ -338,35 +356,17 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
                         this.openingRange.RightTime = this.openingRange.RightTime.AddDays(1);
                     }
 
-                    this.openingRange.StartIndex = (int)this.HistoricalData.GetIndexByTime(currentItem.TicksLeft, SeekOriginHistory.Begin);
+                    this.openingRange.StartIndex = (int)this.HistoricalData.GetIndexByTime(itemTime.Ticks, SeekOriginHistory.Begin);
                 }
 
-                this.UpdateIndicatorLines(this.openingRange);
+                this.UpdateIndicatorLines(openingRange.HighPrice.Value, openingRange.LowPrice.Value, openingRange.StartIndex, this.Count - 1);
             }
         }
 
         this.isOutRange = isOut;
         this.inSymbolSession = inSymbolSession;
     }
-    private void UpdateIndicatorLines(OpeningRange openingRange)
-    {
-        this.UpdateIndicatorLines(openingRange.HighPrice.Value, openingRange.LowPrice.Value, openingRange.StartIndex, this.Count - 1);
-    }
-    private void ClearIndicatorLines(OpeningRange openingRange) => this.UpdateIndicatorLines(double.NaN, double.NaN, openingRange.StartIndex, this.Count - 1);
-    private void UpdateIndicatorLines(double high, double low, int startIndex, int endIndex)
-    {
-        if (startIndex < 0)
-            startIndex = 0;
 
-        int startOffset = this.GetOffset(startIndex);
-        int endOffset = this.GetOffset(endIndex);
-
-        for (int i = endOffset; i <= startOffset; i++)
-        {
-            this.SetValue(high, 0, i);
-            this.SetValue(low, 1, i);
-        }
-    }
     private int GetOffset(int index)
     {
         return this.Count - index - 1;
@@ -380,6 +380,70 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
             this.lowLabelBrush = new SolidBrush(this.LinesSeries[1].Color);
     }
 
+    private void ProcessRealTimeSubscription(bool needSubscribe)
+    {
+        if (this.Symbol == null)
+            return;
+
+        switch (this.Symbol.HistoryType)
+        {
+            case HistoryType.Last:
+                {
+                    if (needSubscribe)
+                        this.Symbol.NewLast += this.Symbol_NewLast;
+                    else
+                        this.Symbol.NewLast -= this.Symbol_NewLast;
+                    break;
+                }
+            case HistoryType.Bid:
+            case HistoryType.Ask:
+                {
+                    if (needSubscribe)
+                        this.Symbol.NewQuote += this.Symbol_NewQuote;
+                    else
+                        this.Symbol.NewQuote -= this.Symbol_NewQuote;
+                    break;
+                }
+            case HistoryType.Mark:
+                {
+                    if (needSubscribe)
+                        this.Symbol.NewMark += this.Symbol_NewMark;
+                    else
+                        this.Symbol.NewMark -= this.Symbol_NewMark;
+                    break;
+                }
+        }
+    }
+    private (DateTime startTimeUTC, DateTime endTimeUTC) GetFullConvertedRangeTimes()
+    {
+        var startTimeUTC = new DateTime(this.StartTime.Ticks, DateTimeKind.Utc);
+        var endTimeUTC = new DateTime(this.EndTime.Ticks, DateTimeKind.Utc);
+
+        //
+        // Chart timezone is not equal to terminal timezone
+        //
+        if (this.CurrentChart != null && this.CurrentChart.CurrentTimeZone != Core.Instance.TimeUtils.SelectedTimeZone)
+        {
+            // from 'Utc' to termial timezone
+            startTimeUTC = Core.Instance.TimeUtils.ConvertFromUTCToSelectedTimeZone(startTimeUTC);
+            endTimeUTC = Core.Instance.TimeUtils.ConvertFromUTCToSelectedTimeZone(endTimeUTC);
+
+            // from chart timezone to 'Utc'
+            startTimeUTC = Core.Instance.TimeUtils.ConvertFromTimeZoneToUTC(startTimeUTC, this.CurrentChart.CurrentTimeZone);
+            endTimeUTC = Core.Instance.TimeUtils.ConvertFromTimeZoneToUTC(endTimeUTC, this.CurrentChart.CurrentTimeZone);
+        }
+
+        return (startTimeUTC, endTimeUTC);
+    }
+
+    private DateTime GetLastTradingUpdateTime()
+    {
+        if (this.Symbol.HistoryType == HistoryType.BidAsk)
+            return this.Symbol.QuoteDateTime;
+        else
+            return this.Symbol.LastDateTime;
+    }
+
     #endregion Misc
 
     #region Relaod
@@ -390,58 +454,101 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
 
         Task.Factory.StartNew(() =>
         {
+            var historyCache = new List<HistoricalData>();
+
             try
             {
+                if (this.HistoricalData.Count == 0)
+                {
+                    this.IsLoadedSuccessfully = true;
+                    return;
+                }
+
                 this.IsLoadedSuccessfully = false;
                 this.IsLoading = true;
 
-                var currentTime = this.HistoricalData.Count > 0
-                    ? this.HistoricalData[0, SeekOriginHistory.End].TimeLeft
-                    : Core.Instance.TimeUtils.DateTimeUtcNow;
+                var (startTime, endTime) = this.GetFullConvertedRangeTimes();
+                var zeroBarLastUpdateTime = this.GetLastTradingUpdateTime();
 
-                var period = this.HistoricalData.Period <= Period.MIN1
-                    ? Period.SECOND1
-                    : Period.MIN1;
-
-                var history = this.Symbol.GetHistory(new HistoryRequestParameters()
+                // Hack. У випадку, якщо зона в поточному дні ще не почалася - грузимо і показуємо попередню.
+                if (this.DataSource == OpeningRangeDataSource.LastAvailable && zeroBarLastUpdateTime < startTime)
                 {
-                    Period = period,
-                    CancellationToken = token,
-                    Aggregation = new HistoryAggregationTime(period),
-                    Symbol = this.Symbol,
-                    FromTime = currentTime.AddDays(-2),
-                    ForceReload = forceReload,
-                    HistoryType = this.Symbol.HistoryType
-                });
-
-                //
-                if (token.IsCancellationRequested)
-                {
-                    history.Dispose();
-                    history = null;
+                    startTime = startTime.AddDays(-1);
+                    endTime = endTime.AddDays(-1);
                 }
-                //
-                else
+
+                var ceilingStartDT = startTime.CeilingTo(Period.MIN1);
+                var floorEndDT = endTime.FloorTo(Period.MIN1);
+
+                // left part
+                if (!token.IsCancellationRequested && startTime < ceilingStartDT)
                 {
-                    for (int i = 0; i < history.Count; i++)
+                    historyCache.Add(this.Symbol.GetHistory(new HistoryRequestParameters()
                     {
-                        if (i % 1000 == 0 && token.IsCancellationRequested)
+                        Period = Period.SECOND1,
+                        CancellationToken = token,
+                        Aggregation = new HistoryAggregationTime(Period.SECOND1),
+                        Symbol = this.Symbol,
+                        FromTime = startTime,
+                        ToTime = ceilingStartDT,
+                        ForceReload = forceReload,
+                        HistoryType = this.Symbol.HistoryType
+                    }));
+                }
+                
+                // middle part
+                if (!token.IsCancellationRequested && ceilingStartDT < floorEndDT)
+                {
+                    historyCache.Add(this.Symbol.GetHistory(new HistoryRequestParameters()
+                    {
+                        Period = Period.MIN1,
+                        CancellationToken = token,
+                        Aggregation = new HistoryAggregationTime(Period.MIN1),
+                        Symbol = this.Symbol,
+                        FromTime = ceilingStartDT,
+                        ToTime = floorEndDT,
+                        ForceReload = forceReload,
+                        HistoryType = this.Symbol.HistoryType
+                    }));
+                }
+
+                // right part
+                if (!token.IsCancellationRequested && floorEndDT < endTime)
+                {
+                    historyCache.Add(this.Symbol.GetHistory(new HistoryRequestParameters()
+                    {
+                        Period = Period.SECOND1,
+                        CancellationToken = token,
+                        Aggregation = new HistoryAggregationTime(Period.SECOND1),
+                        Symbol = this.Symbol,
+                        FromTime = floorEndDT,
+                        ToTime = endTime,
+                        ForceReload = forceReload,
+                        HistoryType = this.Symbol.HistoryType
+                    }));
+                }
+               
+                //
+                if (!token.IsCancellationRequested)
+                {
+                    foreach (var item in historyCache)
+                    {
+                        if (token.IsCancellationRequested)
                             break;
 
-                        var currentItem = history[i, SeekOriginHistory.Begin];
-                        this.CalculateIndicator(currentItem);
+                        for (int i = 0; i < item.Count; i++)
+                        {
+                            if (i % 1000 == 0 && token.IsCancellationRequested)
+                                break;
+
+                            var currentItem = item[i, SeekOriginHistory.Begin];
+                            this.CalculateIndicator(currentItem);
+                        }
                     }
 
-                    if (token.IsCancellationRequested)
+                    if (!token.IsCancellationRequested)
                     {
-                        history.Dispose();
-                        history = null;
-                    }
-                    else
-                    {
-                        this.loadedHistory = history;
-                        this.loadedHistory.HistoryItemUpdated += this.LoadedHistory_HistoryItemUpdated;
-                        this.loadedHistory.NewHistoryItem += this.LoadedHistory_NewHistoryItem;
+                        this.ProcessRealTimeSubscription(true);
                     }
                 }
 
@@ -453,6 +560,11 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
             }
             finally
             {
+                foreach (var item in historyCache)
+                    item.Dispose();
+
+                historyCache.Clear();
+
                 this.IsLoading = false;
             }
 
@@ -462,14 +574,6 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
     {
         this.cts?.Cancel();
         this.cts = new CancellationTokenSource();
-
-        if (this.loadedHistory != null)
-        {
-            this.loadedHistory.HistoryItemUpdated -= this.LoadedHistory_HistoryItemUpdated;
-            this.loadedHistory.NewHistoryItem -= this.LoadedHistory_NewHistoryItem;
-            this.loadedHistory.Dispose();
-            this.loadedHistory = null;
-        }
     }
 
     #endregion Reload
