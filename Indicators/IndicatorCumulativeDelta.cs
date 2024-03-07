@@ -160,7 +160,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
                 {
                     this.customSessionContainer = new CustomSessionsContainer("CustomSession", this.GetTimeZone(), new CustomSession[]
                     {
-                        this.CreateCustomSession(this.CustomRangeStartTime.TimeOfDay,this.CustomRangeEndTime.TimeOfDay)
+                        this.CreateCustomSession(this.CustomRangeStartTime.TimeOfDay,this.CustomRangeEndTime.TimeOfDay, this.GetTimeZone().TimeZoneInfo)
                     });
                     break;
                 }
@@ -171,7 +171,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
                     var session = this.GetFullDayTimeInterval(timeZone);
                     this.fullDaySessionContainer = new CustomSessionsContainer("FullDaySession", timeZone, new CustomSession[]
                     {
-                        this.CreateCustomSession(session.From.TimeOfDay, session.To.TimeOfDay)
+                        this.CreateCustomSession(session.From.TimeOfDay, session.To.TimeOfDay, this.GetTimeZone().TimeZoneInfo)
                     });
                     break;
                 }
@@ -427,17 +427,19 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
         else
             return Period.DAY1;
     }
-    private CustomSession CreateCustomSession(TimeSpan open, TimeSpan close)
+    private CustomSession CreateCustomSession(TimeSpan open, TimeSpan close, TimeZoneInfo info)
     {
-        return new CustomSession
+        var session = new CustomSession
         {
-            OpenTime = open,
-            CloseTime = close,
+            OpenOffset = open,
+            CloseOffset = close,
             IsActive = true,
             Name = "Main",
             Days = Enum.GetValues(typeof(DayOfWeek)).Cast<DayOfWeek>().ToArray(),
             Type = SessionType.Main
         };
+        session.RecalculateOpenCloseTime(info);
+        return session;
     }
     private AreaBuilder CreateAreaBuilder(Interval<DateTime> range)
     {
