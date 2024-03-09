@@ -184,7 +184,7 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
 
     public override void OnPaintChart(PaintChartEventArgs args)
     {
-        if (this.Symbol == null || this.openingRange.IsEmpty || !this.ShowLabels || !this.IsLoadedSuccessfully)
+        if (this.Symbol == null || this.openingRange == null || this.openingRange.IsEmpty || !this.ShowLabels || !this.IsLoadedSuccessfully)
             return;
 
         try
@@ -419,6 +419,18 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
         var startTimeUTC = new DateTime(this.StartTime.Ticks, DateTimeKind.Utc);
         var endTimeUTC = new DateTime(this.EndTime.Ticks, DateTimeKind.Utc);
 
+        var zeroBarLastUpdateTime = this.GetLastTradingUpdateTime();
+
+        if (zeroBarLastUpdateTime != default)
+        {
+            if (startTimeUTC.TimeOfDay <= endTimeUTC.TimeOfDay)
+                startTimeUTC = zeroBarLastUpdateTime.Date.AddTicks(startTimeUTC.TimeOfDay.Ticks);
+            else
+                startTimeUTC = zeroBarLastUpdateTime.Date.AddDays(-1).AddTicks(startTimeUTC.TimeOfDay.Ticks);
+
+            endTimeUTC = zeroBarLastUpdateTime.Date.AddTicks(endTimeUTC.TimeOfDay.Ticks);
+        }
+
         //
         // Chart timezone is not equal to terminal timezone
         //
@@ -438,10 +450,16 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
 
     private DateTime GetLastTradingUpdateTime()
     {
+        DateTime time;
         if (this.Symbol.HistoryType == HistoryType.BidAsk)
-            return this.Symbol.QuoteDateTime;
+            time = this.Symbol.QuoteDateTime;
         else
-            return this.Symbol.LastDateTime;
+            time = this.Symbol.LastDateTime;
+
+        if (time == default && this.HistoricalData.Count > 0)
+            time = this.HistoricalData[0, SeekOriginHistory.End].TimeLeft;
+
+        return time;
     }
 
     #endregion Misc
