@@ -20,7 +20,8 @@ public sealed class IndicatorSimpleMovingAverage : Indicator, IWatchlistIndicato
         "Typical", PriceType.Typical,
         "Median", PriceType.Median,
         "Weighted", PriceType.Weighted,
-        "Volume", PriceType.Volume,
+        "Base asset volume", PriceType.Volume,
+        "Quote asset volume", PriceType.QuoteAssetVolume,
         "Open interest", PriceType.OpenInterest
     })]
     public PriceType SourcePrice = PriceType.Close;
@@ -30,7 +31,7 @@ public sealed class IndicatorSimpleMovingAverage : Indicator, IWatchlistIndicato
     public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorSimpleMovingAverage.cs";
 
     /// <summary>
-    /// Indicator's constructor. Contains general information: name, description, LineSeries etc. 
+    /// Indicator's constructor. Contains general information: name, description, LineSeries etc.
     /// </summary>
     public IndicatorSimpleMovingAverage()
         : base()
@@ -39,16 +40,16 @@ public sealed class IndicatorSimpleMovingAverage : Indicator, IWatchlistIndicato
         this.Name = "Simple Moving Average";
         this.Description = "Average price for the last N periods";
 
-        // Define one line with particular parameters 
+        // Define one line with particular parameters
         this.AddLineSeries("SMA", Color.Red, 1, LineStyle.Solid);
 
         this.SeparateWindow = false;
     }
 
     /// <summary>
-    /// Calculation entry point. This function is called when a price data updates. 
-    /// Will be runing under the HistoricalBar mode during history loading. 
-    /// Under NewTick during realtime. 
+    /// Calculation entry point. This function is called when a price data updates.
+    /// Will be runing under the HistoricalBar mode during history loading.
+    /// Under NewTick during realtime.
     /// Under NewBar if start of the new bar is required.
     /// </summary>
     /// <param name="args">Provides data of updating reason and incoming price.</param>
