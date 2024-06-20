@@ -83,7 +83,6 @@ internal class IndicatorFundingRate : Indicator
                     using var history = this.CurrenntSymbol.GetHistory(new HistoryRequestParameters()
                     {
                         Aggregation = new HistoryAggregationTime(Period.DAY1),
-                        Period = Period.DAY1,
                         FromTime = this.HistoricalData.FromTime,
                         ToTime = this.HistoricalData.ToTime,
                         CancellationToken = token,

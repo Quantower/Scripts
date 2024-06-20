@@ -192,7 +192,6 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
 
                 this.history = this.Symbol.GetHistory(new HistoryRequestParameters()
                 {
-                    Period = inputPeriod,
                     Symbol = this.Symbol,
                     HistoryType = this.HistoricalData.HistoryType,
                     FromTime = fromTime,
@@ -350,14 +349,14 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
                     r2 = close + 0.183 * (high - low);
                     r3 = close + 0.275 * (high - low);
                     r4 = close + 0.55 * (high - low);
-                    r5 = high / low + close;
-                    r6 = r5 + 1.168 * (r5 - r4);
+                    r5 = r4+1.168*(r4-r3);
+                    r6 = (high/low)*close;
 
                     s1 = close - 0.0916 * (high - low);
                     s2 = close - 0.183 * (high - low);
                     s3 = close - 0.275 * (high - low);
                     s4 = close - 0.55 * (high - low);
-                    s5 = close - (r5 - close);
+                    s5 = s4-1.168*(s3-s4);
                     s6 = close - (r6 - close);
                 }
                 break;

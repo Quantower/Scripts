@@ -119,7 +119,6 @@ public class IndicatorHighLow : Indicator, IWatchlistIndicator
                 this.State = IndicatorState.Loading;
                 this.history = this.Symbol.GetHistory(new HistoryRequestParameters()
                 {
-                    Period = period,
                     Symbol = this.Symbol,
                     HistoryType = this.HistoricalData.HistoryType,
                     FromTime = Core.TimeUtils.DateTimeUtcNow.AddTicks(-this.historyTicksRange * coefficient),

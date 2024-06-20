@@ -503,7 +503,6 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
                 {
                     historyCache.Add(this.Symbol.GetHistory(new HistoryRequestParameters()
                     {
-                        Period = Period.SECOND1,
                         CancellationToken = token,
                         Aggregation = new HistoryAggregationTime(Period.SECOND1),
                         Symbol = this.Symbol,
@@ -519,7 +518,6 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
                 {
                     historyCache.Add(this.Symbol.GetHistory(new HistoryRequestParameters()
                     {
-                        Period = Period.MIN1,
                         CancellationToken = token,
                         Aggregation = new HistoryAggregationTime(Period.MIN1),
                         Symbol = this.Symbol,
@@ -535,7 +533,6 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
                 {
                     historyCache.Add(this.Symbol.GetHistory(new HistoryRequestParameters()
                     {
-                        Period = Period.SECOND1,
                         CancellationToken = token,
                         Aggregation = new HistoryAggregationTime(Period.SECOND1),
                         Symbol = this.Symbol,

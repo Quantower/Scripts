@@ -35,7 +35,7 @@ public sealed class IndicatorTimeSessions : Indicator
         };
     }
 
-    protected override void OnInit() => this.currentPeriod =this.HistoricalData.Aggregation.TryGetPeriod(out var period) ? period : Period.MIN1;
+    protected override void OnInit() => this.currentPeriod = this.HistoricalData.Aggregation.GetPeriod;
 
     protected override void OnUpdate(UpdateArgs args) { }
 

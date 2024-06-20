@@ -41,10 +41,8 @@ public class IndicatorDoubleTopBottom : Indicator
     public override void OnPaintChart(PaintChartEventArgs args)
     {
         var graphics = args.Graphics;
-        var currentPeriod = Period.MIN1;
-        if (this.HistoricalData.Aggregation.TryGetPeriod(out var period))
-            currentPeriod = period;
-        if (currentPeriod.BasePeriod == BasePeriod.Tick)
+
+        if (this.HistoricalData.Aggregation.GetPeriod.BasePeriod == BasePeriod.Tick)
         {
             graphics.DrawString("Indicator does not work on tick aggregation", new Font("Arial", 20), Brushes.Red, 20, 50);
             return;
