@@ -22,6 +22,9 @@ public class IndicatorDailyOHLC : Indicator
     private const string CUSTOM_SESSION_NAME_SI = "Custom session name";
     private const string SHOW_EXTEND_LINES_NAME_SI = "Show extend lines";
     private const string LABEL_ALIGNMENT_NAME_SI = "Label alignment";
+    private const string LABEL_POSITION = "Label position";
+    private const string REMOVE_PRICE = "Remove price";
+
 
     private const string ALL_DAY_SESSION_TYPE = "All day";
     private const string SPECIFIED_SESSION_TYPE = "Specified session";
@@ -108,7 +111,14 @@ public class IndicatorDailyOHLC : Indicator
     private DateTime extendRangeEndTime;
 
     public NativeAlignment LabelAlignment { get; set; }
-
+    [InputParameter(LABEL_POSITION, 65, variants: new object[]
+    {
+        "Below the line",0,
+        "Above the line",1
+    })]
+    public int labelPosition = 1;
+    [InputParameter(REMOVE_PRICE, 75)]
+    public bool removePrice = false;
     public LineOptions OpenLineOptions
     {
         get => this.openLineOptions;
@@ -230,6 +240,8 @@ public class IndicatorDailyOHLC : Indicator
     public bool ShowMiddleLineLabel { get; private set; }
 
     public Font CurrentFont { get; private set; }
+
+    public string OpenCustomText = "O: ", HighCustomText = "H: ", LowCustomText = "L: ", CloseCustomText = "C: ", MiddleCustomText = "M: ";
 
     private readonly IList<DailyRangeItem> rangeCache;
 
@@ -492,7 +504,11 @@ public class IndicatorDailyOHLC : Indicator
                 SeparatorGroup = openLineStyleSeparator,
                 Text = loc._("Show line label")
             });
-
+            settings.Add(new SettingItemString("OpenCustomText", this.OpenCustomText, 60)
+            {
+                SeparatorGroup = openLineStyleSeparator,
+                Text = loc._("Add custom text")
+            });
             //
             var highLineStyleSeparator = new SettingItemSeparatorGroup("High line style", -999);
             settings.Add(new SettingItemLineOptions("HighLineOptions", this.HighLineOptions, 60)
@@ -512,7 +528,11 @@ public class IndicatorDailyOHLC : Indicator
                 SeparatorGroup = highLineStyleSeparator,
                 Text = loc._("Show line label")
             });
-
+            settings.Add(new SettingItemString("HighCustomText", this.HighCustomText, 60)
+            {
+                SeparatorGroup = highLineStyleSeparator,
+                Text = loc._("Add custom text")
+            });
             //
             var lowLineStyleSeparator = new SettingItemSeparatorGroup("Low line style", -999);
             settings.Add(new SettingItemLineOptions("LowLineOptions", this.LowLineOptions, 60)
@@ -532,7 +552,11 @@ public class IndicatorDailyOHLC : Indicator
                 SeparatorGroup = lowLineStyleSeparator,
                 Text = loc._("Show line label")
             });
-
+            settings.Add(new SettingItemString("LowCustomText", this.LowCustomText, 60)
+            {
+                SeparatorGroup = lowLineStyleSeparator,
+                Text = loc._("Add custom text")
+            });
             //
             var closeLineStyleSeparator = new SettingItemSeparatorGroup("Close line style", -999);
             settings.Add(new SettingItemLineOptions("CloseLineOptions", this.CloseLineOptions, 60)
@@ -552,7 +576,11 @@ public class IndicatorDailyOHLC : Indicator
                 SeparatorGroup = closeLineStyleSeparator,
                 Text = loc._("Show line label")
             });
-
+            settings.Add(new SettingItemString("CloseCustomText", this.CloseCustomText, 60)
+            {
+                SeparatorGroup = closeLineStyleSeparator,
+                Text = loc._("Add custom text")
+            });
             //
             var middleLineStyleSeparator = new SettingItemSeparatorGroup("Middle line style", -999);
             settings.Add(new SettingItemLineOptions("MiddleLineOptions", this.MiddleLineOptions, 60)
@@ -571,6 +599,11 @@ public class IndicatorDailyOHLC : Indicator
             {
                 SeparatorGroup = middleLineStyleSeparator,
                 Text = loc._("Show line label")
+            });
+            settings.Add(new SettingItemString("MiddleCustomText", this.MiddleCustomText, 60)
+            {
+                SeparatorGroup = middleLineStyleSeparator,
+                Text = loc._("Add custom text")
             });
 
             var defaultSeparator = settings.FirstOrDefault()?.SeparatorGroup;
@@ -629,6 +662,21 @@ public class IndicatorDailyOHLC : Indicator
 
             if (holder.TryGetValue("ShowMiddleLineLabel", out item) && item.Value is bool showMiddleLabel)
                 this.ShowMiddleLineLabel = showMiddleLabel;
+
+            if (holder.TryGetValue("OpenCustomText", out item) && item.Value is string openCustomText)
+                this.OpenCustomText = openCustomText;
+
+            if (holder.TryGetValue("HighCustomText", out item) && item.Value is string highCustomText)
+                this.HighCustomText = highCustomText;
+
+            if (holder.TryGetValue("LowCustomText", out item) && item.Value is string lowCustomText)
+                this.LowCustomText = lowCustomText;
+
+            if (holder.TryGetValue("CloseCustomText", out item) && item.Value is string closeCustomText)
+                this.CloseCustomText = closeCustomText;
+
+            if (holder.TryGetValue("MiddleCustomText", out item) && item.Value is string middleCustomText)
+                this.MiddleCustomText = middleCustomText;
 
             if (holder.TryGetValue("Font", out item) && item.Value is Font font)
                 this.CurrentFont = font;
@@ -715,7 +763,7 @@ public class IndicatorDailyOHLC : Indicator
                             gr.DrawLine(this.highLinePen, leftX, highY, rightX, highY);
 
                             if (this.ShowHighLineLabel)
-                                this.DrawBillet(gr, range.High, ref leftX, ref rightX, ref highY, this.CurrentFont, this.highLineOptions, this.highLinePen, this.centerNearSF, this.LabelAlignment, "H:");
+                                this.DrawBillet(gr, range.High, ref leftX, ref rightX, ref highY, this.CurrentFont, this.highLineOptions, this.highLinePen, this.centerNearSF, this.LabelAlignment, HighCustomText);
                         }
 
                         if (needDrawExtendLines && this.HighExtendLineOptions.Enabled)
@@ -733,7 +781,7 @@ public class IndicatorDailyOHLC : Indicator
                             gr.DrawLine(this.lowLinePen, leftX, lowY, rightX, lowY);
 
                             if (this.ShowLowLineLabel)
-                                this.DrawBillet(gr, range.Low, ref leftX, ref rightX, ref lowY, this.CurrentFont, this.lowLineOptions, this.lowLinePen, this.centerNearSF, this.LabelAlignment, "L:");
+                                this.DrawBillet(gr, range.Low, ref leftX, ref rightX, ref lowY, this.CurrentFont, this.lowLineOptions, this.lowLinePen, this.centerNearSF, this.LabelAlignment, LowCustomText);
                         }
 
                         if (needDrawExtendLines && this.LowExtendLineOptions.Enabled)
@@ -751,7 +799,7 @@ public class IndicatorDailyOHLC : Indicator
                             gr.DrawLine(this.openLinePen, leftX, openY, rightX, openY);
 
                             if (this.ShowOpenLineLabel)
-                                this.DrawBillet(gr, range.Open, ref leftX, ref rightX, ref openY, this.CurrentFont, this.openLineOptions, this.openLinePen, this.centerNearSF, this.LabelAlignment, "O:");
+                                this.DrawBillet(gr, range.Open, ref leftX, ref rightX, ref openY, this.CurrentFont, this.openLineOptions, this.openLinePen, this.centerNearSF, this.LabelAlignment, OpenCustomText);
                         }
 
                         if (needDrawExtendLines && this.OpenExtendLineOptions.Enabled)
@@ -769,7 +817,7 @@ public class IndicatorDailyOHLC : Indicator
                             gr.DrawLine(this.closeLinePen, leftX, closeY, rightX, closeY);
 
                             if (this.ShowCloseLineLabel)
-                                this.DrawBillet(gr, range.Close, ref leftX, ref rightX, ref closeY, this.CurrentFont, this.closeLineOptions, this.closeLinePen, this.centerNearSF, this.LabelAlignment, "C:");
+                                this.DrawBillet(gr, range.Close, ref leftX, ref rightX, ref closeY, this.CurrentFont, this.closeLineOptions, this.closeLinePen, this.centerNearSF, this.LabelAlignment, CloseCustomText);
                         }
 
                         if (needDrawExtendLines && this.CloseExtendLineOptions.Enabled)
@@ -787,7 +835,7 @@ public class IndicatorDailyOHLC : Indicator
                             gr.DrawLine(this.middleLinePen, leftX, middleY, rightX, middleY);
 
                             if (this.ShowMiddleLineLabel)
-                                this.DrawBillet(gr, range.MiddlePrice, ref leftX, ref rightX, ref middleY, this.CurrentFont, this.middleLineOptions, this.middleLinePen, this.centerNearSF, this.LabelAlignment, "M:");
+                                this.DrawBillet(gr, range.MiddlePrice, ref leftX, ref rightX, ref middleY, this.CurrentFont, this.middleLineOptions, this.middleLinePen, this.centerNearSF, this.LabelAlignment, MiddleCustomText);
                         }
 
                         if (needDrawExtendLines && this.MiddleExtendLineOptions.Enabled)
@@ -865,14 +913,15 @@ public class IndicatorDailyOHLC : Indicator
 
     private void DrawBillet(Graphics gr, double price, ref float leftX, ref float rightX, ref float priceY, Font font, LineOptions lineOptions, Pen pen, StringFormat stringFormat, NativeAlignment nativeAlignment, string prefix)
     {
-        string label = prefix + this.Symbol.FormatPrice(price);
+
+        string label = removePrice==false ? prefix + this.Symbol.FormatPrice(price) : prefix;
         var labelSize = gr.MeasureString(label, font);
 
         var rect = new RectangleF()
         {
             Height = labelSize.Height,
             Width = labelSize.Width + 5,
-            Y = priceY - labelSize.Height - lineOptions.Width
+            Y = labelPosition == 1 ? priceY - labelSize.Height - lineOptions.Width : priceY - lineOptions.Width + 1
         };
 
         switch (nativeAlignment)

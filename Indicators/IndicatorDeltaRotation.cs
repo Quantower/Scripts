@@ -98,7 +98,7 @@ public class IndicatorDeltaRotation : Indicator, IVolumeAnalysisIndicator
         if (!this.allowCalculateRealTime)
             return;
 
-        var isNewBar = this.HistoricalData.Period == Period.TICK1 && this.HistoricalData.Aggregation is HistoryAggregationTick
+        var isNewBar = this.HistoricalData.Aggregation.GetPeriod == Period.TICK1 && this.HistoricalData.Aggregation is HistoryAggregationTick
             ? args.Reason == UpdateReason.NewTick
             : args.Reason == UpdateReason.HistoricalBar || args.Reason == UpdateReason.NewBar;
 

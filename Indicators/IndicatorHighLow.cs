@@ -120,10 +120,9 @@ public class IndicatorHighLow : Indicator, IWatchlistIndicator
                 this.history = this.Symbol.GetHistory(new HistoryRequestParameters()
                 {
                     Symbol = this.Symbol,
-                    HistoryType = this.HistoricalData.HistoryType,
                     FromTime = Core.TimeUtils.DateTimeUtcNow.AddTicks(-this.historyTicksRange * coefficient),
                     CancellationToken = token,
-                    Aggregation = new HistoryAggregationTime(period),
+                    Aggregation = new HistoryAggregationTime(period, this.HistoricalData.Aggregation.GetHistoryType),
                 });
 
                 if (token.IsCancellationRequested || prevHistoryCount == this.history.Count)
@@ -151,7 +150,7 @@ public class IndicatorHighLow : Indicator, IWatchlistIndicator
     {
         base.OnUpdate(args);
 
-        bool isNewItem = this.HistoricalData.Period == Period.TICK1
+        bool isNewItem = this.HistoricalData.Aggregation.GetPeriod == Period.TICK1
             ? args.Reason == UpdateReason.NewTick
             : args.Reason == UpdateReason.NewBar;
 
@@ -261,7 +260,7 @@ public class IndicatorHighLow : Indicator, IWatchlistIndicator
         this.HighPrice = DEFAULT_HIGH_PRICE;
         this.LowPrice = DEFAULT_LOW_PRICE;
 
-        for (int i = 0; i < this.ConvertRangeToPeriodCount(this.BasePeriod, this.Range, this.history.Period); i++)
+        for (int i = 0; i < this.ConvertRangeToPeriodCount(this.BasePeriod, this.Range, this.history.Aggregation.GetPeriod); i++)
         {
             this.HighPrice = Math.Max(((HistoryItemBar)this.history[i]).High, this.HighPrice);
             this.LowPrice = Math.Min(((HistoryItemBar)this.history[i]).Low, this.LowPrice);
@@ -285,7 +284,7 @@ public class IndicatorHighLow : Indicator, IWatchlistIndicator
         if (this.history == null || this.history.Count == 0)
             return false;
 
-        if (this.history.Count < this.ConvertRangeToPeriodCount(this.BasePeriod, this.Range, this.history.Period))
+        if (this.history.Count < this.ConvertRangeToPeriodCount(this.BasePeriod, this.Range, this.history.Aggregation.GetPeriod))
             return false;
 
         return true;

@@ -151,17 +151,18 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
 
         this.State = IndicatorState.Ready;
 
-        if (inputPeriod.Ticks < this.HistoricalData.Period.Ticks)
+        if (inputPeriod.Ticks < this.HistoricalData.Aggregation.GetPeriod.Ticks)
         {
             this.State = IndicatorState.IncorrectPeriod;
             return;
         }
 
-        if (this.HistoricalData.Period == Period.TICK1)
+        if (this.HistoricalData.Aggregation is not HistoryAggregationTime historyAggregationTime)
         {
             this.State = IndicatorState.OneTickNotAllowed;
             return;
         }
+
         this.loadingTask = Task.Factory.StartNew(() =>
         {
             if (token.IsCancellationRequested)
@@ -193,10 +194,9 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
                 this.history = this.Symbol.GetHistory(new HistoryRequestParameters()
                 {
                     Symbol = this.Symbol,
-                    HistoryType = this.HistoricalData.HistoryType,
                     FromTime = fromTime,
                     CancellationToken = token,
-                    Aggregation = new HistoryAggregationTime(inputPeriod),
+                    Aggregation = new HistoryAggregationTime(inputPeriod, historyAggregationTime.HistoryType),
                 });
 
                 //Core.Loggers.Log($"Pivot point. Period:({inputPeriod}); From:({this.history.FromTime}); LoadedCount:{this.history.Count}; try:{coefficient}; {this.Symbol}");

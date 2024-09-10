@@ -54,7 +54,7 @@ public class IndicatorSuperTrend : Indicator, IWatchlistIndicator
         if (this.Count < this.AtrPeriod)
             return;
 
-        var isNewBar = this.HistoricalData.Period == Period.TICK1
+        var isNewBar = this.HistoricalData.Aggregation.GetPeriod == Period.TICK1
             ? args.Reason == UpdateReason.NewTick || args.Reason == UpdateReason.HistoricalBar
             : args.Reason == UpdateReason.NewBar || args.Reason == UpdateReason.HistoricalBar;
 

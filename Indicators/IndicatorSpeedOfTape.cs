@@ -63,7 +63,7 @@ public class IndicatorSpeedOfTape : Indicator, IVolumeAnalysisIndicator
         if (!this.volumeDataLoaded)
             return;
         double number = Math.Abs(this.HistoricalData[this.Count - 1, SeekOriginHistory.Begin].VolumeAnalysisData.Total.GetValue(this.DataType));
-        double seconds = new TimeSpan(this.HistoricalData.Period.Ticks).TotalSeconds;
+        double seconds = new TimeSpan(this.HistoricalData.Aggregation.GetPeriod.Ticks).TotalSeconds;
         double speed = number / seconds;
         this.SmoothingSource.SetValue(0, 0, 0, speed);
         this.SetValue(speed, 0);

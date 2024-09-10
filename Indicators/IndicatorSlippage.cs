@@ -94,8 +94,7 @@ public class IndicatorSlippage : Indicator
                         FromTime = intervalToDownload[j].From,
                         ToTime = intervalToDownload[j].To,
 
-                        Aggregation = new HistoryAggregationTick(1),
-                        HistoryType = HistoryType.Last,
+                        Aggregation = new HistoryAggregationTick(HistoryType.Last),
 
                         CancellationToken = token,
                         //ForceReload = isForceReload

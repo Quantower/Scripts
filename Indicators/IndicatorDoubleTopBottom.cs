@@ -42,7 +42,7 @@ public class IndicatorDoubleTopBottom : Indicator
     {
         var graphics = args.Graphics;
 
-        if (this.HistoricalData.Aggregation.GetPeriod.BasePeriod == BasePeriod.Tick)
+        if (this.HistoricalData.Aggregation is HistoryAggregationTick)
         {
             graphics.DrawString("Indicator does not work on tick aggregation", new Font("Arial", 20), Brushes.Red, 20, 50);
             return;

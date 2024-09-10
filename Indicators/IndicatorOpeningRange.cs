@@ -504,12 +504,11 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
                     historyCache.Add(this.Symbol.GetHistory(new HistoryRequestParameters()
                     {
                         CancellationToken = token,
-                        Aggregation = new HistoryAggregationTime(Period.SECOND1),
+                        Aggregation = new HistoryAggregationTime(Period.SECOND1, this.Symbol.HistoryType),
                         Symbol = this.Symbol,
                         FromTime = startTime,
                         ToTime = ceilingStartDT,
                         ForceReload = forceReload,
-                        HistoryType = this.Symbol.HistoryType
                     }));
                 }
                 
@@ -519,12 +518,11 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
                     historyCache.Add(this.Symbol.GetHistory(new HistoryRequestParameters()
                     {
                         CancellationToken = token,
-                        Aggregation = new HistoryAggregationTime(Period.MIN1),
+                        Aggregation = new HistoryAggregationTime(Period.MIN1, this.Symbol.HistoryType),
                         Symbol = this.Symbol,
                         FromTime = ceilingStartDT,
                         ToTime = floorEndDT,
                         ForceReload = forceReload,
-                        HistoryType = this.Symbol.HistoryType
                     }));
                 }
 
@@ -534,12 +532,11 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
                     historyCache.Add(this.Symbol.GetHistory(new HistoryRequestParameters()
                     {
                         CancellationToken = token,
-                        Aggregation = new HistoryAggregationTime(Period.SECOND1),
+                        Aggregation = new HistoryAggregationTime(Period.SECOND1, this.Symbol.HistoryType),
                         Symbol = this.Symbol,
                         FromTime = floorEndDT,
                         ToTime = endTime,
                         ForceReload = forceReload,
-                        HistoryType = this.Symbol.HistoryType
                     }));
                 }
                

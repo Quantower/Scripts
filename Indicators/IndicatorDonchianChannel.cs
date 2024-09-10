@@ -66,7 +66,7 @@ public class IndicatorDonchianChannel : Indicator, IWatchlistIndicator
 
         double smin, smax;
 
-        var isNewBar = this.HistoricalData.Period == TradingPlatform.BusinessLayer.Period.TICK1
+        var isNewBar = this.HistoricalData.Aggregation.GetPeriod == TradingPlatform.BusinessLayer.Period.TICK1
             ? args.Reason == UpdateReason.NewTick || args.Reason == UpdateReason.HistoricalBar
             : args.Reason == UpdateReason.NewBar || args.Reason == UpdateReason.HistoricalBar;
 

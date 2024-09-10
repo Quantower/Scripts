@@ -74,7 +74,7 @@ public class IndicatorContador : Indicator
     protected override void OnInit()
     {
         this.calculatedMessage = string.Empty;
-        this.isCorrectTimeFrame = this.HistoricalData.Period.BasePeriod == BasePeriod.Tick;
+        this.isCorrectTimeFrame = this.HistoricalData.Aggregation.GetPeriod.BasePeriod == BasePeriod.Tick;
         this.messageMargin = this.isCorrectTimeFrame
             ? 30
             : 70;
@@ -91,11 +91,11 @@ public class IndicatorContador : Indicator
         if (this.isCorrectTimeFrame)
         {
             int ticksCount = this.IsCountdown
-                ? this.HistoricalData.Period.PeriodMultiplier - (int)this.Ticks()
+                ? this.HistoricalData.Aggregation.GetPeriod.PeriodMultiplier - (int)this.Ticks()
                 : (int)this.Ticks();
 
             this.calculatedMessage = this.ShowPercentages
-                ? this.prefix + ticksCount * 100 / this.HistoricalData.Period.PeriodMultiplier + " %"
+                ? this.prefix + ticksCount * 100 / this.HistoricalData.Aggregation.GetPeriod.PeriodMultiplier + " %"
                 : this.prefix + ticksCount.ToString();
         }
     }
