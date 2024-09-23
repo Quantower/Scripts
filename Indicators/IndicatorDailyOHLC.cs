@@ -445,13 +445,13 @@ public class IndicatorDailyOHLC : Indicator
                 SortIndex = 10,
             });
             //
-            settings.Add(new SettingItemString("CustomSessionName", this.CustomSessionName, 20)
+            settings.Add(new SettingItemString("Custom session name", this.CustomSessionName, 20)
             {
                 SeparatorGroup = defaultSeparator,
                 Text = loc._("Custom session name"),
                 Relation = new SettingItemRelationVisibility("Session type", specifiedSession)
             });
-            settings.Add(new SettingItemDateTime("StartTime", this.customRangeStartTime, 20)
+            settings.Add(new SettingItemDateTime("Start time", this.customRangeStartTime, 20)
             {
                 SeparatorGroup = defaultSeparator,
                 Text = loc._("Start time"),
@@ -459,7 +459,7 @@ public class IndicatorDailyOHLC : Indicator
                 ValueChangingBehavior = SettingItemValueChangingBehavior.WithConfirmation,
                 Relation = new SettingItemRelationVisibility("Session type", customRange)
             });
-            settings.Add(new SettingItemDateTime("EndTime", this.customRangeEndTime, 20)
+            settings.Add(new SettingItemDateTime("End time", this.customRangeEndTime, 20)
             {
                 SeparatorGroup = defaultSeparator,
                 Text = loc._("End time"),
@@ -467,25 +467,25 @@ public class IndicatorDailyOHLC : Indicator
                 ValueChangingBehavior = SettingItemValueChangingBehavior.WithConfirmation,
                 Relation = new SettingItemRelationVisibility("Session type", customRange)
             });
-            settings.Add(new SettingItemInteger("DaysCount", this.DaysCount, 20)
+            settings.Add(new SettingItemInteger("Numbers of days to calculate", this.DaysCount, 20)
             {
                 SeparatorGroup = defaultSeparator,
                 Text = loc._("Numbers of days to calculate"),
                 Relation = new SettingItemRelationVisibility("Session type", allDay, specifiedSession, customRange)
             });
-            settings.Add(new SettingItemInteger("PreviousDataOffset", this.PreviousDataOffset, 20)
+            settings.Add(new SettingItemInteger("Use previous data (offset in days)", this.PreviousDataOffset, 20)
             {
                 SeparatorGroup = defaultSeparator,
                 Text = loc._("Use previous data (offset in days)"),
                 Relation = new SettingItemRelationVisibility("Session type", allDay, specifiedSession, customRange)
             });
-            settings.Add(new SettingItemBoolean("ShowExtendLines", this.UseExtendLines, 40)
+            settings.Add(new SettingItemBoolean("Show extend lines", this.UseExtendLines, 40)
             {
                 SeparatorGroup = defaultSeparator,
                 Text = loc._("Show extend lines"),
                 Relation = new SettingItemRelationVisibility("Session type", specifiedSession, customRange)
             });
-            settings.Add(new SettingItemDateTime("StartExtendTime", this.extendRangeStartTime, 45)
+            settings.Add(new SettingItemDateTime("Start extend time", this.extendRangeStartTime, 45)
             {
                 SeparatorGroup = defaultSeparator,
                 Text = loc._("Start extend time"),
@@ -493,7 +493,7 @@ public class IndicatorDailyOHLC : Indicator
                 ValueChangingBehavior = SettingItemValueChangingBehavior.WithConfirmation,
                 Relation = new SettingItemRelationVisibility("ShowExtendLines", true)
             });
-            settings.Add(new SettingItemDateTime("EndExtendTime", this.extendRangeEndTime, 50)
+            settings.Add(new SettingItemDateTime("End extend time", this.extendRangeEndTime, 50)
             {
                 SeparatorGroup = defaultSeparator,
                 Text = loc._("End extend time"),
@@ -725,30 +725,30 @@ public class IndicatorDailyOHLC : Indicator
                 this.DailySessionType = item.GetValue<DailyOHLCSessionType>();
                 needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
             }
-            if (holder.TryGetValue("CustomSessionName", out item) && item.Value is string customSessionName)
+            if (holder.TryGetValue("Custom session name", out item) && item.Value is string customSessionName)
                 this.CustomSessionName = customSessionName;
-            if (holder.TryGetValue("StartTime", out item) && item.Value is DateTime dtStartTime)
+            if (holder.TryGetValue("Start time", out item) && item.Value is DateTime dtStartTime)
             {
                 this.customRangeStartTime = dtStartTime;
                 needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
             }
-            if (holder.TryGetValue("EndTime", out item) && item.Value is DateTime dtEndTime)
+            if (holder.TryGetValue("End time", out item) && item.Value is DateTime dtEndTime)
             {
                 this.customRangeEndTime = dtEndTime;
                 needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
             }
-            if (holder.TryGetValue("DaysCount", out item) && item.Value is int daysCount)
+            if (holder.TryGetValue("Numbers of days to calculate", out item) && item.Value is int daysCount)
                 this.DaysCount = daysCount;
-            if (holder.TryGetValue("PreviousDataOffset", out item) && item.Value is int previousDataOffset)
+            if (holder.TryGetValue("Use previous data (offset in days)", out item) && item.Value is int previousDataOffset)
                 this.PreviousDataOffset = previousDataOffset;
-            if (holder.TryGetValue("ShowExtendLines", out item) && item.Value is bool useExtendLines)
+            if (holder.TryGetValue("Show extend lines", out item) && item.Value is bool useExtendLines)
                 this.UseExtendLines = useExtendLines;
-            if (holder.TryGetValue("StartExtendTime", out item) && item.Value is DateTime dtStartExtendTime)
+            if (holder.TryGetValue("Start extend time", out item) && item.Value is DateTime dtStartExtendTime)
             {
                 this.extendRangeStartTime = dtStartExtendTime;
                 needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
             }
-            if (holder.TryGetValue("EndExtendTime", out item) && item.Value is DateTime dtEndExtendTime)
+            if (holder.TryGetValue("End extend time", out item) && item.Value is DateTime dtEndExtendTime)
             {
                 this.extendRangeEndTime = dtEndExtendTime;
                 needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
