@@ -719,12 +719,24 @@ public class IndicatorDailyOHLC : Indicator
             if (holder.TryGetValue("MiddleCustomText", out item) && item.Value is string middleCustomText)
                 this.MiddleCustomText = middleCustomText;
 
+            var needRefresh = false;
+            if (holder.TryGetValue("Session type", out item) && item.GetValue<DailyOHLCSessionType>() != this.DailySessionType)
+            {
+                this.DailySessionType = item.GetValue<DailyOHLCSessionType>();
+                needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
+            }
             if (holder.TryGetValue("CustomSessionName", out item) && item.Value is string customSessionName)
                 this.CustomSessionName = customSessionName;
             if (holder.TryGetValue("StartTime", out item) && item.Value is DateTime dtStartTime)
+            {
                 this.customRangeStartTime = dtStartTime;
+                needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
+            }
             if (holder.TryGetValue("EndTime", out item) && item.Value is DateTime dtEndTime)
+            {
                 this.customRangeEndTime = dtEndTime;
+                needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
+            }
             if (holder.TryGetValue("DaysCount", out item) && item.Value is int daysCount)
                 this.DaysCount = daysCount;
             if (holder.TryGetValue("PreviousDataOffset", out item) && item.Value is int previousDataOffset)
@@ -732,9 +744,15 @@ public class IndicatorDailyOHLC : Indicator
             if (holder.TryGetValue("ShowExtendLines", out item) && item.Value is bool useExtendLines)
                 this.UseExtendLines = useExtendLines;
             if (holder.TryGetValue("StartExtendTime", out item) && item.Value is DateTime dtStartExtendTime)
+            {
                 this.extendRangeStartTime = dtStartExtendTime;
+                needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
+            }
             if (holder.TryGetValue("EndExtendTime", out item) && item.Value is DateTime dtEndExtendTime)
+            {
                 this.extendRangeEndTime = dtEndExtendTime;
+                needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
+            }
             if (holder.TryGetValue("Font", out item) && item.Value is Font font)
                 this.CurrentFont = font;
             if (holder.TryGetValue("Label alignment", out item) && item.Value is NativeAlignment labelAlignment)
@@ -745,6 +763,8 @@ public class IndicatorDailyOHLC : Indicator
                 this.labelPosition = lpitem.GetValue<int>();
             if (holder.TryGetValue("Format", out var lfitem)&& lfitem.GetValue<int>() != this.labelFormat)
                 this.labelFormat = lfitem.GetValue<int>();
+            if (needRefresh)
+                this.Refresh();
             base.Settings = value;
         }
     }
