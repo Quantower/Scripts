@@ -1,5 +1,6 @@
 // Copyright QUANTOWER LLC. © 2017-2024. All rights reserved.
 
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -18,20 +19,12 @@ public sealed class IndicatorRLarryWilliams : Indicator, IWatchlistIndicator
     public override string HelpLink => "https://help.quantower.com/analytics-panels/chart/technical-indicators/oscillators/r-larry-williams";
     public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorQstick.cs";
 
-    // Highest 
-    private readonly List<double> highest;
-    // Lowest 
-    private readonly List<double> lowest;
-
     /// <summary>
     /// Indicator's constructor. Contains general information: name, description, LineSeries etc. 
     /// </summary>
     public IndicatorRLarryWilliams()
         : base()
     {
-        this.highest = new List<double>();
-        this.lowest = new List<double>();
-
         // Serves for an identification of related indicators with different parameters.
         this.Name = "%R Larry Williams";
         this.Description = "Uses Stochastic to determine overbought and oversold levels";
@@ -53,20 +46,11 @@ public sealed class IndicatorRLarryWilliams : Indicator, IWatchlistIndicator
     /// <param name="args">Provides data of updating reason and incoming price.</param>
     protected override void OnUpdate(UpdateArgs args)
     {
-        if (args.Reason != UpdateReason.NewTick)
-        {
-            this.highest.Insert(0, 0);
-            this.lowest.Insert(0, 0);
-        }
-
-        this.highest[0] = this.GetPrice(PriceType.High);
-        this.lowest[0] = this.GetPrice(PriceType.Low);
-
-        if (this.Count < this.MinHistoryDepths)
+        if (this.Count < this.Period)
             return;
 
-        double highestPrice = this.highest.Take(this.Period).Max();
-        double lowestPrice = this.lowest.Take(this.Period).Min();
+        double highestPrice = Enumerable.Range(0, this.Period).Select(i => this.GetPrice(PriceType.High, i)).Max();
+        double lowestPrice = Enumerable.Range(0, this.Period).Select(i => this.GetPrice(PriceType.Low, i)).Min();
 
         if (highestPrice - lowestPrice > 1e-7)
             this.SetValue(-100 * (highestPrice - this.GetPrice(PriceType.Close)) / (highestPrice - lowestPrice));
