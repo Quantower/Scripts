@@ -70,9 +70,11 @@ public class IndicatorSlippage : Indicator
         this.slippageFinder.OnNewArea += this.SlippageFinder_OnNewArea;
         this.dataExporter.Initialize();
 
+        var aggregation = new HistoryAggregationTick(HistoryType.Last);
+
         // from (time of first item) to (now)
         var intervalToDownload = new Interval<DateTime>(this.HistoricalData[0, SeekOriginHistory.Begin].TimeLeft, Core.TimeUtils.DateTimeUtcNow)
-           .Split(this.Symbol.GetHistoryDownloadingStep(Period.TICK1))
+           .Split(this.Symbol.GetHistoryDownloadingStep(aggregation))
            .ToArray();
 
         this.Symbol.NewLast += this.Symbol_NewLast;
@@ -94,7 +96,7 @@ public class IndicatorSlippage : Indicator
                         FromTime = intervalToDownload[j].From,
                         ToTime = intervalToDownload[j].To,
 
-                        Aggregation = new HistoryAggregationTick(HistoryType.Last),
+                        Aggregation = aggregation,
 
                         CancellationToken = token,
                         //ForceReload = isForceReload

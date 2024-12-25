@@ -52,7 +52,7 @@ public sealed class IndicatorMovingAverageConvergenceDivergence : Indicator, IWa
         this.AddLineSeries("MACD", Color.DodgerBlue, 1, LineStyle.Solid);
         this.AddLineSeries("Signal", Color.Red, 1, LineStyle.Solid);
         this.AddLineSeries("OsMA", Color.Green, 4, LineStyle.Histogramm);
-
+        this.AddLineLevel(0, "0 level", Color.DarkGreen, 1, LineStyle.Solid);
         this.SeparateWindow = true;
     }
 
@@ -75,6 +75,8 @@ public sealed class IndicatorMovingAverageConvergenceDivergence : Indicator, IWa
         // Add auxiliary EMA indicators to the current one. 
         this.AddIndicator(this.fastEMA);
         this.AddIndicator(this.slowEMA);
+
+        LinesLevels[0].Visible = false;
     }
 
     /// <summary>

@@ -74,6 +74,8 @@ public class IndicatorDivergenceDetector : Indicator
     private readonly StringFormat centerNearSF;
     private Font currentFont;
 
+    private bool hideshowSignatures;
+
     private string selectedIndicatorName;
 
     public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorDivergenceDetector.cs";
@@ -273,6 +275,11 @@ public class IndicatorDivergenceDetector : Indicator
                 : new SettingItemSeparatorGroup("");
 
             var separatorGroup = new SettingItemSeparatorGroup(string.Empty, -999);
+            settings.Add(new SettingItemBoolean("HideShowSignatures", this.hideshowSignatures, 40)
+            {
+                Text = loc._("Hide signatures"),
+                SeparatorGroup = separatorGroup
+            });
             settings.Add(new SettingItemLineOptions("RegularBullishStyle", this.RegularBullishLineStyle, 50)
             {
                 Text = loc._("Regular bullish line style"),
@@ -334,6 +341,8 @@ public class IndicatorDivergenceDetector : Indicator
         }
         set
         {
+            if (value.GetItemByName("HideShowSignatures")?.Value is Boolean HideShowSignatures)
+                this.hideshowSignatures= HideShowSignatures;
             if (value.GetItemByName("RegularBullishStyle")?.Value is LineOptions regularBullish)
                 this.RegularBullishLineStyle = regularBullish;
 
@@ -483,7 +492,7 @@ public class IndicatorDivergenceDetector : Indicator
                             tempPen = this.regularBullishLinePen;
                             lineOption = this.RegularBullishLineStyle;
                             isTopBilletPosition = false;
-                            billetText = "Regular bull";
+                            billetText = hideshowSignatures==false ? "Regular bull" : "";
                             break;
                         }
                     case DivergenceType.HiddenBullish:
@@ -494,7 +503,7 @@ public class IndicatorDivergenceDetector : Indicator
                             tempPen = this.hiddenBullishLinePen;
                             lineOption = this.HiddenBullishLineStyle;
                             isTopBilletPosition = false;
-                            billetText = "Hidden bull";
+                            billetText = hideshowSignatures == false ? "Hidden bull" : "";
                             break;
                         }
                     case DivergenceType.RegularBearish:
@@ -505,7 +514,7 @@ public class IndicatorDivergenceDetector : Indicator
                             tempPen = this.regularBearishLinePen;
                             lineOption = this.RegularBearishLineStyle;
                             isTopBilletPosition = true;
-                            billetText = "Regular bear";
+                            billetText = hideshowSignatures == false ? "Regular bear" : "";
                             break;
                         }
                     case DivergenceType.HiddenBearish:
@@ -516,7 +525,7 @@ public class IndicatorDivergenceDetector : Indicator
                             tempPen = this.hiddenBearishLinePen;
                             lineOption = this.HiddenBearishLineStyle;
                             isTopBilletPosition = true;
-                            billetText = "Hidden bear";
+                            billetText = hideshowSignatures == false ? "Hidden bear" : "";
                             break;
                         }
                 }
