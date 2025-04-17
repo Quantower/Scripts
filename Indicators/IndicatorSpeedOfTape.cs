@@ -48,7 +48,7 @@ public class IndicatorSpeedOfTape : Indicator, IVolumeAnalysisIndicator
 
     public void VolumeAnalysisData_Loaded()
     {
-        volumeDataLoaded = true;
+        this.volumeDataLoaded = true;
         this.OnSettingsUpdated();
     }
 
@@ -60,10 +60,17 @@ public class IndicatorSpeedOfTape : Indicator, IVolumeAnalysisIndicator
     }
     protected override void OnUpdate(UpdateArgs args)
     {
-        if (!this.volumeDataLoaded)
+        if (!this.volumeDataLoaded || this.HistoricalData.Aggregation is HistoryAggregationTick || this.HistoricalData[this.Count - 1, SeekOriginHistory.Begin].VolumeAnalysisData == null)
             return;
         double number = Math.Abs(this.HistoricalData[this.Count - 1, SeekOriginHistory.Begin].VolumeAnalysisData.Total.GetValue(this.DataType));
-        double seconds = new TimeSpan(this.HistoricalData.Aggregation.GetPeriod.Ticks).TotalSeconds;
+        double seconds;
+        if (this.HistoricalData.Aggregation is HistoryAggregationTime aggregationTime)
+            seconds = aggregationTime.Period.Duration.TotalSeconds;
+        else
+        {
+            var currHistoryItem = this.HistoricalData[this.Count - 1, SeekOriginHistory.Begin];
+            seconds = new TimeSpan(currHistoryItem.TicksRight - currHistoryItem.TicksLeft).TotalSeconds;
+        }
         double speed = number / seconds;
         this.SmoothingSource.SetValue(0, 0, 0, speed);
         this.SetValue(speed, 0);
@@ -71,12 +78,14 @@ public class IndicatorSpeedOfTape : Indicator, IVolumeAnalysisIndicator
         if (this.controlLineType == ControlLineType.Smoothed)
             smoothed = this.smoothing.GetValue();
         this.SetValue(smoothed, 1);
-        LinesSeries[0].RemoveMarker(0);
+        this.LinesSeries[0].RemoveMarker(0);
+        if (this.paintBar)
+            this.SetBarColor();
         if (speed > smoothed)
         {
-            LinesSeries[0].SetMarker(0, new IndicatorLineMarker(abnormalColor, upperIcon: this.markerIcon));
+            this.LinesSeries[0].SetMarker(0, new IndicatorLineMarker(abnormalColor, upperIcon: this.markerIcon));
             if (this.paintBar)
-                this.SetBarColor(abnormalColor);
+                this.SetBarColor(this.abnormalColor);
         }
     }
     public override void OnPaintChart(PaintChartEventArgs args)
@@ -91,6 +100,11 @@ public class IndicatorSpeedOfTape : Indicator, IVolumeAnalysisIndicator
         graphics.SetClip(args.Rectangle);
         try
         {
+            if (this.HistoricalData.Aggregation is HistoryAggregationTick)
+            {
+                graphics.DrawString("Indicator does not work on tick aggregation", new Font("Arial", 20), Brushes.Red, 20, 50);
+                return;
+            }
             if (!this.volumeDataLoaded)
                 graphics.DrawString(LoadingMessage, this.font, Brushes.DodgerBlue, args.Rectangle, this.centerCenterSF);
         }

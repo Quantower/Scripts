@@ -3,7 +3,7 @@
 using System.Drawing;
 using TradingPlatform.BusinessLayer;
 
-namespace Trend;
+namespace MovingAverageIndicators;
 
 public sealed class IndicatorAlligator : Indicator
 {

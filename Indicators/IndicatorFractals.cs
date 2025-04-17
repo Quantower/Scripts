@@ -1,4 +1,3 @@
-using CommandLine;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -9,7 +8,7 @@ namespace Fractals;
 
 public class IndicatorFractals : Indicator
 {
-    [InputParameter("Period", 10)]
+    [InputParameter("Period", 10, 2)]
     public int period = 3;
 
     [InputParameter("Local Maximum Color", 20)]
@@ -20,6 +19,20 @@ public class IndicatorFractals : Indicator
 
     [InputParameter("Draw marker lines untils intersection", 40)]
     public bool drawLinesUntilInterstion = false;
+
+    [InputParameter("Local maximum icon type", 1, variants: new object[]{
+        "Arrow", IndicatorLineMarkerIconType.UpArrow,
+        "Flag", IndicatorLineMarkerIconType.Flag,
+        "Circle", IndicatorLineMarkerIconType.FillCircle,
+    })]
+    public IndicatorLineMarkerIconType localMaxIconType = IndicatorLineMarkerIconType.UpArrow;
+
+    [InputParameter("Local minimum icon type", 1, variants: new object[]{
+        "Arrow", IndicatorLineMarkerIconType.DownArrow,
+        "Flag", IndicatorLineMarkerIconType.Flag,
+        "Circle", IndicatorLineMarkerIconType.FillCircle,
+    })]
+    public IndicatorLineMarkerIconType localMinIconType = IndicatorLineMarkerIconType.DownArrow;
 
     public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorFractals.cs";
 
@@ -76,11 +89,10 @@ public class IndicatorFractals : Indicator
             if (baseLow < currentLow)
                 minTrendValue++;
         }
-
         if (maxTrendValue == period * 2)
-            LinesSeries[0].SetMarker(period, new IndicatorLineMarker(maximumColor, upperIcon: IndicatorLineMarkerIconType.UpArrow));
+            LinesSeries[0].SetMarker(period, new IndicatorLineMarker(this.maximumColor, upperIcon: this.localMaxIconType));
         if (minTrendValue == period * 2)
-            LinesSeries[1].SetMarker(period, new IndicatorLineMarker(minimumColor, bottomIcon: IndicatorLineMarkerIconType.DownArrow));
+            LinesSeries[1].SetMarker(period, new IndicatorLineMarker(this.minimumColor, bottomIcon: this.localMinIconType));
 
         if (maxTrendValue != period * 2 && minTrendValue != period * 2)
         {
@@ -105,11 +117,11 @@ public class IndicatorFractals : Indicator
             List<MarkerLineItem> markersCache = new List<MarkerLineItem>();
             double topPrice = this.CurrentChart.MainWindow.CoordinatesConverter.GetPrice(this.CurrentChart.MainWindow.ClientRectangle.Top);
             double bottomPrice = this.CurrentChart.MainWindow.CoordinatesConverter.GetPrice(this.CurrentChart.MainWindow.ClientRectangle.Bottom);
-            Pen maximumPen = new Pen(this.maximumColor, 1) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash};
+            Pen maximumPen = new Pen(this.maximumColor, 1) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash };
             Pen minimumPen = new Pen(this.minimumColor, 1) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash };
 
             // Check
-            for (int i = 0; i<this.Count; i++)
+            for (int i = 0; i < this.Count; i++)
             {
                 int indexFromBegin = this.Count - i - 1;
 
@@ -117,18 +129,18 @@ public class IndicatorFractals : Indicator
                 double highPrice = this.High(indexFromBegin);
                 double lowPrice = this.Low(indexFromBegin);
                 int barX = (int)this.CurrentChart.MainWindow.CoordinatesConverter.GetChartX(this.Time(indexFromBegin));
-                int halfBarWidth = (int)(this.CurrentChart.BarsWidth/2.0);
+                int halfBarWidth = (int)(this.CurrentChart.BarsWidth / 2.0);
                 int highY = (int)this.CurrentChart.MainWindow.CoordinatesConverter.GetChartY(highPrice);
                 int lowY = (int)this.CurrentChart.MainWindow.CoordinatesConverter.GetChartY(lowPrice);
 
-                for (int j = 0; j<markersCache.Count; j++)
+                for (int j = 0; j < markersCache.Count; j++)
                 {
                     var currentMarker = markersCache[j];
 
-                    if ((currentMarker.Price<=highPrice && currentMarker.Price>=lowPrice) || indexFromBegin==0)
+                    if ((currentMarker.Price <= highPrice && currentMarker.Price >= lowPrice) || indexFromBegin == 0)
                     {
-                        gr.DrawLine(currentMarker.IsMax ? maximumPen : minimumPen, currentMarker.StartX, currentMarker.Y, barX+((indexFromBegin==0) ?halfBarWidth:0), currentMarker.Y);
-                        currentMarker.Closed=true;
+                        gr.DrawLine(currentMarker.IsMax ? maximumPen : minimumPen, currentMarker.StartX, currentMarker.Y, barX + ((indexFromBegin == 0) ? halfBarWidth : 0), currentMarker.Y);
+                        currentMarker.Closed = true;
                     }
                 }
                 markersCache = markersCache.Where(x => !x.Closed).ToList();
@@ -137,15 +149,15 @@ public class IndicatorFractals : Indicator
                 var marker = this.LinesSeries[0].GetMarker(indexFromBegin);
                 if (marker != null)
                 {
-                    if (highPrice>topPrice || highPrice<bottomPrice)
+                    if (highPrice > topPrice || highPrice < bottomPrice)
                         continue;
 
                     markersCache.Add(new MarkerLineItem()
                     {
                         Price = highPrice,
-                        StartX = barX+halfBarWidth,
+                        StartX = barX + halfBarWidth,
                         Y = highY,
-                        IsMax=true
+                        IsMax = true
                     });
                 }
 
@@ -153,20 +165,20 @@ public class IndicatorFractals : Indicator
                 marker = this.LinesSeries[1].GetMarker(indexFromBegin);
                 if (marker != null)
                 {
-                    if (lowPrice>topPrice || lowPrice<bottomPrice)
+                    if (lowPrice > topPrice || lowPrice < bottomPrice)
                         continue;
 
                     markersCache.Add(new MarkerLineItem()
                     {
                         Price = lowPrice,
-                        StartX = barX+halfBarWidth,
+                        StartX = barX + halfBarWidth,
                         Y = lowY,
-                        IsMax=false
+                        IsMax = false
                     });
                 }
             }
         }
-        catch(Exception ex)
+        catch (Exception ex)
         {
             Core.Instance.Loggers.Log(ex);
         }

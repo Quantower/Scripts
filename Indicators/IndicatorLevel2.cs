@@ -119,6 +119,49 @@ public class IndicatorLevel2 : Indicator
     private readonly Font font;
     private readonly StringFormat farCenter;
 
+    private bool IsMBOMode;
+    private double mboFilter;
+    private bool UseHighlight;
+    private double mboItemHighlightValue;
+
+    private SolidBrush mboItemFontBrush;
+    private Color mboItemFontColor;
+    private Color MBOItemFontColor
+    {
+        get => this.mboItemFontColor;
+        set
+        {
+            this.mboItemFontColor = value;
+            this.mboItemFontBrush = new SolidBrush(value);
+        }
+    }
+
+    private SolidBrush mboItemHighlightFontBrush;
+    private Color mboItemHighlightFontColor;
+    private Color MBOItemHighlightFontColor
+    {
+        get => this.mboItemHighlightFontColor;
+        set
+        {
+            this.mboItemHighlightFontColor = value;
+            this.mboItemHighlightFontBrush = new SolidBrush(value);
+        }
+    }
+
+    private readonly StringFormat mboCenter;
+    private Color mboItemBorderColor;
+    private Color MBOItemBorderColor
+    {
+        get => this.mboItemBorderColor;
+        set
+        {
+            this.mboItemBorderColor = value;
+            this.mboItemBorderPen = new Pen(value);
+        }
+    }
+    private Pen mboItemBorderPen;
+
+
     public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorLevel2.cs";
 
     #endregion Parameters
@@ -138,6 +181,15 @@ public class IndicatorLevel2 : Indicator
 
         this.font = new Font("Verdana", 10, FontStyle.Regular, GraphicsUnit.Pixel);
         this.farCenter = new StringFormat() { Alignment = StringAlignment.Far, LineAlignment = StringAlignment.Center };
+
+        this.MBOItemFontColor = Color.White;
+        this.MBOItemBorderColor = Color.White;
+        this.MBOItemHighlightFontColor = Color.Yellow;
+        this.mboCenter = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+        this.IsMBOMode = false;
+        this.mboFilter = 0;
+        this.UseHighlight = false;  
+        this.mboItemHighlightValue = 0;
     }
 
     #region Overrides
@@ -161,6 +213,7 @@ public class IndicatorLevel2 : Indicator
             var settings = base.Settings;
 
             var separator = settings.FirstOrDefault()?.SeparatorGroup;
+            var mboSeparator = new SettingItemSeparatorGroup("MBO orders");
 
             settings.Add(new SettingItemPairColor("AskStyle", new PairColor(this.AskLabelColor, this.AskColor, loc._("Text"), loc._("Back")), 40)
             {
@@ -171,6 +224,44 @@ public class IndicatorLevel2 : Indicator
             {
                 Text = loc._("Bid style"),
                 SeparatorGroup = separator
+            });
+
+            settings.Add(new SettingItemBoolean("IsMBOMode", this.IsMBOMode)
+            {
+                Text = "MBO mode",
+                SeparatorGroup = mboSeparator
+            });
+
+            settings.Add(new SettingItemDouble("mboFilter", this.mboFilter)
+            {
+                Text = "Filter orders more than (MBO)",
+                SeparatorGroup = mboSeparator
+            });
+
+            settings.Add(new SettingItemColor("MBOItemFontColor", this.MBOItemFontColor)
+            {
+                Text = "MBO item font color",
+                SeparatorGroup = mboSeparator
+            });
+
+            settings.Add(new SettingItemColor("MBOItemBorderColor", this.MBOItemBorderColor)
+            {
+                Text = "MBO item border color",
+                SeparatorGroup = mboSeparator
+            });
+
+            settings.Add(new SettingItemColor("MBOItemHighlightFontColor", this.MBOItemHighlightFontColor)
+            {
+                Text = "Highlight values more than",
+                WithCheckBox = true,
+                Checked = this.UseHighlight,
+                SeparatorGroup = mboSeparator
+            });
+
+            settings.Add(new SettingItemDouble("mboItemHighlightValue", this.mboItemHighlightValue)
+            {
+                Text = "Value",
+                SeparatorGroup = mboSeparator
             });
 
             settings.Add(new SettingItemGroup("FiltersCache", this.filtersCache.Settings));
@@ -207,6 +298,27 @@ public class IndicatorLevel2 : Indicator
                 this.BidLabelColor = bidStyle.Color1;
                 this.BidColor = bidStyle.Color2;
             }
+
+            if (holder.TryGetValue("IsMBOMode", out si) && si.Value is bool mm)
+                this.IsMBOMode = mm;
+
+            if (holder.TryGetValue("mboFilter", out si) && si.Value is double mf)
+                this.mboFilter = mf;
+
+            if (holder.TryGetValue("MBOItemFontColor", out si) && si.Value is Color ic)
+                this.MBOItemFontColor = ic;
+
+            if (holder.TryGetValue("MBOItemBorderColor", out si) && si.Value is Color bc)
+                this.MBOItemBorderColor = bc;
+
+            if (holder.TryGetValue("MBOItemHighlightFontColor", out si) && si is SettingItemColor colorSI)
+            {
+                this.UseHighlight = colorSI.Checked;
+                this.MBOItemHighlightFontColor = (Color)colorSI.Value;
+            }
+
+            if (holder.TryGetValue("mboItemHighlightValue", out si) && si.Value is double hv)
+                this.mboItemHighlightValue = hv;
 
             if (holder.TryGetValue("FiltersCache", out si) && si?.Value is IList<SettingItem> filtersCacheSI)
                 this.filtersCache.Settings = filtersCacheSI;
@@ -260,6 +372,10 @@ public class IndicatorLevel2 : Indicator
         this.bidHistogramBrush?.Dispose();
         this.bidSizeFontBrush?.Dispose();
 
+        this.mboItemHighlightFontBrush?.Dispose();
+        this.mboItemFontBrush?.Dispose();
+        this.priceFontBrush?.Dispose();
+
         this.filtersCache?.Dispose();
 
         base.Dispose();
@@ -295,6 +411,7 @@ public class IndicatorLevel2 : Indicator
                 AggregateMethod = AggregateMethod.ByPriceLVL,
                 CustomTickSize = this.CurrentChart.TickSize,
                 LevelsCount = this.LevelsCount,
+                GetMBOItems = this.IsMBOMode
             }
         });
 
@@ -331,6 +448,7 @@ public class IndicatorLevel2 : Indicator
 
                 cacheItem.Price = newItem.Price;
                 cacheItem.Size = newItem.Size;
+                cacheItem.DetailedLevels = newItem.DetailedLevels;
 
                 if (this.filtersCache.TryGetHighlightLevel(cacheItem.Size, out var level))
                 {
@@ -347,7 +465,7 @@ public class IndicatorLevel2 : Indicator
             }
         }
 
-
+        
     }
     private void DrawLevels(Graphics gr, Symbol symbol, Rectangle windowRect, IList<Lvl2LevelItem> items, int maxWidth, DrawingLevelType type)
     {
@@ -415,6 +533,33 @@ public class IndicatorLevel2 : Indicator
                 if (drawText && windowRect.Width - item.Rectangle.Width >= sizeTextWidth)
                     gr.DrawString(sizeText, this.font, item.ForeBrush, item.Rectangle.X - 2, item.Rectangle.Y + item.Rectangle.Height / 2, this.farCenter);
 
+                if(this.IsMBOMode)
+                {
+                    var curX = item.Rectangle.X;
+
+                    foreach (var mboItem in item.DetailedLevels)
+                    {
+                        var mboItemRectangle = new RectangleF(curX, item.Rectangle.Y, 0, item.Rectangle.Height);
+                        var width = (float)((mboItem.Size * item.Rectangle.Width) / item.Size);
+                        mboItemRectangle.Width = width;
+
+                        if(mboItem.Size > this.mboFilter)
+                        {
+                            var mboText = symbol.FormatQuantity(mboItem.Size);
+
+                            if (gr.MeasureString(mboText, this.font).Width < mboItemRectangle.Width)
+                            {
+                                var brush = this.UseHighlight && mboItem.Size > this.mboItemHighlightValue ? this.mboItemHighlightFontBrush : this.mboItemFontBrush;
+
+                                gr.DrawString(mboText, this.font, brush, mboItemRectangle, this.mboCenter);
+                            }
+
+                            gr.DrawRectangle(this.mboItemBorderPen, mboItemRectangle);
+                        }
+
+                        curX += mboItemRectangle.Width;
+                    }
+                }
                 gr.FillRectangle(item.BackBrush, item.Rectangle);
             }
 
@@ -440,6 +585,8 @@ public class IndicatorLevel2 : Indicator
 
         public Brush BackBrush { get; set; }
         public Brush ForeBrush { get; set; }
+
+        public Level2Item[] DetailedLevels { get; set; }
 
         public Lvl2LevelItem()
         {
