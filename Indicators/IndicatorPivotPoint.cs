@@ -151,16 +151,30 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
 
         this.State = IndicatorState.Ready;
 
-        if (inputPeriod.Ticks < this.HistoricalData.Aggregation.GetPeriod.Ticks)
-        {
-            this.State = IndicatorState.IncorrectPeriod;
-            return;
-        }
 
-        if (this.HistoricalData.Aggregation is not HistoryAggregationTime historyAggregationTime)
+        if (this.HistoricalData.Aggregation is HistoryAggregationTick)
         {
             this.State = IndicatorState.OneTickNotAllowed;
             return;
+        }
+        HistoryType currHistoryType = HistoryType.Last;
+        if (this.HistoricalData.Aggregation is HistoryAggregationTime historyAggregationTime)
+        {
+            currHistoryType = historyAggregationTime.HistoryType;
+            if (inputPeriod.Ticks < ((HistoryAggregationTime)this.HistoricalData.Aggregation).Period.Duration.Ticks)
+            {
+                this.State = IndicatorState.IncorrectPeriod;
+                return;
+            }
+        }
+        if (this.HistoricalData.Aggregation is HistoryAggregationTickBars historyAggregationTickBars)
+        {
+            currHistoryType = historyAggregationTickBars.HistoryType;
+            if (inputPeriod.Ticks < ((HistoryAggregationTickBars)this.HistoricalData.Aggregation).TicksCount)
+            {
+                this.State = IndicatorState.IncorrectPeriod;
+                return;
+            }
         }
 
         this.loadingTask = Task.Factory.StartNew(() =>
@@ -196,7 +210,7 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
                     Symbol = this.Symbol,
                     FromTime = fromTime,
                     CancellationToken = token,
-                    Aggregation = new HistoryAggregationTime(inputPeriod, historyAggregationTime.HistoryType),
+                    Aggregation = new HistoryAggregationTime(inputPeriod, currHistoryType),
                 });
 
                 //Core.Loggers.Log($"Pivot point. Period:({inputPeriod}); From:({this.history.FromTime}); LoadedCount:{this.history.Count}; try:{coefficient}; {this.Symbol}");
@@ -223,7 +237,6 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
                     this.history.Dispose();
                 }
             }
-
         });
     }
     protected override void OnUpdate(UpdateArgs args)
@@ -349,14 +362,14 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
                     r2 = close + 0.183 * (high - low);
                     r3 = close + 0.275 * (high - low);
                     r4 = close + 0.55 * (high - low);
-                    r5 = r4+1.168*(r4-r3);
-                    r6 = (high/low)*close;
+                    r5 = r4 + 1.168 * (r4 - r3);
+                    r6 = (high / low) * close;
 
                     s1 = close - 0.0916 * (high - low);
                     s2 = close - 0.183 * (high - low);
                     s3 = close - 0.275 * (high - low);
                     s4 = close - 0.55 * (high - low);
-                    s5 = s4-1.168*(s3-s4);
+                    s5 = s4 - 1.168 * (s3 - s4);
                     s6 = close - (r6 - close);
                 }
                 break;

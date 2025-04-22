@@ -76,7 +76,6 @@ public sealed class IndicatorMovingAverageConvergenceDivergence : Indicator, IWa
         this.AddIndicator(this.fastEMA);
         this.AddIndicator(this.slowEMA);
 
-        LinesLevels[0].Visible = false;
     }
 
     /// <summary>
