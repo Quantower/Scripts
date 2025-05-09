@@ -93,14 +93,19 @@ public sealed class IndicatorCommodityChannelIndex : Indicator, IWatchlistIndica
         if (this.Count < this.MinHistoryDepths)
             return;
 
-        double val = this.MA.GetValue();
-        double d = 0;
-        // Processes calculating loop.
+        double meanDeviation = 0;
         for (int i = 0; i < this.Period; i++)
-            d += Math.Abs(this.GetPrice(this.SourcePrice, i) - val);
+        {
+            double tp = this.GetPrice(this.SourcePrice, i);
+            double sma = this.MA.GetValue(i);
+            meanDeviation += Math.Abs(tp - sma);
+        }
 
-        d = 0.015 * (d / this.Period);
-        // Setting the value
-        this.SetValue((this.GetPrice(this.SourcePrice) - val) / d);
+        meanDeviation = 0.015 * (meanDeviation / this.Period);
+
+        double currentTP = this.GetPrice(this.SourcePrice);
+        double currentSMA = this.MA.GetValue();
+
+        this.SetValue((currentTP - currentSMA) / meanDeviation);
     }
 }

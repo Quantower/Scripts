@@ -7,6 +7,8 @@ using System.Drawing.Drawing2D;
 using TradingPlatform.BusinessLayer;
 using TradingPlatform.BusinessLayer.Utils;
 using TradingPlatform.BusinessLayer.Chart;
+using System.Threading.Tasks;
+using System.Threading;
 
 
 namespace IndicatorPowerOfThree
@@ -17,6 +19,7 @@ namespace IndicatorPowerOfThree
         private Period tfPeriod = Period.DAY1;
         private bool useTFPeriod = true;
         private int barsPeriod = 20;
+        private int barsCount = 1;
         private int offset = 0;
         private bool useCustomBarWidth = false;
         private int customBarWidth = 10;
@@ -127,7 +130,20 @@ namespace IndicatorPowerOfThree
         private bool showHighLevelLine = false;
 
         private bool tfDataLoaded = false;
+        private bool needRedownload = false;
         private HistoricalData tfData;
+        private IndicatorState state;
+        private Task loadingTask;
+        private CancellationTokenSource cancellationSource;
+        private IndicatorState State
+        {
+            get => this.state;
+            set
+            {
+                this.state = value;
+
+            }
+        }
         public IndicatorPowerOfThree()
             : base()
         {
@@ -158,10 +174,12 @@ namespace IndicatorPowerOfThree
         }
         protected override void OnInit()
         {
-            if (this.useTFPeriod && !tfDataLoaded)
+            base.OnInit();
+            this.AbortPreviousTask();
+            if (this.useTFPeriod && !this.tfDataLoaded)
             {
-                this.tfData = this.Symbol.GetHistory(this.tfPeriod, this.Symbol.HistoryType, 1);
-                this.tfDataLoaded = true;
+                var token = this.cancellationSource.Token;
+                this.loadingTask = Task.Factory.StartNew(() => HistoryDownload(this.cancellationSource.Token));
             }
             this.growingBorderPen.Width = this.borderWidth;
             this.decreasingBorderPen.Width = this.borderWidth;
@@ -174,13 +192,24 @@ namespace IndicatorPowerOfThree
         {
             base.OnPaintChart(args);
 
-            if (this.CurrentChart == null || this.HistoricalData == null || this.tfData == null)
+            if (this.CurrentChart == null || this.HistoricalData == null)
                 return;
 
             var gr = args.Graphics;
             var currWindow = this.CurrentChart.Windows[args.WindowIndex];
             RectangleF prevClipRectangle = gr.ClipBounds;
             gr.SetClip(args.Rectangle);
+            switch (this.State)
+            {
+                case IndicatorState.Loading:
+                    gr.DrawString("Downloading historical data", new Font("Tahoma", 20), Brushes.Red, 20, 50);
+                    return;
+                case IndicatorState.NoData:
+                    gr.DrawString("No downloaded historical data", new Font("Tahoma", 20), Brushes.Red, 20, 50);
+                    return;
+                default:
+                    break;
+            }
             try
             {
                 // bar width correction logic
@@ -204,72 +233,45 @@ namespace IndicatorPowerOfThree
                 SolidBrush currBodyBrush = new SolidBrush(Color.White);
                 Pen currBodyPen = new Pen(currBodyBrush);
                 Pen currWickPen = new Pen(currBodyBrush);
-                candleBody.X = (float)currWindow.CoordinatesConverter.GetChartX(this.HistoricalData[0].TimeLeft) + this.offset + barLeftOffset + barWidth;
+                candleBody.X = (float)currWindow.CoordinatesConverter.GetChartX(this.HistoricalData[0].TimeLeft) + this.offset + barLeftOffset + 1 + barWidth;
                 candleBody.Width = this.useCustomBarWidth ? this.customBarWidth : barWidth;
                 shadowTop.X = candleBody.X + candleBody.Width / 2;
                 shadowBottom.X = shadowTop.X;
                 HistoryItemBar resultBar = new HistoryItemBar();
-                if (this.useTFPeriod)
+                for (int i = 0; i < this.barsCount; i++)
                 {
-                    if (this.tfData == null || this.tfData.Count == 0)
-                        return;
-                    if (this.tfPeriod != Period.TICK1)
+                    resultBar = this.GetResultBar(i);
+                    if (resultBar ==  null)
+                        continue;
+                    shadowTop.Y = (float)currWindow.CoordinatesConverter.GetChartY(resultBar.High);
+                    shadowBottom.Y = (float)currWindow.CoordinatesConverter.GetChartY(resultBar.Low);
+                    if (resultBar.Close == resultBar.Open)
                     {
-                        HistoryItemBar lastTFBar = (HistoryItemBar)this.tfData[0];
-                        resultBar.High = lastTFBar.High;
-                        resultBar.Low = lastTFBar.Low;
-                        resultBar.Close = lastTFBar.Close;
-                        resultBar.Open = lastTFBar.Open;
+                        candleBody.Height = 1;
+                        currBodyBrush = this.dojiCandleBrush;
+                        currBodyPen = this.dojiBorderPen;
+                        currWickPen = this.dojiWickPen;
+                        candleBody.Y = (float)currWindow.CoordinatesConverter.GetChartY(resultBar.Close);
                     }
                     else
                     {
-                        HistoryItemLast lastTick = (HistoryItemLast)this.tfData[0];
-                        resultBar.High = lastTick.Price;
-                        resultBar.Low = lastTick.Price;
-                        resultBar.Close = lastTick.Price;
-                        resultBar.Open = lastTick.Price;
+                        candleBody.Y = resultBar.Close > resultBar.Open ? (float)currWindow.CoordinatesConverter.GetChartY(resultBar.Close) : (float)currWindow.CoordinatesConverter.GetChartY(resultBar.Open);
+                        currBodyBrush = resultBar.Close > resultBar.Open ? this.growingCandleBrush : this.decreasingCandleBrush;
+                        currBodyPen = resultBar.Close > resultBar.Open ? this.growingBorderPen : this.decreasingBorderPen;
+                        currWickPen = resultBar.Close > resultBar.Open ? this.growingWickPen : this.decreasingWickPen;
+                        candleBody.Height = Math.Abs((float)currWindow.CoordinatesConverter.GetChartY(resultBar.Close) - (float)currWindow.CoordinatesConverter.GetChartY(resultBar.Open));
                     }
+                    gr.FillRectangle(currBodyBrush, candleBody);
+                    if (this.drawBorder)
+                        gr.DrawRectangle(currBodyPen, candleBody);
+                    else
+                        currBodyPen = new Pen(currBodyBrush.Color, this.borderWidth);
+                    gr.DrawLine(currWickPen, shadowTop, new PointF(shadowTop.X, candleBody.Y));
+                    gr.DrawLine(currWickPen, shadowBottom, new PointF(shadowBottom.X, candleBody.Y + candleBody.Height));
+                    candleBody.X += barLeftOffset*2 + barWidth;
+                    shadowTop.X += barLeftOffset*2 + barWidth;
+                    shadowBottom.X += barLeftOffset*2 + barWidth;
                 }
-                else
-                {
-                    if (this.Count < this.barsPeriod)
-                        return;
-                    resultBar.Close = this.Close();
-                    resultBar.Low = this.Low();
-                    resultBar.Open = this.Open(this.barsPeriod-1);
-                    for (int i = 0; i<this.barsPeriod; i++)
-                    {
-                        if (this.High(i) >= resultBar.High)
-                            resultBar.High = this.High(i);
-                        if (this.Low(i) <= resultBar.Low)
-                            resultBar.Low = this.Low(i);
-                    }
-                }
-                shadowTop.Y = (float)currWindow.CoordinatesConverter.GetChartY(resultBar.High);
-                shadowBottom.Y = (float)currWindow.CoordinatesConverter.GetChartY(resultBar.Low);
-                if (resultBar.Close == resultBar.Open)
-                {
-                    candleBody.Height = 1;
-                    currBodyBrush = this.dojiCandleBrush;
-                    currBodyPen = this.dojiBorderPen;
-                    currWickPen = this.dojiWickPen;
-                    candleBody.Y = (float)currWindow.CoordinatesConverter.GetChartY(resultBar.Close);
-                }
-                else
-                {
-                    candleBody.Y = resultBar.Close > resultBar.Open ? (float)currWindow.CoordinatesConverter.GetChartY(resultBar.Close) : (float)currWindow.CoordinatesConverter.GetChartY(resultBar.Open);
-                    currBodyBrush = resultBar.Close > resultBar.Open ? this.growingCandleBrush : this.decreasingCandleBrush;
-                    currBodyPen = resultBar.Close > resultBar.Open ? this.growingBorderPen : this.decreasingBorderPen;
-                    currWickPen = resultBar.Close > resultBar.Open ? this.growingWickPen : this.decreasingWickPen;
-                    candleBody.Height = Math.Abs((float)currWindow.CoordinatesConverter.GetChartY(resultBar.Close) - (float)currWindow.CoordinatesConverter.GetChartY(resultBar.Open));
-                }
-                gr.FillRectangle(currBodyBrush, candleBody);
-                if (this.drawBorder)
-                    gr.DrawRectangle(currBodyPen, candleBody);
-                else
-                    currBodyPen = new Pen(currBodyBrush.Color, this.borderWidth);
-                gr.DrawLine(currWickPen, shadowTop, new PointF(shadowTop.X, candleBody.Y));
-                gr.DrawLine(currWickPen, shadowBottom, new PointF(shadowBottom.X, candleBody.Y + candleBody.Height));
 
                 if (this.showLabel)
                 {
@@ -289,20 +291,20 @@ namespace IndicatorPowerOfThree
 
                     if (this.OpenLevelLineOptions.Enabled)
                     {
-                        PointF endOpenLine = new PointF(shadowTop.X, (float)currWindow.CoordinatesConverter.GetChartY(resultBar.Open));
-                        PointF startOpenLine = new PointF((float)currWindow.CoordinatesConverter.GetChartX(this.tfData[0].TimeLeft) + barWidth/2, endOpenLine.Y);
+                        PointF endOpenLine = new PointF(shadowTop.X - barWidth/2, (float)currWindow.CoordinatesConverter.GetChartY(resultBar.Open));
+                        PointF startOpenLine = this.GetStartLineCoordinates(resultBar.Open, PriceType.Open, currWindow.CoordinatesConverter);
                         gr.DrawLine(this.openLevelLinePen, startOpenLine, endOpenLine);
 
                     }
                     if (this.HighLevelLineOptions.Enabled)
                     {
-                        PointF endHighLine = new PointF(shadowTop.X, (float)currWindow.CoordinatesConverter.GetChartY(resultBar.High));
+                        PointF endHighLine = new PointF(shadowTop.X - barWidth / 2, (float)currWindow.CoordinatesConverter.GetChartY(resultBar.High));
                         PointF startHighLine = this.GetStartLineCoordinates(resultBar.High, PriceType.High, currWindow.CoordinatesConverter);
                         gr.DrawLine(this.highLevelLinePen, startHighLine, endHighLine);
                     }
                     if (this.LowLevelLineOptions.Enabled)
                     {
-                        PointF endLowLine = new PointF(shadowTop.X, (float)currWindow.CoordinatesConverter.GetChartY(resultBar.Low));
+                        PointF endLowLine = new PointF(shadowTop.X - barWidth / 2, (float)currWindow.CoordinatesConverter.GetChartY(resultBar.Low));
                         PointF startLowLine = this.GetStartLineCoordinates(resultBar.Low, PriceType.Low, currWindow.CoordinatesConverter);
                         gr.DrawLine(this.lowLevelLinePen, startLowLine, endLowLine);
                     }
@@ -312,6 +314,55 @@ namespace IndicatorPowerOfThree
             {
                 gr.SetClip(prevClipRectangle);
             }
+        }
+        private HistoryItemBar GetResultBar(int currBarIndex)
+        {
+            HistoryItemBar resultBar = new HistoryItemBar();
+
+            if (this.useTFPeriod)
+            {
+                if (this.tfData == null || this.tfData.Count == 0)
+                    return null;
+                if (this.tfPeriod != Period.TICK1)
+                {
+                    HistoryItemBar lastTFBar = (HistoryItemBar)this.tfData[currBarIndex, SeekOriginHistory.Begin];
+                    resultBar.High = lastTFBar.High;
+                    resultBar.Low = lastTFBar.Low;
+                    resultBar.Close = lastTFBar.Close;
+                    resultBar.Open = lastTFBar.Open;
+                }
+                else
+                {
+                    HistoryItemLast lastTick = (HistoryItemLast)this.tfData[currBarIndex, SeekOriginHistory.Begin];
+                    resultBar.High = lastTick.Price;
+                    resultBar.Low = lastTick.Price;
+                    resultBar.Close = lastTick.Price;
+                    resultBar.Open = lastTick.Price;
+                }
+            }
+            else
+            {
+                int startIndex = (this.barsCount - currBarIndex - 1) * this.barsPeriod;
+                int finalIndex = startIndex + this.barsPeriod - 1;
+                if (this.Count <= startIndex)
+                    return null;
+                if (finalIndex >= this.Count)
+                    finalIndex = this.Count - 1;
+                resultBar.High = this.High(finalIndex);
+                resultBar.Close = this.Close(startIndex);
+                resultBar.Low = this.Low(finalIndex);
+                resultBar.Open = this.Open(finalIndex);
+                for (int i = 0; i < this.barsPeriod - 1; i++)
+                {
+                    if (startIndex + i >= this.Count)
+                        break;
+                    if (this.High(startIndex+i) >= resultBar.High)
+                        resultBar.High = this.High(startIndex+i);
+                    if (this.Low(startIndex+i) <= resultBar.Low)
+                        resultBar.Low = this.Low(startIndex+i);
+                }
+            }
+            return resultBar;
         }
         private PointF GetStartLineCoordinates(double price, PriceType priceType, IChartWindowCoordinatesConverter converter)
         {
@@ -329,7 +380,7 @@ namespace IndicatorPowerOfThree
                 double currPrice = priceType == PriceType.Open ? currBar.Open :
                     priceType == PriceType.High ? currBar.High :
                     currBar.Low;
-                if ((currPrice <= price && priceType == PriceType.Low) || (currPrice >= price && priceType == PriceType.High))
+                if ((currPrice <= price && priceType == PriceType.Low) || (currPrice >= price && priceType == PriceType.High) || (currPrice == price && priceType == PriceType.Open))
                     X = (float)converter.GetChartX(this.HistoricalData[i, SeekOriginHistory.Begin].TimeLeft) + this.CurrentChart.BarsWidth/2;
             }
             return new PointF(X, (float)converter.GetChartY(price));
@@ -377,6 +428,13 @@ namespace IndicatorPowerOfThree
                     Minimum = 2,
                     Relation = customWidth,
                     SeparatorGroup = barDrawingGroup,
+                });
+                settings.Add(new SettingItemInteger("barsCount", this.barsCount)
+                {
+                    Text = "Bars Count",
+                    SortIndex = 1,
+                    Minimum = 1,
+                    SeparatorGroup = calculatingGroup,
                 });
                 settings.Add(new SettingItemBoolean("useTFPeriod", this.useTFPeriod)
                 {
@@ -538,6 +596,15 @@ namespace IndicatorPowerOfThree
                     Relation = visibleRelationLevelLine,
                     SeparatorGroup = levelLinesDrawingGroup,
                 });
+                settings.Add(new SettingItemLineOptions("highLevelLineOptions", this._highLevelLineOptions)
+                {
+                    Text = "High level line",
+                    SortIndex = 7,
+                    ExcludedStyles = new LineStyle[] { LineStyle.Histogramm, LineStyle.Points },
+                    UseEnabilityToggler = true,
+                    Relation = visibleRelationLevelLine,
+                    SeparatorGroup = levelLinesDrawingGroup,
+                });
                 return settings;
             }
             set
@@ -545,6 +612,11 @@ namespace IndicatorPowerOfThree
                 base.Settings = value;
                 if (value.TryGetValue("barsPeriod", out int barsPeriod))
                     this.barsPeriod = barsPeriod;
+                if (value.TryGetValue("barsCount", out int barsCount))
+                {
+                    this.barsCount = barsCount;
+                    this.needRedownload = true;
+                }
                 if (value.TryGetValue("offset", out int offset))
                     this.offset = offset;
                 if (value.TryGetValue("useCustomBarWidth", out bool useCustomBarWidth))
@@ -554,7 +626,7 @@ namespace IndicatorPowerOfThree
                 if (value.TryGetValue("tfPeriod", out Period tfPeriod))
                 {
                     this.tfPeriod = tfPeriod;
-                    this.tfDataLoaded = false;
+                    this.needRedownload = true;
                 }
                 if (value.TryGetValue("useTFPeriod", out bool useTFPeriod))
                     this.useTFPeriod = useTFPeriod;
@@ -596,13 +668,79 @@ namespace IndicatorPowerOfThree
                     this.HighLevelLineOptions = highLevelLineOptions;
                 if (value.TryGetValue("labelColor", out Color labelColor))
                     this.labelColor = labelColor;
-                this.OnSettingsUpdated();
+                if (this.needRedownload && this.useTFPeriod)
+                {
+                    this.loadingTask = Task.Factory.StartNew(() => HistoryDownload(this.cancellationSource.Token));
+                }
+            }
+        }
+        protected override void OnClear()
+        {
+            base.OnClear();
+            this.AbortPreviousTask();
+        }
+
+        private void AbortPreviousTask()
+        {
+            if (this.tfData != null)
+                this.tfData.Dispose();
+
+            if (this.cancellationSource != null)
+                this.cancellationSource.Cancel();
+
+            this.cancellationSource = new CancellationTokenSource();
+        }
+
+        private bool IsValidLoadedHistory(HistoricalData history)
+        {
+            if (history == null || history.Count == 0)
+                return false;
+            return true;
+        }
+        private void HistoryDownload(CancellationToken token)
+        {
+            this.State = IndicatorState.Loading;
+            var fromTime = this.HistoricalData.FromTime;
+
+            var prevHistoryCount = -1;
+
+            var needReload = true;
+            while (needReload)
+            {
+                needReload = false;
+
+                if (token.IsCancellationRequested)
+                    return;
+
+                this.tfData = this.Symbol.GetHistory(this.tfPeriod, this.Symbol.HistoryType, this.barsCount);
+
+                if (token.IsCancellationRequested || prevHistoryCount == this.tfData.Count)
+                {
+                    this.State = IndicatorState.NoData;
+                }
+                else if (this.IsValidLoadedHistory(this.tfData))
+                    this.State = IndicatorState.Ready;
+                else
+                {
+                    prevHistoryCount = this.tfData.Count;
+                    needReload = true;
+                    this.tfData.Dispose();
+                }
             }
         }
         internal enum HorizontalPosition
         {
             Right,
             Left
+        }
+
+        public enum IndicatorState
+        {
+            Ready,
+            Loading,
+            NoData,
+            IncorrectPeriod,
+            OneTickNotAllowed
         }
     }
 }
