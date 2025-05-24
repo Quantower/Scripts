@@ -24,7 +24,7 @@ public sealed class IndicatorCommodityChannelIndex : Indicator, IWatchlistIndica
          "Volume", PriceType.Volume,
          "Open interest", PriceType.OpenInterest
     })]
-    public PriceType SourcePrice = PriceType.Close;
+    public PriceType SourcePrice = PriceType.Typical;
 
     // Displays Input Parameter as dropdown list.
     [InputParameter("Type of Moving Average", 30, variants: new object[] {

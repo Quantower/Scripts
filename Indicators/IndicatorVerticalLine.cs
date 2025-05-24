@@ -11,6 +11,17 @@ namespace ChanneIsIndicators;
 public class IndicatorVerticalLine : Indicator
 {
     private TimeLine[] lines = new TimeLine[5] { new TimeLine(Color.Green, "First Line", 1), new TimeLine(Color.Red, "Second Line", 2), new TimeLine(Color.GreenYellow, "Third Line", 3), new TimeLine(Color.Blue, "Fourth Line", 4), new TimeLine(Color.Cyan, "Fifth Line", 5) };
+    private bool allWeekAvailable = true;
+    private Dictionary<DayOfWeek, bool> awailableDays = new Dictionary<DayOfWeek, bool>()
+    {
+        {DayOfWeek.Monday, true},
+        {DayOfWeek.Tuesday, true},
+        {DayOfWeek.Wednesday, true},
+        {DayOfWeek.Thursday, true},
+        {DayOfWeek.Friday, true},
+        {DayOfWeek.Saturday, true},
+        {DayOfWeek.Sunday, true},
+    };
 
     private Period currentPeriod;
 
@@ -58,38 +69,42 @@ public class IndicatorVerticalLine : Indicator
                 {
                     DateTime lineTime = lines[i].Time;
 
-                    DateTime currentLineTime = new DateTime(leftBorderTime.Year, leftBorderTime.Month, leftBorderTime.Day, lineTime.Hour, lineTime.Minute, lineTime.Second,  DateTimeKind.Utc);
+                    DateTime currentLineTime = new DateTime(leftBorderTime.Year, leftBorderTime.Month, leftBorderTime.Day, lineTime.Hour, lineTime.Minute, lineTime.Second, DateTimeKind.Utc);
 
                     if (currentLineTime < leftBorderTime)
                         currentLineTime = currentLineTime.AddDays(1);
                     if (currentLineTime > rightBorderTime)
                         currentLineTime = currentLineTime.AddDays(-1);
-
                     // 
                     int labelY = 0;
                     if (lines[i].LabelPosition == Position.MiddleLeft || lines[i].LabelPosition == Position.MiddleRight)
-                        labelY=bottomY/2;
+                        labelY = bottomY / 2;
                     else if (lines[i].LabelPosition == Position.BottomLeft || lines[i].LabelPosition == Position.BottomRight)
-                        labelY=bottomY;
+                        labelY = bottomY;
 
                     if (lines[i].LineVisibility && currentLineTime > leftBorderTime && currentLineTime < rightBorderTime)
-                    {                 
+                    {
+                        bool drawCurrentLine = true;
                         for (int j = 0; j <= daysSpan; j++)
                         {
-                            int topX = (int)mainWindow.CoordinatesConverter.GetChartX(currentLineTime);          
-                            graphics.DrawLine(lines[i].linePen, topX, 0, topX, bottomY);
-
-                            if (lines[i].LabelVisibility)
+                            if (!this.allWeekAvailable)
+                                drawCurrentLine = this.awailableDays[currentLineTime.DayOfWeek];
+                            if (drawCurrentLine)
                             {
-                                //
-                                string labelText = "";
-                                if (lines[i].textFormat == Format.DateTime || lines[i].textFormat == Format.DateTimeText)
-                                    labelText = Core.Instance.TimeUtils.ConvertFromUTCToSelectedTimeZone(currentLineTime).ToString();
-                                if (lines[i].textFormat == Format.DateTimeText || lines[i].textFormat == Format.Text)
-                                    labelText = labelText + " " + lines[i].labelText;
+                                int topX = (int)mainWindow.CoordinatesConverter.GetChartX(currentLineTime);
+                                graphics.DrawLine(lines[i].linePen, topX, 0, topX, bottomY);
+                                if (lines[i].LabelVisibility)
+                                {
+                                    //
+                                    string labelText = "";
+                                    if (lines[i].textFormat == Format.DateTime || lines[i].textFormat == Format.DateTimeText)
+                                        labelText = Core.Instance.TimeUtils.ConvertFromUTCToSelectedTimeZone(currentLineTime).ToString();
+                                    if (lines[i].textFormat == Format.DateTimeText || lines[i].textFormat == Format.Text)
+                                        labelText = labelText + " " + lines[i].labelText;
 
-                                //
-                                graphics.DrawString(labelText, lines[i].labelFont, lines[i].labelBrush, new PointF(topX, labelY), lines[i].lineSF);
+                                    //
+                                    graphics.DrawString(labelText, lines[i].labelFont, lines[i].labelBrush, new PointF(topX, labelY), lines[i].lineSF);
+                                }
                             }
                             currentLineTime = currentLineTime.AddDays(1);
                         }
@@ -107,6 +122,63 @@ public class IndicatorVerticalLine : Indicator
         get
         {
             var settings = base.Settings;
+            SettingItemSeparatorGroup availableDaysGroup = new SettingItemSeparatorGroup("Days Settings", 0);
+            settings.Add(new SettingItemBooleanSwitcher("allWeekAvailable", this.allWeekAvailable)
+            {
+                Text = "Draw Every Day Line",
+                SortIndex = 0,
+                SeparatorGroup = availableDaysGroup,
+            });
+            SettingItemRelationVisibility visibleRelationNotAllDays = new SettingItemRelationVisibility("allWeekAvailable", false);
+            settings.Add(new SettingItemBoolean("Monday", this.awailableDays[DayOfWeek.Monday])
+            {
+                Text = "Monday",
+                SortIndex = 0,
+                SeparatorGroup = availableDaysGroup,
+                Relation = visibleRelationNotAllDays
+            });
+            settings.Add(new SettingItemBoolean("Tuesday", this.awailableDays[DayOfWeek.Tuesday])
+            {
+                Text = "Tuesday",
+                SortIndex = 0,
+                SeparatorGroup = availableDaysGroup,
+                Relation = visibleRelationNotAllDays
+            });
+            settings.Add(new SettingItemBoolean("Wednesday", this.awailableDays[DayOfWeek.Wednesday])
+            {
+                Text = "Wednesday",
+                SortIndex = 0,
+                SeparatorGroup = availableDaysGroup,
+                Relation = visibleRelationNotAllDays
+            });
+            settings.Add(new SettingItemBoolean("Thursday", this.awailableDays[DayOfWeek.Thursday])
+            {
+                Text = "Thursday",
+                SortIndex = 0,
+                SeparatorGroup = availableDaysGroup,
+                Relation = visibleRelationNotAllDays
+            });
+            settings.Add(new SettingItemBoolean("Friday", this.awailableDays[DayOfWeek.Friday])
+            {
+                Text = "Friday",
+                SortIndex = 0,
+                SeparatorGroup = availableDaysGroup,
+                Relation = visibleRelationNotAllDays
+            });
+            settings.Add(new SettingItemBoolean("Saturday", this.awailableDays[DayOfWeek.Saturday])
+            {
+                Text = "Saturday",
+                SortIndex = 0,
+                SeparatorGroup = availableDaysGroup,
+                Relation = visibleRelationNotAllDays
+            });
+            settings.Add(new SettingItemBoolean("Sunday", this.awailableDays[DayOfWeek.Sunday])
+            {
+                Text = "Sunday",
+                SortIndex = 0,
+                SeparatorGroup = availableDaysGroup,
+                Relation = visibleRelationNotAllDays
+            });
             for (int i = 0; i < lines.Length; i++)
                 settings.Add(new SettingItemGroup(lines[i].LineName, lines[i].Settings));
 
@@ -115,6 +187,22 @@ public class IndicatorVerticalLine : Indicator
         set
         {
             base.Settings = value;
+            if (value.TryGetValue("allWeekAvailable", out bool allWeekAvailable))
+                this.allWeekAvailable = allWeekAvailable;
+            if (value.TryGetValue("Monday", out bool Monday))
+                this.awailableDays[DayOfWeek.Monday] = Monday;
+            if (value.TryGetValue("Tuesday", out bool Tuesday))
+                this.awailableDays[DayOfWeek.Tuesday] = Tuesday;
+            if (value.TryGetValue("Wednesday", out bool Wednesday))
+                this.awailableDays[DayOfWeek.Wednesday] = Wednesday;
+            if (value.TryGetValue("Thursday", out bool Thursday))
+                this.awailableDays[DayOfWeek.Thursday] = Thursday;
+            if (value.TryGetValue("Friday", out bool Friday))
+                this.awailableDays[DayOfWeek.Friday] = Friday;
+            if (value.TryGetValue("Saturday", out bool Saturday))
+                this.awailableDays[DayOfWeek.Saturday] = Saturday;
+            if (value.TryGetValue("Sunday", out bool Sunday))
+                this.awailableDays[DayOfWeek.Sunday] = Sunday;
             for (int i = 0; i < lines.Length; i++)
             {
                 lines[i].Settings = value;
@@ -143,7 +231,7 @@ public class TimeLine : ICustomizable
         get => this.labelPosition;
         set
         {
-            this.labelPosition=value;
+            this.labelPosition = value;
 
             this.UpdateLineSF();
         }
@@ -155,7 +243,7 @@ public class TimeLine : ICustomizable
         get => this.labelOrientation;
         set
         {
-            this.labelOrientation=value;
+            this.labelOrientation = value;
 
             this.UpdateLineSF();
         }
@@ -189,7 +277,7 @@ public class TimeLine : ICustomizable
             string relationName = this.LineName + "LineVisibility";
             string relationNameLabel = this.LineName + "ShowLabel";
             string relationNameCustomTextFormat = this.LineName + "CustomTextFormat";
-            settings.Add(new SettingItemBoolean(relationName, this.LineVisibility)
+            settings.Add(new SettingItemBooleanSwitcher(relationName, this.LineVisibility)
             {
                 Text = "Line Visibility",
                 SortIndex = lineSortIndex,
@@ -197,7 +285,7 @@ public class TimeLine : ICustomizable
             });
             SettingItemRelationVisibility visibleRelation = new SettingItemRelationVisibility(relationName, true);
             SettingItemRelationVisibility visibleRelationLabel = new SettingItemRelationVisibility(relationNameLabel, true);
-            settings.Add(new SettingItemDateTime("LineTime", this.Time)
+            settings.Add(new SettingItemDateTime(this.LineName + "LineTime", this.Time)
             {
                 Text = "Line Time",
                 SortIndex = lineSortIndex,
@@ -205,7 +293,7 @@ public class TimeLine : ICustomizable
                 SeparatorGroup = separatorGroup1,
                 Relation = visibleRelation
             });
-            settings.Add(new SettingItemLineOptions("LineStyle", this.lineOptions)
+            settings.Add(new SettingItemLineOptions(this.LineName + "LineStyle", this.lineOptions)
             {
                 Text = "Line Style",
                 SortIndex = lineSortIndex,
@@ -226,38 +314,39 @@ public class TimeLine : ICustomizable
                 Text = "Label format",
                 SortIndex = lineSortIndex,
                 SeparatorGroup = separatorGroup1,
-                Relation = visibleRelationLabel
+                Relation = visibleRelationLabel,
+
             });
             SettingItemRelationVisibility visibleRelationCustomText = new SettingItemRelationVisibility(relationNameCustomTextFormat, new SelectItem[2] { new SelectItem("Text", Format.Text), new SelectItem("DateTime+Text", Format.DateTimeText) });
-            settings.Add(new SettingItemTextArea("LabelText", this.labelText)
+            settings.Add(new SettingItemTextArea(this.LineName + "LabelText", this.labelText)
             {
                 Text = "Custom text",
                 SortIndex = lineSortIndex,
                 SeparatorGroup = separatorGroup1,
                 Relation = visibleRelationCustomText,
             });
-            settings.Add(new SettingItemFont("Font", this.labelFont)
+            settings.Add(new SettingItemFont(this.LineName + "Font", this.labelFont)
             {
                 Text = "Font",
                 SortIndex = lineSortIndex,
                 SeparatorGroup = separatorGroup1,
                 Relation = visibleRelationLabel
             });
-            settings.Add(new SettingItemColor("FontColor", this.labelColor)
+            settings.Add(new SettingItemColor(this.LineName + "FontColor", this.labelColor)
             {
                 Text = "Font Color",
                 SortIndex = lineSortIndex,
                 SeparatorGroup = separatorGroup1,
                 Relation = visibleRelationLabel
             });
-            settings.Add(new SettingItemSelectorLocalized("LabelPosition", this.LabelPosition, new List<SelectItem> { new SelectItem("Top Right", Position.TopRight), new SelectItem("Top Left", Position.TopLeft), new SelectItem("Bottom Right", Position.BottomRight), new SelectItem("Bottom Left", Position.BottomLeft), new SelectItem("Middle Left", Position.MiddleLeft), new SelectItem("Middle Right", Position.MiddleRight) })
+            settings.Add(new SettingItemSelectorLocalized(this.LineName + "LabelPosition", this.LabelPosition, new List<SelectItem> { new SelectItem("Top Right", Position.TopRight), new SelectItem("Top Left", Position.TopLeft), new SelectItem("Bottom Right", Position.BottomRight), new SelectItem("Bottom Left", Position.BottomLeft), new SelectItem("Middle Left", Position.MiddleLeft), new SelectItem("Middle Right", Position.MiddleRight) })
             {
                 Text = "Label position",
                 SortIndex = lineSortIndex,
                 SeparatorGroup = separatorGroup1,
                 Relation = visibleRelationLabel
             });
-            settings.Add(new SettingItemSelectorLocalized("LabelOrientation", this.LabelOrientation, new List<SelectItem> { new SelectItem("Horizontal", Orientation.Horizontal), new SelectItem("Vertical", Orientation.Vertical) })
+            settings.Add(new SettingItemSelectorLocalized(this.LineName + "LabelOrientation", this.LabelOrientation, new List<SelectItem> { new SelectItem("Horizontal", Orientation.Horizontal), new SelectItem("Vertical", Orientation.Vertical) })
             {
                 Text = "Label orientation",
                 SortIndex = lineSortIndex,
@@ -273,9 +362,9 @@ public class TimeLine : ICustomizable
                 settings = inputSettings;
             if (settings.TryGetValue(LineName + "LineVisibility", out bool SessionVisibility))
                 this.LineVisibility = SessionVisibility;
-            if (settings.TryGetValue("LineTime", out DateTime SessionFirstTime))
+            if (settings.TryGetValue(this.LineName + "LineTime", out DateTime SessionFirstTime))
                 this.Time = SessionFirstTime;
-            if (settings.TryGetValue("LineStyle", out LineOptions lineStyle))
+            if (settings.TryGetValue(this.LineName + "LineStyle", out LineOptions lineStyle))
             {
                 this.lineOptions = lineStyle;
 
@@ -287,18 +376,18 @@ public class TimeLine : ICustomizable
                 this.LabelVisibility = LabelVisibility;
             if (settings.TryGetValue(this.LineName + "CustomTextFormat", out Format textFormat))
                 this.textFormat = textFormat;
-            if (settings.TryGetValue("LabelText", out string customText))
+            if (settings.TryGetValue(this.LineName + "LabelText", out string customText))
                 this.labelText = customText;
-            if (settings.TryGetValue("Font", out Font labelFont))
+            if (settings.TryGetValue(this.LineName + "Font", out Font labelFont))
                 this.labelFont = labelFont;
-            if (settings.TryGetValue("FontColor", out Color labelColor))
+            if (settings.TryGetValue(this.LineName + "FontColor", out Color labelColor))
             {
                 this.labelColor = labelColor;
                 this.labelBrush.Color = labelColor;
             }
-            if (settings.TryGetValue("LabelPosition", out Position labelPosition))
+            if (settings.TryGetValue(this.LineName + "LabelPosition", out Position labelPosition))
                 this.LabelPosition = labelPosition;
-            if (settings.TryGetValue("LabelOrientation", out Orientation labelOrientation))
+            if (settings.TryGetValue(this.LineName + "LabelOrientation", out Orientation labelOrientation))
                 this.LabelOrientation = labelOrientation;
         }
     }
