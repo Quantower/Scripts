@@ -8,7 +8,7 @@ namespace Fractals;
 
 public class IndicatorFractals : Indicator
 {
-    [InputParameter("Period", 10, 2)]
+    [InputParameter("Period", 10, 1)]
     public int period = 3;
 
     [InputParameter("Local Maximum Color", 20)]
