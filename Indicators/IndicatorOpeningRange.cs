@@ -254,8 +254,10 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
         if (startIndex < 0)
             startIndex = 0;
 
-        int startOffset = this.GetOffset(startIndex);
+        int startOffset = this.GetOffset(startIndex) + 1;
         int endOffset = this.GetOffset(endIndex);
+        if (startOffset >= this.HistoricalData.Count)
+            startOffset = this.HistoricalData.Count - 1;
 
         for (int i = endOffset; i <= startOffset; i++)
         {
@@ -511,7 +513,7 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
                         ForceReload = forceReload,
                     }));
                 }
-                
+
                 // middle part
                 if (!token.IsCancellationRequested && ceilingStartDT < floorEndDT)
                 {
@@ -539,7 +541,7 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
                         ForceReload = forceReload,
                     }));
                 }
-               
+
                 //
                 if (!token.IsCancellationRequested)
                 {

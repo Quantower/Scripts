@@ -97,8 +97,8 @@ public sealed class IndicatorVolume : Indicator, IWatchlistIndicator
         {
             Color1 = Color.FromArgb(255, 251, 87, 87),
             Color2 = Color.FromArgb(255, 0, 178, 89),
-            Text1 = "Up",
-            Text2 = "Down"
+            Text1 = "Down",
+            Text2 = "Up"
         };
     }
 

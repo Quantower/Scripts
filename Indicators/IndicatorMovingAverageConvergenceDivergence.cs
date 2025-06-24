@@ -1,7 +1,9 @@
 // Copyright QUANTOWER LLC. © 2017-2024. All rights reserved.
 
 using System;
+using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 using TradingPlatform.BusinessLayer;
 
 namespace Oscillators;
@@ -38,6 +40,11 @@ public sealed class IndicatorMovingAverageConvergenceDivergence : Indicator, IWa
     private Indicator sma;
     private HistoricalDataCustom customHD;
 
+    private Color level1_Color;
+    private Color level2_Color;
+    private Color level3_Color;
+    private Color level4_Color;
+
     /// <summary>
     /// Indicator's constructor. Contains general information: name, description, LineSeries etc. 
     /// </summary>
@@ -54,6 +61,11 @@ public sealed class IndicatorMovingAverageConvergenceDivergence : Indicator, IWa
         this.AddLineSeries("OsMA", Color.Green, 4, LineStyle.Histogramm);
         this.AddLineLevel(0, "0 level", Color.DarkGreen, 1, LineStyle.Solid);
         this.SeparateWindow = true;
+
+        this.level1_Color = Color.FromArgb(0, 178, 89);
+        this.level2_Color = Color.FromArgb(50, this.level1_Color);
+        this.level3_Color = Color.FromArgb(251, 87, 87);
+        this.level4_Color = Color.FromArgb(50, this.level3_Color);
     }
 
     /// <summary>
@@ -112,5 +124,69 @@ public sealed class IndicatorMovingAverageConvergenceDivergence : Indicator, IWa
 
         // Set value to the 'OsMA' line buffer.
         this.SetValue(differ - signal, 2);
+
+        var osMAValue = differ - signal;
+        if (osMAValue > 0)
+            this.LinesSeries[2].SetMarker(0, osMAValue > this.LinesSeries[2].GetValue(1) ? this.level1_Color : this.level2_Color);
+        else
+            this.LinesSeries[2].SetMarker(0, osMAValue < this.LinesSeries[2].GetValue(1) ? this.level3_Color : this.level4_Color);
+    }
+
+    public override IList<SettingItem> Settings
+    {
+        get
+        {
+            var settings = base.Settings;
+
+            if (settings.GetItemByName("Line_2") is SettingItemGroup lineGroup)
+            {
+                var items = lineGroup.Value as IList<SettingItem>;
+                var separatorGeoup = items?.FirstOrDefault()?.SeparatorGroup;
+
+                lineGroup.AddItem(new SettingItemColor("Color 1", this.level1_Color, 1) { ColorText = loc._("Color"), SeparatorGroup = separatorGeoup });
+                lineGroup.AddItem(new SettingItemColor("Color 2", this.level2_Color, 1) { ColorText = loc._("Color"), SeparatorGroup = separatorGeoup });
+                lineGroup.AddItem(new SettingItemColor("Color 3", this.level3_Color, 1) { ColorText = loc._("Color"), SeparatorGroup = separatorGeoup });
+                lineGroup.AddItem(new SettingItemColor("Color 4", this.level4_Color, 1) { ColorText = loc._("Color"), SeparatorGroup = separatorGeoup });
+            }
+
+            return  settings;
+        }
+        set
+        {
+            base.Settings = value;
+
+            if (value.GetItemByName("Line_2") is SettingItemGroup lineGroup)
+            {
+                bool needUpdate = false;
+                var colorsHolder = new SettingsHolder(lineGroup.Value as IList<SettingItem>);
+
+                if (colorsHolder.TryGetValue("Color 1", out var item))
+                {
+                    this.level1_Color = item.GetValue<Color>();
+                    needUpdate |= true;
+                }
+
+                if (colorsHolder.TryGetValue("Color 2", out item))
+                {
+                    this.level2_Color = item.GetValue<Color>();
+                    needUpdate |= true;
+                }
+
+                if (colorsHolder.TryGetValue("Color 3", out item))
+                {
+                    this.level3_Color = item.GetValue<Color>();
+                    needUpdate |= true;
+                }
+
+                if (colorsHolder.TryGetValue("Color 4", out item))
+                {
+                    this.level4_Color = item.GetValue<Color>();
+                    needUpdate |= true;
+                }
+
+                if (needUpdate)
+                    this.OnSettingsUpdated();
+            }            
+        }
     }
 }
