@@ -11,7 +11,7 @@ namespace Oscillators;
 public sealed class IndicatorRLarryWilliams : Indicator, IWatchlistIndicator
 {
     // Displays Input Parameter as input field (or checkbox if value type is bolean).
-    [InputParameter("Period", 0, 1, 999, 1, 0)]
+    [InputParameter("Period", 0, 1, 9999, 1, 0)]
     public int Period = 14;
 
     public int MinHistoryDepths => this.Period;

@@ -30,6 +30,11 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
     private const string SPECIFIED_SESSION_TYPE = "Specified session";
     private const string CUSTOM_RANGE_SESSION_TYPE = "Custom range";
 
+    private const string LINE_COLORS_SI = "ColorLines";
+    private const string CLOSE_LINE_COLOR_BY_SI = "CloseLineColorBy";
+    private const string MA_LINE_COLORS_SI = "MAColorLines";
+    private const string MA_LINE_COLOR_BY_SI = "MALineColorBy";
+
     #endregion Consts
 
     #region Parameters
@@ -49,6 +54,21 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
         CUSTOM_RANGE_SESSION_TYPE, CumulativeDeltaSessionMode.CustomRange
     })]
     public CumulativeDeltaSessionMode SessionMode;
+
+    [InputParameter("Period of Moving Average", 31, 1, 9999, 1, 1)]
+    public int MAPeriod = 20;
+
+    [InputParameter("Average Type", 32, variants: new object[]{
+            "Simple Moving Average", MaMode.SMA,
+            "Exponential Moving Average", MaMode.EMA,
+            "Smoothed Moving Average", MaMode.SMMA,
+            "Linearly Weighted Moving Average", MaMode.LWMA,
+        })]
+    public MaMode MaType = MaMode.SMA;
+
+    private MALineColorOption maLineColorOption;
+
+    private CloseLineColorOption closeLineСoloringOption;
 
     public ISessionsContainer SessionContainer
     {
@@ -130,16 +150,29 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
 
     private AreaBuilder currentAreaBuider;
 
+    private Color upLineColor;
+    private Color downLineColor;
+
+    private Color maUpLineColor;
+    private Color maDownLineColor;
+
+    private Indicator ma;
     #endregion Parameters
 
     public IndicatorCumulativeDelta()
         : base()
     {
+        this.AddLineSeries("MA", Color.Red, 2, LineStyle.Solid);
+
+        this.upLineColor = Color.FromArgb(0, 178, 89);
+        this.downLineColor = Color.FromArgb(251, 87, 87);
+
+        this.maUpLineColor = Color.Green;
+        this.maDownLineColor = Color.Red;
+        this.maLineColorOption = MALineColorOption.PriceCross;
+        this.closeLineСoloringOption = CloseLineColorOption.Delta;
+
         this.Name = "Cumulative delta";
-        this.LinesSeries[0].Name = "Cumulative open";
-        this.LinesSeries[1].Name = "Cumulative high";
-        this.LinesSeries[2].Name = "Cumulative low";
-        this.LinesSeries[3].Name = "Cumulative close";
 
         this.AddLineLevel(0d, "Zero line", Color.Gray, 1, LineStyle.DashDot);
 
@@ -177,7 +210,11 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
                 }
         }
         base.OnInit();
+
+        this.ma = Core.Indicators.BuiltIn.MA(this.MAPeriod, PriceType.Close, this.MaType);
+        this.CandleHistoricalData.AddIndicator(this.ma);
     }
+
     protected override void OnUpdate(UpdateArgs args)
     {
         if (this.IsLoading)
@@ -234,6 +271,25 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
 
             var separ = settings.FirstOrDefault()?.SeparatorGroup;
 
+            var lineRelationVisibility = new SettingItemRelationVisibility("VisualStyle", new SelectItem("", (int)CandleDrawIndicatorVisualMode.Lines));
+            var closeLineColorOptions = new List<SelectItem>()
+            {
+                new SelectItem(loc._("By Delta"), CloseLineColorOption.Delta),
+                new SelectItem(loc._("By Sign"), CloseLineColorOption.Sign),
+            };
+            settings.Add(new SettingItemSelectorLocalized(CLOSE_LINE_COLOR_BY_SI, closeLineColorOptions.GetItemByValue(this.closeLineСoloringOption), closeLineColorOptions, 20)
+            {
+                Text = loc._("Coloring mode"),
+                SeparatorGroup = separ,
+                Relation = lineRelationVisibility
+            });
+            settings.Add(new SettingItemPairColor(LINE_COLORS_SI, new PairColor(this.upLineColor, this.downLineColor, loc._("Up"), loc._("Down")), 20)
+            {
+                Text = loc._("Lines"),
+                SeparatorGroup = separ,
+                Relation = lineRelationVisibility
+            });
+
             //
             //
             //
@@ -277,6 +333,25 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
                 ExcludedPeriods = new BasePeriod[] { BasePeriod.Tick, BasePeriod.Second, BasePeriod.Minute, BasePeriod.Hour, BasePeriod.Year },
                 SeparatorGroup = separ,
                 Relation = new SettingItemRelationVisibility(RESET_TYPE_NAME_SI, new SelectItem("", (int)CumulativeDeltaSessionMode.ByPeriod))
+            });
+
+            var lineColorOptions = new List<SelectItem>()
+            {
+                new SelectItem(loc._("Price Cross"), MALineColorOption.PriceCross),
+                new SelectItem(loc._("Value Change (Up/Down)"), MALineColorOption.ValueChange),
+                new SelectItem(loc._("Solid Color"), MALineColorOption.SolidColor)
+            };
+            settings.Add(new SettingItemSelectorLocalized(MA_LINE_COLOR_BY_SI, lineColorOptions.GetItemByValue(this.maLineColorOption), lineColorOptions, 40)
+            {
+                Text = loc._("Color by"),
+                SeparatorGroup = separ
+            });
+
+            settings.Add(new SettingItemPairColor(MA_LINE_COLORS_SI, new PairColor(this.maUpLineColor, this.maDownLineColor, loc._("Up"), loc._("Down")), 40)
+            {
+                Text = loc._("Lines"),
+                SeparatorGroup = separ,
+                Relation = new SettingItemRelationVisibility(MA_LINE_COLOR_BY_SI, new object[] { lineColorOptions[0], lineColorOptions[1] })
             });
 
             return settings;
@@ -333,6 +408,52 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
                 }
             }
 
+            if (holder.TryGetValue(LINE_COLORS_SI, out item))
+            {
+                var newValue = item.GetValue<PairColor>();
+
+                if (this.upLineColor != newValue.Color1 || this.downLineColor != newValue.Color2)
+                {
+                    this.upLineColor = newValue.Color1;
+                    this.downLineColor = newValue.Color2;
+                    needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
+                }
+            }
+
+            if (holder.TryGetValue(MA_LINE_COLOR_BY_SI, out item))
+            {
+                var newValue =  (MALineColorOption)((SelectItem)item.Value).Value;
+
+                if (this.maLineColorOption != newValue)
+                {
+                    this.maLineColorOption = newValue;
+                    needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
+                }
+            }
+
+            if (holder.TryGetValue(MA_LINE_COLORS_SI, out item))
+            {
+                var newValue = item.GetValue<PairColor>();
+
+                if (this.upLineColor != newValue.Color1 || this.downLineColor != newValue.Color2)
+                {
+                    this.maUpLineColor = newValue.Color1;
+                    this.maDownLineColor = newValue.Color2;
+                    needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
+                }
+            }
+
+            if (holder.TryGetValue(CLOSE_LINE_COLOR_BY_SI, out item))
+            {
+                var newValue = (CloseLineColorOption)((SelectItem)item.Value).Value;
+
+                if (this.closeLineСoloringOption != newValue)
+                {
+                    this.closeLineСoloringOption = newValue;
+                    needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
+                }
+            }
+
             //
             if (needRefresh)
                 this.Refresh();
@@ -357,7 +478,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
         //
         if (this.SessionMode == CumulativeDeltaSessionMode.SpecifiedSession || this.SessionMode == CumulativeDeltaSessionMode.CustomRange)
         {
-            if (!this.SessionContainer.ContainsDate(time.Ticks))
+            if (!this.SessionContainer.ContainsDate(time))
             {
                 this.currentAreaBuider?.Reset(index);
                 return;
@@ -382,7 +503,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
         else if (!this.currentAreaBuider.Contains(time))
         {
             var period = this.GetStepPeriod();
-            var range = HistoryStepsCalculator.GetNextStep(this.currentAreaBuider.Range.To, period.BasePeriod, period.PeriodMultiplier);
+            var range = HistoryStepsCalculator.GetNextStep(this.currentAreaBuider.Range.To, period.BasePeriod, period.PeriodMultiplier, this.SessionContainer?.TimeZone);
 
             if (range.IsEmpty)
                 return;
@@ -405,8 +526,42 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
 
         this.SetValues(this.currentAreaBuider.Bar.Open, this.currentAreaBuider.Bar.High, this.currentAreaBuider.Bar.Low, this.currentAreaBuider.Bar.Close, offset);
 
+        bool isUpColor = this.closeLineСoloringOption switch
+        {
+            CloseLineColorOption.Sign => this.LinesSeries[1].GetValue(offset) > 0,
+            CloseLineColorOption.Delta => (this.DeltaSourceType == CumulativeDeltaSourceType.Volume && currentItem.Total.Delta > 0) ||
+                                            (this.DeltaSourceType == CumulativeDeltaSourceType.Trades && (currentItem.Total.BuyTrades - currentItem.Total.SellTrades) > 0),
+
+            _ => true,
+        };
+        this.LinesSeries[1].SetMarker(offset, isUpColor ? this.upLineColor : this.downLineColor);
+
+        if (this.Count > offset && this.Count > this.MAPeriod)
+        {
+            switch (this.maLineColorOption)
+            {
+                case MALineColorOption.PriceCross:
+                    this.LinesSeries[2].SetMarker(offset, this.LinesSeries[1].GetValue(offset) > this.LinesSeries[2].GetValue(offset) ? this.maUpLineColor : this.maDownLineColor);
+                    break;
+                case MALineColorOption.ValueChange:
+                    this.LinesSeries[2].SetMarker(offset, this.LinesSeries[2].GetValue(offset) > this.LinesSeries[2].GetValue(offset + 1) ? this.maUpLineColor : this.maDownLineColor);
+                    break;
+            }
+        }
+
         if (isNewBar && createAfterUpdate)
             this.currentAreaBuider.StartNew(++index);
+    }
+
+    protected override void SetValues(double open, double high, double low, double close, int offset)
+    {
+        if (!IsValidPrice(open) || !IsValidPrice(close))
+            return;
+
+        base.SetValues(open, high, low, close, offset);
+
+        if (this.Count > offset && this.Count > this.MAPeriod)
+            this.SetValue(this.ma.GetValue(offset), 2, offset);
     }
 
     private Interval<DateTime> GetFullDayTimeInterval(TradingPlatform.BusinessLayer.TimeZone timeZone)
@@ -458,14 +613,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
     bool IVolumeAnalysisIndicator.IsRequirePriceLevelsCalculation => false;
     public void VolumeAnalysisData_Loaded()
     {
-        if (this.currentAreaBuider != null)
-        {
-            this.currentAreaBuider.Dispose();
-            this.currentAreaBuider = null;
-        }
-
-        for (int i = this.Count - 1; i >= 0; i--)
-            this.CalculateIndicatorByOffset(i, true);
+        this.Refresh();
 
         this.IsLoading = false;
     }
@@ -485,6 +633,19 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
     {
         Volume,
         Trades
+    }
+
+    public enum MALineColorOption
+    {
+        PriceCross,
+        ValueChange,
+        SolidColor
+    }
+
+    public enum CloseLineColorOption
+    {
+        Delta,
+        Sign
     }
 
     abstract class AreaBuilder : IDisposable

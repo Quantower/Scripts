@@ -94,10 +94,10 @@ public sealed class IndicatorCommodityChannelIndex : Indicator, IWatchlistIndica
             return;
 
         double meanDeviation = 0;
+        double sma = this.MA.GetValue(0);
         for (int i = 0; i < this.Period; i++)
         {
             double tp = this.GetPrice(this.SourcePrice, i);
-            double sma = this.MA.GetValue(i);
             meanDeviation += Math.Abs(tp - sma);
         }
 

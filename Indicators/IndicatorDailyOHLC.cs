@@ -73,6 +73,8 @@ public class IndicatorDailyOHLC : Indicator
     public NativeAlignment LabelAlignment { get; set; }
     public int labelFormat { get; set; }
     public int labelPosition { get; set; }
+    public int LabelHorizontalMode { get; set; } = 0;
+    public int LastLabelsCount { get; set; } = 1;
     public bool ShowLabel { get; private set; }
     public LineOptions OpenLineOptions
     {
@@ -425,6 +427,13 @@ public class IndicatorDailyOHLC : Indicator
 
             var belowTL = new SelectItem("Below the line", 0);
             var aboveTL = new SelectItem("Above the line", 1);
+            var centerTL = new SelectItem("Center on the line", 2);
+
+            var labRight = new SelectItem("Right", 0);
+            var labLeft = new SelectItem("Left", 1);
+            var labCentered = new SelectItem("Centered", 2);
+            var labRightEdge = new SelectItem("Right Edge", 3);
+            var labPriceScale = new SelectItem("Price Scale", 4);
 
             var formatPrice = new SelectItem("Price", 0);
             var formatTextPrice = new SelectItem("Text and Price", 1);
@@ -513,16 +522,28 @@ public class IndicatorDailyOHLC : Indicator
                 Text = loc._("Font"),
                 Relation = new SettingItemRelationVisibility("ShowLabel", true)
             });
-            settings.Add(new SettingItemAlignment("Label alignment", this.LabelAlignment, 60)
+            settings.Add(new SettingItemSelectorLocalized(
+                             "Label alignment",                                     // имя ключа остаётся прежним
+                             new SelectItem("Label alignment", this.LabelHorizontalMode),
+                             new List<SelectItem> { labRight, labLeft, labCentered, labRightEdge, labPriceScale })
             {
-                Text = loc._("Label alignment"),
                 SeparatorGroup = defaultSeparator,
+                Text = loc._("Label alignment"),
+                SortIndex = 60,
                 Relation = new SettingItemRelationVisibility("ShowLabel", true)
+            });
+            settings.Add(new SettingItemInteger("Last labels count", this.LastLabelsCount, 61)
+            {
+                SeparatorGroup = defaultSeparator,
+                Text = loc._("Last labels count"),
+                // показываем только когда выбран Right Edge или Price Scale
+                Relation = new SettingItemRelationVisibility("Label alignment", labRightEdge, labPriceScale)
             });
             settings.Add(new SettingItemSelectorLocalized("Label position", new SelectItem("Label position", this.labelPosition), new List<SelectItem>
                              {
                                  belowTL,
-                                 aboveTL
+                                 aboveTL,
+                                 centerTL
                              })
             {
                 SeparatorGroup = defaultSeparator,
@@ -755,12 +776,14 @@ public class IndicatorDailyOHLC : Indicator
             }
             if (holder.TryGetValue("Font", out item) && item.Value is Font font)
                 this.CurrentFont = font;
-            if (holder.TryGetValue("Label alignment", out item) && item.Value is NativeAlignment labelAlignment)
-                this.LabelAlignment = labelAlignment;
+            if (holder.TryGetValue("Label alignment", out var laItem) && laItem.GetValue<int>() != this.LabelHorizontalMode)
+                this.LabelHorizontalMode = laItem.GetValue<int>();
             if (holder.TryGetValue("ShowLabel", out item) && item.Value is bool showLabel)
                 this.ShowLabel = showLabel;
             if (holder.TryGetValue("Label position", out var lpitem)&& lpitem.GetValue<int>() != this.labelPosition)
                 this.labelPosition = lpitem.GetValue<int>();
+            if (holder.TryGetValue("Last labels count", out item) && item.Value is int lastLabels)
+                this.LastLabelsCount = lastLabels;
             if (holder.TryGetValue("Format", out var lfitem)&& lfitem.GetValue<int>() != this.labelFormat)
                 this.labelFormat = lfitem.GetValue<int>();
             if (needRefresh)
@@ -834,7 +857,9 @@ public class IndicatorDailyOHLC : Indicator
                 // get previous date
                 if (needUsePreviosRange)
                     range = this.rangeCache[prevDailyRangeOffset];
-
+                bool restrictLabels = this.LabelHorizontalMode == 3 || this.LabelHorizontalMode == 4;
+                int maxLabelDays = restrictLabels ? Math.Max(0, Math.Min(this.LastLabelsCount, this.DaysCount)) : int.MaxValue;
+                bool allowLabelForThisDay = i < maxLabelDays;
                 if (this.HighLineOptions.Enabled || this.HighExtendLineOptions.Enabled)
                 {
                     float highY = (float)currentWindow.CoordinatesConverter.GetChartY(range.High);
@@ -845,7 +870,10 @@ public class IndicatorDailyOHLC : Indicator
                             gr.DrawLine(this.highLinePen, leftX, highY, rightX, highY);
 
                             if (this.ShowHighLineLabel)
-                                this.DrawBillet(gr, range.High, ref leftX, ref rightX, ref highY, this.CurrentFont, this.highLineOptions, this.highLinePen, this.centerNearSF, this.LabelAlignment, HighCustomText);
+                                if (this.ShowHighLineLabel)
+                                    this.DrawBillet(gr, range.High, ref leftX, ref rightX, ref highY,
+                                        this.CurrentFont, this.highLineOptions, this.highLinePen, this.centerNearSF, args.Rectangle, HighCustomText);
+
                         }
 
                         if (needDrawExtendLines && this.HighExtendLineOptions.Enabled)
@@ -862,8 +890,10 @@ public class IndicatorDailyOHLC : Indicator
                         {
                             gr.DrawLine(this.lowLinePen, leftX, lowY, rightX, lowY);
 
-                            if (this.ShowLowLineLabel)
-                                this.DrawBillet(gr, range.Low, ref leftX, ref rightX, ref lowY, this.CurrentFont, this.lowLineOptions, this.lowLinePen, this.centerNearSF, this.LabelAlignment, LowCustomText);
+                                if (allowLabelForThisDay && this.ShowLowLineLabel)
+                                    this.DrawBillet(gr, range.Low, ref leftX, ref rightX, ref lowY,
+                                        this.CurrentFont, this.lowLineOptions, this.lowLinePen, this.centerNearSF, args.Rectangle, LowCustomText);
+
                         }
 
                         if (needDrawExtendLines && this.LowExtendLineOptions.Enabled)
@@ -880,8 +910,10 @@ public class IndicatorDailyOHLC : Indicator
                         {
                             gr.DrawLine(this.openLinePen, leftX, openY, rightX, openY);
 
-                            if (this.ShowOpenLineLabel)
-                                this.DrawBillet(gr, range.Open, ref leftX, ref rightX, ref openY, this.CurrentFont, this.openLineOptions, this.openLinePen, this.centerNearSF, this.LabelAlignment, OpenCustomText);
+                                if (allowLabelForThisDay && this.ShowOpenLineLabel)
+                                    this.DrawBillet(gr, range.Open, ref leftX, ref rightX, ref openY,
+                                        this.CurrentFont, this.openLineOptions, this.openLinePen, this.centerNearSF, args.Rectangle, OpenCustomText);
+
                         }
 
                         if (needDrawExtendLines && this.OpenExtendLineOptions.Enabled)
@@ -898,8 +930,10 @@ public class IndicatorDailyOHLC : Indicator
                         {
                             gr.DrawLine(this.closeLinePen, leftX, closeY, rightX, closeY);
 
-                            if (this.ShowCloseLineLabel)
-                                this.DrawBillet(gr, range.Close, ref leftX, ref rightX, ref closeY, this.CurrentFont, this.closeLineOptions, this.closeLinePen, this.centerNearSF, this.LabelAlignment, CloseCustomText);
+                                if (allowLabelForThisDay && this.ShowCloseLineLabel)
+                                    this.DrawBillet(gr, range.Close, ref leftX, ref rightX, ref closeY,
+                                        this.CurrentFont, this.closeLineOptions, this.closeLinePen, this.centerNearSF, args.Rectangle, CloseCustomText);
+
                         }
 
                         if (needDrawExtendLines && this.CloseExtendLineOptions.Enabled)
@@ -916,8 +950,10 @@ public class IndicatorDailyOHLC : Indicator
                         {
                             gr.DrawLine(this.middleLinePen, leftX, middleY, rightX, middleY);
 
-                            if (this.ShowMiddleLineLabel)
-                                this.DrawBillet(gr, range.MiddlePrice, ref leftX, ref rightX, ref middleY, this.CurrentFont, this.middleLineOptions, this.middleLinePen, this.centerNearSF, this.LabelAlignment, MiddleCustomText);
+                                if (allowLabelForThisDay && this.ShowMiddleLineLabel)
+                                    this.DrawBillet(gr, range.MiddlePrice, ref leftX, ref rightX, ref middleY,
+                                        this.CurrentFont, this.middleLineOptions, this.middleLinePen, this.centerNearSF, args.Rectangle, MiddleCustomText);
+
                         }
 
                         if (needDrawExtendLines && this.MiddleExtendLineOptions.Enabled)
@@ -993,43 +1029,84 @@ public class IndicatorDailyOHLC : Indicator
         }
     }
 
-    private void DrawBillet(Graphics gr, double price, ref float leftX, ref float rightX, ref float priceY, Font font, LineOptions lineOptions, Pen pen, StringFormat stringFormat, NativeAlignment nativeAlignment, string prefix)
+    private void DrawBillet(Graphics gr, double price, ref float leftX, ref float rightX, ref float priceY,
+                         Font font, LineOptions lineOptions, Pen pen, StringFormat stringFormat,
+                         Rectangle chartRect, string prefix)
     {
         string label = "";
-        if (ShowLabel==true)
-            label = labelFormat==1 ? prefix + this.Symbol.FormatPrice(price) : labelFormat == 0 ? this.Symbol.FormatPrice(price) : prefix;
+        if (ShowLabel)
+            label = labelFormat == 1 ? prefix + this.Symbol.FormatPrice(price)
+                                     : labelFormat == 0 ? this.Symbol.FormatPrice(price)
+                                                        : prefix;
+
         var labelSize = gr.MeasureString(label, font);
 
         var rect = new RectangleF()
         {
             Height = labelSize.Height,
-            Width = labelSize.Width + 5,
-            Y = labelPosition == 1 ? priceY - labelSize.Height - lineOptions.Width : priceY - lineOptions.Width + 1
+            Width  = labelSize.Width + 5
+            // Y выставим ниже
         };
 
-        switch (nativeAlignment)
+        // === Вертикальное позиционирование:
+        // 0 — ниже линии; 1 — выше линии; 2 — по центру линии (добавлено ранее)
+        if (this.labelPosition == 1)            // Above
+            rect.Y = priceY - labelSize.Height - lineOptions.Width;
+        else if (this.labelPosition == 2)       // Center on the line
+            rect.Y = priceY - labelSize.Height / 2f;
+        else                                    // Below (0)
+            rect.Y = priceY - lineOptions.Width + 1;
+
+        // === Горизонтальное позиционирование (5 вариантов):
+        switch (this.LabelHorizontalMode)
         {
-            case NativeAlignment.Center:
+            case 2:
+                rect.X = (rightX - leftX) / 2f + leftX - rect.Width / 2f;
+                break;
+
+            case 1:
+                rect.X = leftX;
+                break;
+
+            case 0:
+                rect.X = rightX - rect.Width;
+                break;
+
+            case 3:
+                // Приклеиваемся к правому краю видимой области окна графика
+                rect.X = chartRect.Right - rect.Width;
+                break;
+
+            case 4:
+                // Рисуем в области правой ценовой шкалы: выходим из клипа графика,
+                // ставим X чуть правее правой границы области чарта и возвращаем клип назад.
                 {
-                    rect.X = (rightX - leftX) / 2f + leftX - rect.Width / 2f;
-                    break;
+                    var savedClip = gr.Clip; // Region
+                    try
+                    {
+                        gr.ResetClip(); // разрешаем рисовать вне области args.Rectangle
+                        rect.X = chartRect.Right + 4; // сместились внутрь области шкалы (обычно сразу справа от графика)
+                        gr.FillRectangle(pen.Brush, rect);
+                        gr.DrawString(label, font, Brushes.White, rect, stringFormat);
+                        return; // уже всё нарисовали
+                    }
+                    finally
+                    {
+                        // вернуть предыдущий клип
+                        gr.SetClip(savedClip, System.Drawing.Drawing2D.CombineMode.Replace);
+                    }
                 }
-            case NativeAlignment.Right:
-                {
-                    rect.X = rightX - rect.Width;
-                    break;
-                }
-            case NativeAlignment.Left:
+
             default:
-                {
-                    rect.X = leftX;
-                    break;
-                }
+                rect.X = rightX - rect.Width; // безопасный дефолт — как Right
+                break;
         }
 
         gr.FillRectangle(pen.Brush, rect);
         gr.DrawString(label, font, Brushes.White, rect, stringFormat);
     }
+
+
     private Session CreateDefaultSession()
     {
         // 00:00

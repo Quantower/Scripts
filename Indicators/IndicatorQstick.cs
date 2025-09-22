@@ -22,7 +22,17 @@ public sealed class IndicatorQstick : Indicator, IWatchlistIndicator
         "Linear Weighted", MaMode.LWMA}
     )]
     public MaMode MAType = MaMode.SMA;
+    [InputParameter("Smoothing period", 0, 1, 999, 0, 0)]
+    public int SmoothingPeriod = 20;
 
+    // Displays Input Parameter as dropdown list.
+    [InputParameter("Smoothing Type", 1, variants: new object[] {
+        "Simple", MaMode.SMA,
+        "Exponential", MaMode.EMA,
+        "Modified", MaMode.SMMA,
+        "Linear Weighted", MaMode.LWMA}
+    )]
+    public MaMode SmoothingType = MaMode.SMA;
     //
     [InputParameter("Calculation type", 5, variants: new object[]
     {
@@ -37,6 +47,8 @@ public sealed class IndicatorQstick : Indicator, IWatchlistIndicator
 
     private HistoricalDataCustom customHistData;
     private Indicator ma;
+    private Indicator smoothing;
+
 
     /// <summary>
     /// Indicator's constructor. Contains general information: name, description, LineSeries etc. 
@@ -51,6 +63,7 @@ public sealed class IndicatorQstick : Indicator, IWatchlistIndicator
         // Defines line on demand with particular parameters.
         this.AddLineSeries("Qstick'Line", Color.Blue, 1, LineStyle.Solid);
         this.AddLineLevel(0, "0'Line", Color.Gray, 1, LineStyle.Solid);
+        this.AddLineSeries("Smoothing line", Color.IndianRed, 1, LineStyle.Solid);
 
         this.SeparateWindow = true;
     }
@@ -68,6 +81,9 @@ public sealed class IndicatorQstick : Indicator, IWatchlistIndicator
 
         // Adds the smoothing indicator to the custom historical data.
         this.customHistData.AddIndicator(this.ma);
+
+        this.smoothing = Core.Indicators.BuiltIn.MA(this.SmoothingPeriod, PriceType.Open, this.SmoothingType, this.CalculationType);
+        this.customHistData.AddIndicator(this.smoothing);
     }
 
     /// <summary>
@@ -85,8 +101,10 @@ public sealed class IndicatorQstick : Indicator, IWatchlistIndicator
         // Skip if count is smaller than period value.
         if (this.Count < this.MinHistoryDepths)
             return;
-
+        var qStickValue = this.ma.GetValue();
+        this.customHistData[PriceType.Open] = this.Close() - this.Open();
         // Sets value (smoothing value on the custom historical data) for displaying on the chart.
-        this.SetValue(this.ma.GetValue());
+        this.SetValue(qStickValue);
+        this.SetValue(this.smoothing.GetValue(), 1);
     }
 }

@@ -52,14 +52,8 @@ public class IndicatorBarCounter : Indicator
                 return;
             }
             var mainWindow = this.CurrentChart.MainWindow;
-            DateTime leftBorderTime = mainWindow.CoordinatesConverter.GetTime(0);
-            DateTime rightBorderTime = mainWindow.CoordinatesConverter.GetTime(mainWindow.ClientRectangle.Width);
-            int leftIndex = (int)mainWindow.CoordinatesConverter.GetBarIndex(leftBorderTime);
-            int rightIndex = (int)mainWindow.CoordinatesConverter.GetBarIndex(rightBorderTime);
-            if (leftIndex < 0)
-                leftIndex = 0;
-            if (rightIndex >= this.HistoricalData.Count)
-                rightIndex = this.HistoricalData.Count - 1;
+            int leftIndex = args.LeftVisibleBarIndex;
+            int rightIndex = args.RightVisibleBarIndex;
             Brush labelBrush = new SolidBrush(labelColor);
             leftIndex = this.HistoricalData.Count - leftIndex - 1;
             rightIndex = this.HistoricalData.Count - rightIndex - 1;

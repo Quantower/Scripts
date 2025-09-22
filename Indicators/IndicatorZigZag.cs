@@ -1,5 +1,6 @@
 // Copyright QUANTOWER LLC. © 2017-2024. All rights reserved.
 
+using System;
 using System.Drawing;
 using TradingPlatform.BusinessLayer;
 
@@ -14,11 +15,18 @@ public sealed class IndicatorZigZag : Indicator
     [InputParameter("Percent Deviation", 0, 0.01, 100.0, 0.01, 2)]
     public double deviation = 0.1;
 
+    [InputParameter("Is price marker visible")]
+    public bool IsMarkerVisible;
+
+    [InputParameter("Marker colors")]
+    public PairColor pairColor;
+
     // Defines ZigZag calculation variables.
-    private int trendLineLenght;
-    private int retracementLenght;
+    private int trendLineLength;
+    private int retracementLength;
     private int direction;
     private double lastTurnPoint;
+    private double lastPriceChangeDirection;
 
     public override string ShortName => $"ZZ ({this.deviation})";
     public override string HelpLink => "https://help.quantower.com/analytics-panels/chart/technical-indicators/trend/zigzag";
@@ -38,6 +46,9 @@ public sealed class IndicatorZigZag : Indicator
         this.AddLineSeries("ZZ'Line", Color.Yellow, 2, LineStyle.Solid);
 
         this.SeparateWindow = false;
+
+        this.IsMarkerVisible = true;
+        this.pairColor = new PairColor(Color.Green, Color.Red, loc._("Up", loc._("Down")));
     }
 
     /// <summary>
@@ -46,10 +57,11 @@ public sealed class IndicatorZigZag : Indicator
     protected override void OnInit()
     {
         // Initializes calculation parameters.
-        this.trendLineLenght = 0;
-        this.retracementLenght = 0;
+        this.trendLineLength = 0;
+        this.retracementLength = 0;
         this.direction = 1;
         this.lastTurnPoint = 0;
+        this.lastPriceChangeDirection = double.NaN;
     }
 
     /// <summary>
@@ -64,8 +76,8 @@ public sealed class IndicatorZigZag : Indicator
         // Changes calculation parameters on each bar.
         if (args.Reason != UpdateReason.NewTick)
         {
-            this.trendLineLenght++;
-            this.retracementLenght++;
+            this.trendLineLength++;
+            this.retracementLength++;
         }
 
         if (this.Count == 0)
@@ -81,8 +93,8 @@ public sealed class IndicatorZigZag : Indicator
             if (high >= this.lastTurnPoint)
             {
                 this.lastTurnPoint = high;
-                this.retracementLenght = 0;
-                this.DrawTrendLine(this.trendLineLenght + 1);
+                this.retracementLength = 0;
+                this.DrawTrendLine(this.trendLineLength + 1);
                 return;
             }
             // Sloping trend detection block.
@@ -90,9 +102,10 @@ public sealed class IndicatorZigZag : Indicator
             {
                 this.lastTurnPoint = low;
                 this.direction = -1;
-                this.trendLineLenght = this.retracementLenght;
-                this.retracementLenght = 0;
-                this.DrawTrendLine(this.trendLineLenght + 1);
+                this.trendLineLength = this.retracementLength;
+                this.retracementLength = 0;
+                this.DrawTrendLine(this.trendLineLength + 1);
+                this.DrawLabel(this.trendLineLength);
                 return;
             }
         }
@@ -103,8 +116,8 @@ public sealed class IndicatorZigZag : Indicator
             if (low <= this.lastTurnPoint)
             {
                 this.lastTurnPoint = low;
-                this.retracementLenght = 0;
-                this.DrawTrendLine(this.trendLineLenght + 1);
+                this.retracementLength = 0;
+                this.DrawTrendLine(this.trendLineLength + 1);
                 return;
             }
             // Sloping trend detection block.
@@ -112,9 +125,10 @@ public sealed class IndicatorZigZag : Indicator
             {
                 this.lastTurnPoint = high;
                 this.direction = 1;
-                this.trendLineLenght = this.retracementLenght;
-                this.retracementLenght = 0;
-                this.DrawTrendLine(this.trendLineLenght + 1);
+                this.trendLineLength = this.retracementLength;
+                this.retracementLength = 0;
+                this.DrawTrendLine(this.trendLineLength + 1);
+                this.DrawLabel(this.trendLineLength);
                 return;
             }
         }
@@ -136,5 +150,33 @@ public sealed class IndicatorZigZag : Indicator
             double y = (this.direction > 0) ? high - i * (high - this.Low(x - 1)) / (x - 1) : low - i * (low - this.High(x - 1)) / (x - 1);
             this.SetValue(y, 0, i);
         }
+    }
+
+    private void DrawLabel(int x)
+    {
+        if (!this.IsMarkerVisible)
+            return;
+
+        var upperIcon = this.direction == -1 ? IndicatorLineMarkerIconType.Text : IndicatorLineMarkerIconType.None;
+        var bottomIcon = this.direction == 1 ? IndicatorLineMarkerIconType.Text : IndicatorLineMarkerIconType.None;
+        var marker = new IndicatorLineMarker(this.LinesSeries[0].Color, upperIcon, bottomIcon);
+
+        var currentPrice = this.LinesSeries[0].GetValue(x);
+        var labelText = this.Symbol.FormatPrice(currentPrice);
+        var percent = (currentPrice - this.lastPriceChangeDirection) / this.lastPriceChangeDirection * 100;
+        if (!double.IsNaN(percent))
+            labelText += $" ({Math.Round(percent, 2).ToString()}%)";
+
+        var color = this.LinesSeries[0].Color;
+        if (percent > 0)
+            color = this.pairColor.Color1;
+        else if (percent < 0)
+            color = this.pairColor.Color2;
+
+        marker.Color = color;
+        marker.TextSettings.Text = labelText;
+        this.LinesSeries[0].SetMarker(x, marker);
+
+        this.lastPriceChangeDirection = this.LinesSeries[0].GetValue(x);
     }
 }

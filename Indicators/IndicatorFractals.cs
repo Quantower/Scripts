@@ -58,49 +58,35 @@ public class IndicatorFractals : Indicator
         double baseHigh = High(period);
         double baseLow = Low(period);
 
-        double currentHigh;
-        double currentLow;
         int minTrendValue = 0;
         int maxTrendValue = 0;
 
         SetValue(High(), 0);
         SetValue(Low(), 1);
 
-        for (int i = 0; i <= period; i++)
+        for (int i = 1; i <= period; i++)
         {
-            currentHigh = High(period + i);
-            currentLow = Low(period + i);
-
-            if (baseHigh > currentHigh)
+            double leftHigh = High(period + i);
+            double leftLow = Low(period + i);
+            double rightHigh = High(period - i);
+            double rightLow = Low(period - i);
+            if (baseHigh >= leftHigh && baseHigh > rightHigh)
                 maxTrendValue++;
 
-            if (baseLow < currentLow)
+            if (baseLow <= leftLow && baseLow < rightLow)
                 minTrendValue++;
+
         }
-        for (int i = 0; i <= period; i++)
-        {
-
-            currentHigh = High(period - i);
-            currentLow = Low(period - i);
-
-            if (baseHigh > currentHigh)
-                maxTrendValue++;
-
-            if (baseLow < currentLow)
-                minTrendValue++;
-        }
-        if (maxTrendValue == period * 2)
+        if (maxTrendValue == period)
             LinesSeries[0].SetMarker(period, new IndicatorLineMarker(this.maximumColor, upperIcon: this.localMaxIconType));
-        if (minTrendValue == period * 2)
+        if (minTrendValue == period)
             LinesSeries[1].SetMarker(period, new IndicatorLineMarker(this.minimumColor, bottomIcon: this.localMinIconType));
 
-        if (maxTrendValue != period * 2 && minTrendValue != period * 2)
-        {
+        if (maxTrendValue != period)
             LinesSeries[0].RemoveMarker(period);
+        if (minTrendValue != period)
             LinesSeries[1].RemoveMarker(period);
-        }
     }
-
     #region Draw lines until intersection
 
     public override void OnPaintChart(PaintChartEventArgs args)

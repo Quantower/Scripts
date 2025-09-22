@@ -56,10 +56,10 @@ public sealed class IndicatorMovingAverageConvergenceDivergence : Indicator, IWa
         this.Description = "A trend-following momentum indicator that shows the relationship between two moving averages of prices";
 
         // Defines line on demand with particular parameters.
-        this.AddLineSeries("MACD", Color.DodgerBlue, 1, LineStyle.Solid);
-        this.AddLineSeries("Signal", Color.Red, 1, LineStyle.Solid);
         this.AddLineSeries("OsMA", Color.Green, 4, LineStyle.Histogramm);
         this.AddLineLevel(0, "0 level", Color.DarkGreen, 1, LineStyle.Solid);
+        this.AddLineSeries("MACD", Color.DodgerBlue, 1, LineStyle.Solid);
+        this.AddLineSeries("Signal", Color.Red, 1, LineStyle.Solid);
         this.SeparateWindow = true;
 
         this.level1_Color = Color.FromArgb(0, 178, 89);
@@ -149,7 +149,7 @@ public sealed class IndicatorMovingAverageConvergenceDivergence : Indicator, IWa
                 lineGroup.AddItem(new SettingItemColor("Color 4", this.level4_Color, 1) { ColorText = loc._("Color"), SeparatorGroup = separatorGeoup });
             }
 
-            return  settings;
+            return settings;
         }
         set
         {
@@ -186,7 +186,7 @@ public sealed class IndicatorMovingAverageConvergenceDivergence : Indicator, IWa
 
                 if (needUpdate)
                     this.OnSettingsUpdated();
-            }            
+            }
         }
     }
 }

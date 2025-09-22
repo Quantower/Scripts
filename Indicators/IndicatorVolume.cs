@@ -136,6 +136,8 @@ public sealed class IndicatorVolume : Indicator, IWatchlistIndicator
                         this.LinesSeries[0].SetMarker(0, this.pairColor.Color2);
                     else if (this.Open() > this.Close())
                         this.LinesSeries[0].SetMarker(0, this.pairColor.Color1);
+                    else if(this.Open() == this.Close())
+                        this.LinesSeries[0].SetMarker(0, this.LinesSeries[0].Color);
                     break;
                 }
             case VolumeColoringScheme.ByDifference:
