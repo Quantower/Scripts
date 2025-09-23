@@ -1,7 +1,9 @@
 // Copyright QUANTOWER LLC. © 2017-2024. All rights reserved.
 
 using System;
+using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 using TradingPlatform.BusinessLayer;
 
 namespace Trend;
@@ -15,11 +17,11 @@ public sealed class IndicatorZigZag : Indicator
     [InputParameter("Percent Deviation", 0, 0.01, 100.0, 0.01, 2)]
     public double deviation = 0.1;
 
-    [InputParameter("Is price marker visible")]
-    public bool IsMarkerVisible;
-
-    [InputParameter("Marker colors")]
-    public PairColor pairColor;
+    private bool isLabelVisible;
+    private Color upLabelColor;
+    private Color downLabelColor;
+    private Font labelFont;
+    private LabelFormat labelFormat;
 
     // Defines ZigZag calculation variables.
     private int trendLineLength;
@@ -47,8 +49,11 @@ public sealed class IndicatorZigZag : Indicator
 
         this.SeparateWindow = false;
 
-        this.IsMarkerVisible = true;
-        this.pairColor = new PairColor(Color.Green, Color.Red, loc._("Up", loc._("Down")));
+        this.isLabelVisible = true;
+        this.upLabelColor = Color.Green;
+        this.downLabelColor = Color.Red;
+        this.labelFont = SystemFonts.DefaultFont;
+        this.labelFormat = LabelFormat.PriceAndChange;
     }
 
     /// <summary>
@@ -154,7 +159,7 @@ public sealed class IndicatorZigZag : Indicator
 
     private void DrawLabel(int x)
     {
-        if (!this.IsMarkerVisible)
+        if (!this.isLabelVisible)
             return;
 
         var upperIcon = this.direction == -1 ? IndicatorLineMarkerIconType.Text : IndicatorLineMarkerIconType.None;
@@ -162,21 +167,118 @@ public sealed class IndicatorZigZag : Indicator
         var marker = new IndicatorLineMarker(this.LinesSeries[0].Color, upperIcon, bottomIcon);
 
         var currentPrice = this.LinesSeries[0].GetValue(x);
-        var labelText = this.Symbol.FormatPrice(currentPrice);
+        var priceText = this.Symbol.FormatPrice(currentPrice);
         var percent = (currentPrice - this.lastPriceChangeDirection) / this.lastPriceChangeDirection * 100;
-        if (!double.IsNaN(percent))
-            labelText += $" ({Math.Round(percent, 2).ToString()}%)";
+        var percentText = double.IsNaN(percent) ? string.Empty : $"{Math.Round(percent, 2).ToString()}%";
+
+        var labelText = this.labelFormat switch
+        {
+            LabelFormat.Price => priceText,
+            LabelFormat.Change => percentText,
+            LabelFormat.PriceAndChange => $"{priceText} ({percentText})",
+
+            _ => priceText
+        };
 
         var color = this.LinesSeries[0].Color;
         if (percent > 0)
-            color = this.pairColor.Color1;
+            color = this.upLabelColor;
         else if (percent < 0)
-            color = this.pairColor.Color2;
+            color = this.downLabelColor;
 
         marker.Color = color;
+        marker.PaintLine = false;
         marker.TextSettings.Text = labelText;
+        marker.TextSettings.Font = this.labelFont;
         this.LinesSeries[0].SetMarker(x, marker);
 
         this.lastPriceChangeDirection = this.LinesSeries[0].GetValue(x);
+    }
+
+    public override IList<SettingItem> Settings
+    {
+        get
+        {
+            var settings = base.Settings;
+
+            var separatorGroup = settings.FirstOrDefault(s => s.Name == "Percent Deviation")?.SeparatorGroup;
+
+            settings.Add(new SettingItemBoolean("IsLabelVisible", this.isLabelVisible)
+            {
+                Text = loc._("Is price label visible"),
+                SeparatorGroup = separatorGroup
+            });
+            var labelVisibleRelation = new SettingItemRelationVisibility("IsLabelVisible", true);
+            settings.Add(new SettingItemPairColor("LabelColors", new PairColor(this.upLabelColor, this.downLabelColor, loc._("Up"), loc._("Down")))
+            {
+                Text = loc._("Label colors"),
+                Relation = labelVisibleRelation,
+                SeparatorGroup = separatorGroup
+            });
+            settings.Add(new SettingItemFont("LabelFont", this.labelFont)
+            {
+                Text = loc._("Label font"),
+                Relation = labelVisibleRelation,
+                SeparatorGroup = separatorGroup
+            });
+            var labelFormats = new List<SelectItem>()
+            {
+                new SelectItem(loc._("Price"), LabelFormat.Price),
+                new SelectItem(loc._("Change"), LabelFormat.Change),
+                new SelectItem(loc._("Price and change"), LabelFormat.PriceAndChange),
+            };
+            settings.Add(new SettingItemSelectorLocalized("LabelFormat", labelFormats.GetItemByValue(this.labelFormat), labelFormats)
+            {
+                Text = loc._("Label format"),
+                Relation = labelVisibleRelation,
+                SeparatorGroup = separatorGroup
+            });
+
+            return settings;
+        }
+        set
+        {
+            base.Settings = value;
+            var holder = new SettingsHolder(value);
+
+            var settingsUpdated = false;
+            if (holder.TryGetValue("IsLabelVisible", out var item))
+            {
+                settingsUpdated |= this.isLabelVisible != (bool)item.Value;
+                this.isLabelVisible = (bool)item.Value;
+            }
+
+            if (holder.TryGetValue("LabelFormat", out item))
+            {
+                var selectItem = (SelectItem)item.Value;
+                settingsUpdated |= (LabelFormat)selectItem.Value != this.labelFormat;
+                this.labelFormat = (LabelFormat)selectItem.Value;
+            }
+
+            if (holder.TryGetValue("LabelFont", out item))
+            {
+                settingsUpdated |= this.labelFont != (Font)item.Value;
+                this.labelFont = (Font)item.Value;
+            }
+
+            if (holder.TryGetValue("LabelColors", out item))
+            {
+                var pairColor = (PairColor)item.Value;
+
+                settingsUpdated |= this.upLabelColor != pairColor.Color1 || this.downLabelColor != pairColor.Color2;
+                this.upLabelColor = pairColor.Color1;
+                this.downLabelColor = pairColor.Color2;
+            }
+
+            if (settingsUpdated)
+                this.OnSettingsUpdated();
+        }
+    }
+
+    public enum LabelFormat
+    {
+        Price,
+        Change,
+        PriceAndChange
     }
 }

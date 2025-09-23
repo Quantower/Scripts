@@ -24,6 +24,7 @@ public class IndicatorFractals : Indicator
         "Arrow", IndicatorLineMarkerIconType.UpArrow,
         "Flag", IndicatorLineMarkerIconType.Flag,
         "Circle", IndicatorLineMarkerIconType.FillCircle,
+        "Pointer", IndicatorLineMarkerIconType.UpPointer,
     })]
     public IndicatorLineMarkerIconType localMaxIconType = IndicatorLineMarkerIconType.UpArrow;
 
@@ -31,6 +32,7 @@ public class IndicatorFractals : Indicator
         "Arrow", IndicatorLineMarkerIconType.DownArrow,
         "Flag", IndicatorLineMarkerIconType.Flag,
         "Circle", IndicatorLineMarkerIconType.FillCircle,
+        "Pointer", IndicatorLineMarkerIconType.DownPointer,
     })]
     public IndicatorLineMarkerIconType localMinIconType = IndicatorLineMarkerIconType.DownArrow;
 
