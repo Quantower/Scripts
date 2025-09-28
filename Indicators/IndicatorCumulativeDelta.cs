@@ -150,6 +150,8 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
 
     private AreaBuilder currentAreaBuider;
 
+    private IntervalGenerator intervalGenerator;
+
     private Color upLineColor;
     private Color downLineColor;
 
@@ -491,19 +493,25 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
         if (this.currentAreaBuider == null)
         {
             var period = this.GetStepPeriod();
-            var range = this.SessionMode != CumulativeDeltaSessionMode.FullHistory
-                ? HistoryStepsCalculator.GetSteps(time, time.AddTicks(period.Ticks), period.BasePeriod, period.PeriodMultiplier, this.SessionContainer, this.GetTimeZone()).FirstOrDefault()
-                : new Interval<DateTime>(time, DateTime.MaxValue);
+
+            Interval<DateTime> range;
+
+            if (this.SessionMode == CumulativeDeltaSessionMode.FullHistory)
+                range = new Interval<DateTime>(time, DateTime.MaxValue);
+            else
+            {
+                this.intervalGenerator = new IntervalGenerator(time, period, this.SessionContainer, this.GetTimeZone());
+                range = this.intervalGenerator.Current;
+            }
 
             if (range.IsEmpty)
                 return;
 
             this.currentAreaBuider = this.CreateAreaBuilder(range);
         }
-        else if (!this.currentAreaBuider.Contains(time))
+        else if (this.intervalGenerator != null && !this.currentAreaBuider.Contains(time))
         {
-            var period = this.GetStepPeriod();
-            var range = HistoryStepsCalculator.GetNextStep(this.currentAreaBuider.Range.To, period.BasePeriod, period.PeriodMultiplier, this.SessionContainer?.TimeZone);
+            var range = this.intervalGenerator.MoveNext();
 
             if (range.IsEmpty)
                 return;
