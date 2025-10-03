@@ -511,7 +511,9 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
         }
         else if (this.intervalGenerator != null && !this.currentAreaBuider.Contains(time))
         {
-            var range = this.intervalGenerator.MoveNext();
+            this.intervalGenerator.MoveUntil(time);
+
+            var range = this.intervalGenerator.Current;
 
             if (range.IsEmpty)
                 return;
@@ -601,7 +603,6 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
             Days = Enum.GetValues(typeof(DayOfWeek)).Cast<DayOfWeek>().ToArray(),
             Type = SessionType.Main
         };
-        session.RecalculateOpenCloseTime(info);
         return session;
     }
     private AreaBuilder CreateAreaBuilder(Interval<DateTime> range)
