@@ -125,9 +125,6 @@ namespace IndicatorPowerOfThree
         private Font labelFont;
         private HorizontalPosition horizontalPosition = HorizontalPosition.Right;
         private bool showLevelLine = false;
-        private bool showOpenLevelLine = false;
-        private bool showLowLevelLine = false;
-        private bool showHighLevelLine = false;
 
         private bool tfDataLoaded = false;
         private bool needRedownload = false;
@@ -238,7 +235,7 @@ namespace IndicatorPowerOfThree
                 shadowTop.X = candleBody.X + candleBody.Width / 2;
                 shadowBottom.X = shadowTop.X;
                 HistoryItemBar resultBar = new HistoryItemBar();
-                for (int i = 0; i < this.barsCount; i++)
+                for (int i = this.barsCount-1; i >= 0; i--)
                 {
                     resultBar = this.GetResultBar(i);
                     if (resultBar ==  null)
@@ -325,7 +322,7 @@ namespace IndicatorPowerOfThree
                     return null;
                 if (this.tfPeriod != Period.TICK1)
                 {
-                    HistoryItemBar lastTFBar = (HistoryItemBar)this.tfData[currBarIndex, SeekOriginHistory.Begin];
+                    HistoryItemBar lastTFBar = (HistoryItemBar)this.tfData[currBarIndex, SeekOriginHistory.End];
                     resultBar.High = lastTFBar.High;
                     resultBar.Low = lastTFBar.Low;
                     resultBar.Close = lastTFBar.Close;
@@ -609,6 +606,7 @@ namespace IndicatorPowerOfThree
             }
             set
             {
+                this.needRedownload = false;
                 base.Settings = value;
                 if (value.TryGetValue("barsPeriod", out int barsPeriod))
                     this.barsPeriod = barsPeriod;
@@ -670,6 +668,7 @@ namespace IndicatorPowerOfThree
                     this.labelColor = labelColor;
                 if (this.needRedownload && this.useTFPeriod)
                 {
+                    this.AbortPreviousTask();
                     this.loadingTask = Task.Factory.StartNew(() => HistoryDownload(this.cancellationSource.Token));
                 }
             }
@@ -700,7 +699,7 @@ namespace IndicatorPowerOfThree
         private void HistoryDownload(CancellationToken token)
         {
             this.State = IndicatorState.Loading;
-            var fromTime = this.HistoricalData.FromTime;
+            var fromTime = DateTime.UtcNow;
 
             var prevHistoryCount = -1;
 
@@ -708,12 +707,28 @@ namespace IndicatorPowerOfThree
             while (needReload)
             {
                 needReload = false;
-
+                fromTime -= this.tfPeriod.Duration * this.barsCount;
                 if (token.IsCancellationRequested)
                     return;
-
-                this.tfData = this.Symbol.GetHistory(this.tfPeriod, this.Symbol.HistoryType, this.barsCount);
-
+                if (this.Symbol == null)
+                    continue;
+                HistoryAggregation aggregation;
+                if (this.tfPeriod.BasePeriod == BasePeriod.Tick)
+                {
+                    if (this.tfPeriod.PeriodMultiplier == 1)
+                        aggregation = new HistoryAggregationTick(this.Symbol.HistoryType);
+                    else
+                        aggregation = new HistoryAggregationTickBars(this.tfPeriod.PeriodMultiplier, this.Symbol.HistoryType);
+                }
+                else
+                    aggregation = new HistoryAggregationTime(this.tfPeriod, this.Symbol.HistoryType);
+                this.tfData = this.Symbol.GetHistory(new HistoryRequestParameters()
+                {
+                    Symbol = this.Symbol,
+                    FromTime = fromTime,
+                    CancellationToken = this.cancellationSource.Token,
+                    Aggregation = aggregation
+                });
                 if (token.IsCancellationRequested || prevHistoryCount == this.tfData.Count)
                 {
                     this.State = IndicatorState.NoData;
