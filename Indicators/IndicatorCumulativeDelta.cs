@@ -683,16 +683,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
             this.Bar.Open = prevClose;
             this.BarIndex = barIndex;
         }
-        internal bool Contains(DateTime dt)
-        {
-            if (dt.CompareTo(this.Range.Min) < 0)
-                return false;
-
-            if (dt.CompareTo(this.Range.Max) >= 0)
-                return false;
-
-            return true;
-        }
+        internal bool Contains(DateTime dt) => this.Range.Contains(dt);
         internal void Reset(int barIndex)
         {
             this.Bar.Clear();
