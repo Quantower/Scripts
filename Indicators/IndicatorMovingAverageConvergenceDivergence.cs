@@ -127,9 +127,9 @@ public sealed class IndicatorMovingAverageConvergenceDivergence : Indicator, IWa
 
         var osMAValue = differ - signal;
         if (osMAValue > 0)
-            this.LinesSeries[2].SetMarker(0, osMAValue > this.LinesSeries[2].GetValue(1) ? this.level1_Color : this.level2_Color);
+            this.LinesSeries[0].SetMarker(0, osMAValue > this.LinesSeries[0].GetValue(1) ? this.level1_Color : this.level2_Color);
         else
-            this.LinesSeries[2].SetMarker(0, osMAValue < this.LinesSeries[2].GetValue(1) ? this.level3_Color : this.level4_Color);
+            this.LinesSeries[0].SetMarker(0, osMAValue < this.LinesSeries[0].GetValue(1) ? this.level3_Color : this.level4_Color);
     }
 
     public override IList<SettingItem> Settings
@@ -138,7 +138,7 @@ public sealed class IndicatorMovingAverageConvergenceDivergence : Indicator, IWa
         {
             var settings = base.Settings;
 
-            if (settings.GetItemByName("Line_2") is SettingItemGroup lineGroup)
+            if (settings.GetItemByName("Line_0") is SettingItemGroup lineGroup)
             {
                 var items = lineGroup.Value as IList<SettingItem>;
                 var separatorGeoup = items?.FirstOrDefault()?.SeparatorGroup;
@@ -155,7 +155,7 @@ public sealed class IndicatorMovingAverageConvergenceDivergence : Indicator, IWa
         {
             base.Settings = value;
 
-            if (value.GetItemByName("Line_2") is SettingItemGroup lineGroup)
+            if (value.GetItemByName("Line_0") is SettingItemGroup lineGroup)
             {
                 bool needUpdate = false;
                 var colorsHolder = new SettingsHolder(lineGroup.Value as IList<SettingItem>);
