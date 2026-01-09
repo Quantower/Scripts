@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using TradingPlatform.BusinessLayer;
 
@@ -105,7 +106,7 @@ public sealed class IndicatorMovingAverageConvergenceDivergence : Indicator, IWa
 
         // Calculate a difference bettwen two EMA indicators and set value to 'MACD' line buffer.
         double differ = this.fastEMA.GetValue() - this.slowEMA.GetValue();
-        this.SetValue(differ);
+        this.SetValue(differ, 1);
 
         // The calculated value must be set as close price against the custom HistoricalData,
         // because the SMA indicator was initialized with the source price - PriceType.Close. 
@@ -120,10 +121,10 @@ public sealed class IndicatorMovingAverageConvergenceDivergence : Indicator, IWa
             return;
 
         // Set value to the 'Signal' line buffer.
-        this.SetValue(signal, 1);
+        this.SetValue(signal, 2);
 
         // Set value to the 'OsMA' line buffer.
-        this.SetValue(differ - signal, 2);
+        this.SetValue(differ - signal, 0);
 
         var osMAValue = differ - signal;
         if (osMAValue > 0)
@@ -155,7 +156,7 @@ public sealed class IndicatorMovingAverageConvergenceDivergence : Indicator, IWa
         {
             base.Settings = value;
 
-            if (value.GetItemByName("Line_0") is SettingItemGroup lineGroup)
+            if (value.GetItemByName("Line_2") is SettingItemGroup lineGroup)
             {
                 bool needUpdate = false;
                 var colorsHolder = new SettingsHolder(lineGroup.Value as IList<SettingItem>);
