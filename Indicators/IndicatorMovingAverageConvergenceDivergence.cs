@@ -22,13 +22,21 @@ public sealed class IndicatorMovingAverageConvergenceDivergence : Indicator, IWa
     public int SignalPeriod = 9;
 
     //
-    [InputParameter("Calculation type", 4, variants: new object[]
+    [InputParameter("Price type", 4, variants: new object[]
+    {
+        "Open", PriceType.Open,
+        "High", PriceType.High,
+        "Low", PriceType.Low,
+        "Close", PriceType.Close,
+    })]
+    public PriceType PriceType = PriceType.Close;
+    [InputParameter("Calculation type", 5, variants: new object[]
     {
         "All available data", IndicatorCalculationType.AllAvailableData,
         "By period", IndicatorCalculationType.ByPeriod,
     })]
     public IndicatorCalculationType CalculationType = Indicator.DEFAULT_CALCULATION_TYPE;
-
+  
     public int MinHistoryDepths => this.MaxEMAPeriod + this.SignalPeriod;
     public override string ShortName => $"MACD ({this.FastPeriod}: {this.SlowPeriod}: {this.SignalPeriod})";
     public override string HelpLink => "https://help.quantower.com/analytics-panels/chart/technical-indicators/oscillators/moving-average-convergence-divergence";
@@ -75,8 +83,8 @@ public sealed class IndicatorMovingAverageConvergenceDivergence : Indicator, IWa
     protected override void OnInit()
     {
         // Get two EMA and one SMA indicators from built-in indicator collection. 
-        this.fastEMA = Core.Indicators.BuiltIn.EMA(this.FastPeriod, PriceType.Typical, this.CalculationType);
-        this.slowEMA = Core.Indicators.BuiltIn.EMA(this.SlowPeriod, PriceType.Typical, this.CalculationType);
+        this.fastEMA = Core.Indicators.BuiltIn.EMA(this.FastPeriod, this.PriceType, this.CalculationType);
+        this.slowEMA = Core.Indicators.BuiltIn.EMA(this.SlowPeriod, this.PriceType, this.CalculationType);
         this.sma = Core.Indicators.BuiltIn.SMA(this.SignalPeriod, PriceType.Close);
 
         // Create a custom HistoricalData and synchronize it with this(MACD) indicator.
@@ -185,9 +193,9 @@ public sealed class IndicatorMovingAverageConvergenceDivergence : Indicator, IWa
                     needUpdate |= true;
                 }
 
-                if (needUpdate)
-                    this.OnSettingsUpdated();
-            }
+            if (needUpdate)
+                this.OnSettingsUpdated();
         }
+    }
     }
 }
