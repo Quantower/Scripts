@@ -110,7 +110,18 @@ public class IndicatorSquareLevels : Indicator
             c.GenerateLevels(squareBasis, this.LevelCount, includeBasisLevel);
         }
     }
+    protected override void OnUpdate(UpdateArgs args)
+    {
+        if (args.Reason == UpdateReason.HistoricalBar)
+            return;
+        var squareBasis = SquareBasis.Calculate(this.HistoricalData[0][PriceType.Close]);
 
+        foreach (var c in this.containersCache.Values)
+        {
+            bool includeBasisLevel = c.Step == 1d;
+            c.GenerateLevels(squareBasis, this.LevelCount, includeBasisLevel);
+        }
+    }
     public override void OnPaintChart(PaintChartEventArgs args)
     {
         base.OnPaintChart(args);

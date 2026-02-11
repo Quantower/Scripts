@@ -7,6 +7,7 @@ using System.Drawing;
 using System.Linq;
 using TradingPlatform.BusinessLayer;
 using TradingPlatform.BusinessLayer.Utils;
+using TradingPlatform.BusinessLayer.Utils.IntervalGeneration;
 
 namespace BarsDataIndicators;
 

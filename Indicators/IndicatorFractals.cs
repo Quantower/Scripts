@@ -25,6 +25,7 @@ public class IndicatorFractals : Indicator
         "Flag", IndicatorLineMarkerIconType.Flag,
         "Circle", IndicatorLineMarkerIconType.FillCircle,
         "Pointer", IndicatorLineMarkerIconType.UpPointer,
+        "Line", IndicatorLineMarkerIconType.Line,
     })]
     public IndicatorLineMarkerIconType localMaxIconType = IndicatorLineMarkerIconType.UpArrow;
 
@@ -33,8 +34,16 @@ public class IndicatorFractals : Indicator
         "Flag", IndicatorLineMarkerIconType.Flag,
         "Circle", IndicatorLineMarkerIconType.FillCircle,
         "Pointer", IndicatorLineMarkerIconType.DownPointer,
+        "Line", IndicatorLineMarkerIconType.Line,
     })]
     public IndicatorLineMarkerIconType localMinIconType = IndicatorLineMarkerIconType.DownArrow;
+    [InputParameter("Marker size", 1, variants: new object[]{
+        "Small",  IndicatorLineMarkerMarkerSize.Small ,
+        "Medium", IndicatorLineMarkerMarkerSize.Medium,
+        "Large", IndicatorLineMarkerMarkerSize.Large,
+    })]
+    public IndicatorLineMarkerMarkerSize markerSize = IndicatorLineMarkerMarkerSize.Medium;
+
 
     public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorFractals.cs";
 
@@ -80,9 +89,9 @@ public class IndicatorFractals : Indicator
 
         }
         if (maxTrendValue == period)
-            LinesSeries[0].SetMarker(period, new IndicatorLineMarker(this.maximumColor, upperIcon: this.localMaxIconType));
+            LinesSeries[0].SetMarker(period, new IndicatorLineMarker(this.maximumColor, upperIcon: this.localMaxIconType) { MarkerSize = this.markerSize });
         if (minTrendValue == period)
-            LinesSeries[1].SetMarker(period, new IndicatorLineMarker(this.minimumColor, bottomIcon: this.localMinIconType));
+            LinesSeries[1].SetMarker(period, new IndicatorLineMarker(this.minimumColor, bottomIcon: this.localMinIconType) { MarkerSize = this.markerSize });
 
         if (maxTrendValue != period)
             LinesSeries[0].RemoveMarker(period);

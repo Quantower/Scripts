@@ -119,7 +119,7 @@ public sealed class IndicatorRelativeStrengthIndex : Indicator, IWatchlistIndica
             this.prevV = this.sumV;
             this.prevP = this.sumP;
         }
-        if (this.Count < this.Period || this.Period == 0)
+        if (this.Count <= this.Period || this.Period == 0)
             return;
 
         if (this.SourceRSI == RSIMode.Simple)

@@ -22,6 +22,8 @@ public sealed class IndicatorFairValueGap : Indicator
     private bool hideClosed = false;
     private bool continueToEnd = false;
     private bool lastContinue = false;
+    private bool useBodiesOnly = false;
+
 
     private ShrinkType shrinkType = ShrinkType.Shrink;
     private DirectionType directionType = DirectionType.UpAndDown;
@@ -104,10 +106,11 @@ public sealed class IndicatorFairValueGap : Indicator
     {
         if (this.Count < 4)
             return;
-        double currentHigh = this.High(1);
-        double currentLow = this.Low(1);
-        double previousHigh = this.High(3);
-        double previousLow = this.Low(3);
+        double currentHigh = this.useBodiesOnly ? this.BodyHigh(1) : this.High(1);
+        double currentLow = this.useBodiesOnly ? this.BodyLow(1) : this.Low(1);
+        double previousHigh = this.useBodiesOnly ? this.BodyHigh(3) : this.High(3);
+        double previousLow = this.useBodiesOnly ? this.BodyLow(3) : this.Low(3);
+
         double currentClose = this.Close(1);
         double currentOpen = this.Open(1);
         double previousClose = this.Close(3);
@@ -129,8 +132,8 @@ public sealed class IndicatorFairValueGap : Indicator
                     this.gaps.Insert(0, new IndicatorFairValueGapGap(gapStart, previousLow, currentHigh));
             }
         //New values for current High and Low to update the gap in real time
-        currentHigh = this.High(0);
-        currentLow = this.Low(0);
+        currentHigh = this.useBodiesOnly ? this.BodyHigh(0) : this.High(0);
+        currentLow  = this.useBodiesOnly ? this.BodyLow(0) : this.Low(0);
         //Update the state of the gap from the intersection with the current candle
         for (int i = 0; i <= gaps.Count - 1; i++)
         {
@@ -257,7 +260,7 @@ public sealed class IndicatorFairValueGap : Indicator
                     var pen = currGap.GapType == IndicatorFairValueGapType.Up ? this.upPen : this.downPen;
                     var halfPen = currGap.GapType == IndicatorFairValueGapType.Up ? this.upHalfPen : this.downHalfPen;
                     // Painting
-                    if (showShrink) //Case where shrink display is required 
+                    if (showShrink) //Case where shrink display is required
                     {
                         for (int j = 0; j < currGap.upPoints.Count; j++)
                         {
@@ -280,7 +283,7 @@ public sealed class IndicatorFairValueGap : Indicator
                             continuedCount++;
                         }
                     }
-                    else //Case where shrink display is not required 
+                    else //Case where shrink display is not required
                     {
                         int x1 = (int)currWindow.CoordinatesConverter.GetChartX(this.HistoricalData[currGap.upPoints[0].BarNumber, SeekOriginHistory.Begin].TimeLeft) + CurrentChart.BarsWidth / 2;
                         int y1 = (int)currWindow.CoordinatesConverter.GetChartY(currGap.upPoints[0].Price);
@@ -342,6 +345,11 @@ public sealed class IndicatorFairValueGap : Indicator
             settings.Add(new SettingItemBoolean("Partially", this.closeGaps)
             {
                 Text = "Close gaps partially",
+                SortIndex = 1,
+            });
+            settings.Add(new SettingItemBoolean("UseBodiesOnly", this.useBodiesOnly)
+            {
+                Text = "Use candle bodies only",
                 SortIndex = 1,
             });
             SettingItemRelationVisibility visibleRelationPartially = new SettingItemRelationVisibility("Partially", true);
@@ -515,6 +523,8 @@ public sealed class IndicatorFairValueGap : Indicator
             base.Settings = value;
             if (value.TryGetValue("Partially", out bool partially))
                 this.closeGaps = partially;
+            if (value.TryGetValue("UseBodiesOnly", out bool useBodiesOnly))
+                this.useBodiesOnly = useBodiesOnly;
             if (value.TryGetValue("GapsLength", out int gapLength))
                 this.gapLength = gapLength;
             if (value.TryGetValue("MaxNumber", out int MaxNumber))
@@ -586,6 +596,8 @@ public sealed class IndicatorFairValueGap : Indicator
             this.OnSettingsUpdated();
         }
     }
+    private double BodyHigh(int offset) => Math.Max(this.Open(offset), this.Close(offset));
+    private double BodyLow(int offset) => Math.Min(this.Open(offset), this.Close(offset));
 }
 internal sealed class IndicatorFairValueGapGap
 {

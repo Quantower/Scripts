@@ -38,6 +38,11 @@ public sealed class IndicatorParabolicSAR : Indicator, IWatchlistIndicator
     private double start, last_high, last_low;
     private double ep, sar, price_low, price_high;
 
+    private bool prevFirst;
+    private bool prevDirlong;
+    private double prevStart, prevLastHigh, prevLastLow, prevEP, prevSar;
+
+
     /// <summary>
     /// Indicator's constructor. Contains general information: name, description, LineSeries etc. 
     /// </summary>
@@ -71,9 +76,42 @@ public sealed class IndicatorParabolicSAR : Indicator, IWatchlistIndicator
         // Checking, if current amount of bars less, than 2 - calculation is impossible.
         if (this.Count < this.MinHistoryDepths)
             return;
-
         if (this.CalculationType == IndicatorCalculationType.AllAvailableData)
+        {
+            if (args.Reason == UpdateReason.HistoricalBar)
+            {
+                double sarHist = this.CalcualteSAR(this.GetValue(1), 0);
+                this.SetValue(sarHist);
+                this.prevFirst = this.first;
+                this.prevDirlong = this.dirlong;
+                this.prevStart = this.start;
+                this.prevLastHigh = this.last_high;
+                this.prevLastLow = this.last_low;
+                this.prevEP = this.ep;
+                this.prevSar = sarHist; 
+                return;
+            }
+            if (args.Reason == UpdateReason.NewBar)
+            {
+                this.prevFirst = this.first;
+                this.prevDirlong = this.dirlong;
+                this.prevStart = this.start;
+                this.prevLastHigh = this.last_high;
+                this.prevLastLow = this.last_low;
+                this.prevEP = this.ep;
+                this.prevSar = this.GetValue(1);
+            }
+
+            this.first = this.prevFirst;
+            this.dirlong = this.prevDirlong;
+            this.start = this.prevStart;
+            this.last_high = this.prevLastHigh;
+            this.last_low = this.prevLastLow;
+            this.ep = this.prevEP;
+            this.sar = this.prevSar;
+
             this.CalculateForAllData();
+        }
         else if (this.CalculationType == IndicatorCalculationType.ByPeriod)
             this.CalcualteByPeriod();
     }
@@ -237,6 +275,14 @@ public sealed class IndicatorParabolicSAR : Indicator, IWatchlistIndicator
         this.last_high = -10_000_000.0;
         this.last_low = 10_000_000.0;
         this.sar = 0;
+
+        this.prevFirst = this.first;
+        this.prevDirlong = this.dirlong;
+        this.prevStart = this.start;
+        this.prevLastHigh = this.last_high;
+        this.prevLastLow = this.last_low;
+        this.prevEP = this.ep;
+        this.prevSar = this.sar;
     }
     private bool RelationHandler(SettingItemRelationParameters relationParameters)
     {

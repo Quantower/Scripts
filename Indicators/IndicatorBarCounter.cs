@@ -58,7 +58,20 @@ public class IndicatorBarCounter : Indicator
             leftIndex = this.HistoricalData.Count - leftIndex - 1;
             rightIndex = this.HistoricalData.Count - rightIndex - 1;
             int counter = 0;
-            counter = this.fromStart ? (this.HistoricalData.Count - leftIndex - 1) % this.maxCount : (leftIndex + 2) % this.maxCount;
+            int usedBarIndex = this.fromStart ? (this.HistoricalData.Count - leftIndex - 1) : (leftIndex + 2);
+            if(this.useTimeReset)
+            {
+                var currDate = this.HistoricalData[this.fromStart ? leftIndex : rightIndex].TimeLeft.Date;
+                var nearestResetTime = new DateTime(currDate.Year, currDate.Month, currDate.Day, this.resetTime.Hour, this.resetTime.Minute, this.resetTime.Second);
+                int resetIndex = 0;
+                if (this.fromStart)
+                    resetIndex = (int)this.HistoricalData.GetIndexByTime(nearestResetTime.Ticks, SeekOriginHistory.Begin);
+                else
+                    resetIndex = (int)this.HistoricalData.GetIndexByTime(nearestResetTime.Ticks, SeekOriginHistory.End);
+                if(resetIndex <= usedBarIndex)
+                    usedBarIndex -= resetIndex;
+            }
+            counter = usedBarIndex % this.maxCount;
             if (counter == 0)
                 counter = maxCount;
             DateTime currResetTime;
@@ -91,7 +104,11 @@ public class IndicatorBarCounter : Indicator
                 {
                     counter--;
                     if (counter <= 0)
-                        counter = maxCount;
+                    {
+                        counter = i % this.maxCount;
+                        if (counter == 0)
+                            counter = maxCount;
+                    }
                 }
                 if (this.useTimeReset)
                 {

@@ -21,6 +21,7 @@ namespace IndicatorPowerOfThree
         private int barsPeriod = 20;
         private int barsCount = 1;
         private int offset = 0;
+        private int barInterval = 0;
         private bool useCustomBarWidth = false;
         private int customBarWidth = 10;
         public Color decreasingCandleColor
@@ -178,9 +179,6 @@ namespace IndicatorPowerOfThree
                 var token = this.cancellationSource.Token;
                 this.loadingTask = Task.Factory.StartNew(() => HistoryDownload(this.cancellationSource.Token));
             }
-            this.growingBorderPen.Width = this.borderWidth;
-            this.decreasingBorderPen.Width = this.borderWidth;
-            this.dojiBorderPen.Width = this.borderWidth;
         }
         protected override void OnUpdate(UpdateArgs args)
         {
@@ -237,6 +235,8 @@ namespace IndicatorPowerOfThree
                 HistoryItemBar resultBar = new HistoryItemBar();
                 for (int i = this.barsCount-1; i >= 0; i--)
                 {
+                    if (i >= this.tfData.Count)
+                        continue;
                     resultBar = this.GetResultBar(i);
                     if (resultBar ==  null)
                         continue;
@@ -265,9 +265,9 @@ namespace IndicatorPowerOfThree
                         currBodyPen = new Pen(currBodyBrush.Color, this.borderWidth);
                     gr.DrawLine(currWickPen, shadowTop, new PointF(shadowTop.X, candleBody.Y));
                     gr.DrawLine(currWickPen, shadowBottom, new PointF(shadowBottom.X, candleBody.Y + candleBody.Height));
-                    candleBody.X += barLeftOffset*2 + barWidth;
-                    shadowTop.X += barLeftOffset*2 + barWidth;
-                    shadowBottom.X += barLeftOffset*2 + barWidth;
+                    candleBody.X += barLeftOffset*2 + candleBody.Width + currBodyPen.Width + this.barInterval;
+                    shadowTop.X += barLeftOffset*2 + candleBody.Width + currBodyPen.Width + this.barInterval;
+                    shadowBottom.X += barLeftOffset*2 + candleBody.Width + currBodyPen.Width + this.barInterval;
                 }
 
                 if (this.showLabel)
@@ -410,6 +410,15 @@ namespace IndicatorPowerOfThree
                     Text = "Drawing Offset",
                     SortIndex = 1,
                     SeparatorGroup = barDrawingGroup,
+                    Dimension = "px",
+                });
+                settings.Add(new SettingItemInteger("barInterval", this.barInterval)
+                {
+                    Text = "Bar Interval",
+                    SortIndex = 1,
+                    SeparatorGroup = barDrawingGroup,
+                    Dimension = "px",
+                    Minimum = 0,
                 });
                 settings.Add(new SettingItemBoolean("useCustomBarWidth", this.useCustomBarWidth)
                 {
@@ -617,6 +626,8 @@ namespace IndicatorPowerOfThree
                 }
                 if (value.TryGetValue("offset", out int offset))
                     this.offset = offset;
+                if (value.TryGetValue("barInterval", out int barInterval))
+                    this.barInterval = barInterval;
                 if (value.TryGetValue("useCustomBarWidth", out bool useCustomBarWidth))
                     this.useCustomBarWidth = useCustomBarWidth;
                 if (value.TryGetValue("customBarWidth", out int customBarWidth))
@@ -637,7 +648,12 @@ namespace IndicatorPowerOfThree
                 if (value.TryGetValue("drawBorder", out bool drawBorder))
                     this.drawBorder = drawBorder;
                 if (value.TryGetValue("borderWidth", out int borderWidth))
+                {
                     this.borderWidth = borderWidth;
+                    this.growingBorderPen.Width = borderWidth;
+                    this.decreasingBorderPen.Width = borderWidth;
+                    this.dojiBorderPen.Width = borderWidth;
+                }
                 if (value.TryGetValue("decreasingBorderColor", out Color decreasingBorderColor))
                     this.decreasingBorderColor = decreasingBorderColor;
                 if (value.TryGetValue("growingBorderColor", out Color growingBorderColor))
@@ -707,7 +723,7 @@ namespace IndicatorPowerOfThree
             while (needReload)
             {
                 needReload = false;
-                fromTime -= this.tfPeriod.Duration * this.barsCount;
+                fromTime -= this.tfPeriod.Duration * this.barsCount*2;
                 if (token.IsCancellationRequested)
                     return;
                 if (this.Symbol == null)

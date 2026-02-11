@@ -17,10 +17,12 @@ namespace VolumeIndicators
 
         private readonly Session[] sessions;
 
+        private bool drawUnbegunSessions = true;
+
         public IndicatorTimeSessions()
             : base()
         {
-            this.Name = "TimeSessions";
+            this.Name = "Time Sessions";
             this.SeparateWindow = false;
             this.OnBackGround = true;
 
@@ -65,7 +67,7 @@ namespace VolumeIndicators
                 var rightBorderTime = this.Time(0);
 
                 var bordersSpan = rightBorderTime - leftBorderTime;
-                int daysSpan = (int)bordersSpan.TotalDays;
+                int daysSpan = (int)bordersSpan.TotalDays+2;
 
                 int leftCoordinate;
                 int rightCoordinate;
@@ -95,101 +97,146 @@ namespace VolumeIndicators
                     var leftTime = s.SessionFirstTime;
                     var rightTime = s.SessionSecondTime;
 
-
                     startTime = new DateTime(leftBorderTime.Year, leftBorderTime.Month, leftBorderTime.Day, leftTime.Hour, leftTime.Minute, leftTime.Second);
                     endTime   = new DateTime(leftBorderTime.Year, leftBorderTime.Month, leftBorderTime.Day, rightTime.Hour, rightTime.Minute, rightTime.Second);
-
-                    if (leftTime.Hour > rightTime.Hour || (leftTime.Hour == rightTime.Hour && leftTime.Minute > rightTime.Minute))
+                    if (startTime > endTime && startTime.Date == leftBorderTime.Date)
+                    {
+                        startTime = startTime.AddDays(-1);
+                        endTime = endTime.AddDays(-1);
+                    }
+                    if (leftTime.Hour > rightTime.Hour || (leftTime.Hour == rightTime.Hour && leftTime.Minute >= rightTime.Minute))
                         endTime = endTime.AddDays(1);
 
-                    for (int j = 0; j <= daysSpan + 1; j++)
+                    for (int j = 0; j <= daysSpan; j++)
                     {
-                        if (startTime < screenRightTime && endTime > screenLeftTime)
+                        if ((this.drawUnbegunSessions && (startTime < screenRightTime || endTime > screenLeftTime)) ||
+                            (!this.drawUnbegunSessions && startTime < screenRightTime && endTime > screenLeftTime))
                         {
-                            if (startTime < screenLeftTime)
-                                leftCoordinate = (int)mainWindow.CoordinatesConverter.GetChartX(screenLeftTime);
-                            else
-                                leftCoordinate = (int)mainWindow.CoordinatesConverter.GetChartX(startTime);
+                            bool isInChartArea = startTime < screenRightTime && endTime > screenLeftTime;
+                            var currentZoneStartTime = startTime;
+                            var currentZoneEndTime = endTime;
 
-                            if (endTime > screenRightTime)
-                                rightCoordinate = (int)mainWindow.CoordinatesConverter.GetChartX(screenRightTime);
-                            else
-                                rightCoordinate = (int)mainWindow.CoordinatesConverter.GetChartX(endTime);
-                            int topY = 0;
-                            int height = panelHeight;
+                            if (currentZoneStartTime < screenLeftTime)
+                                currentZoneStartTime = screenLeftTime;
+                            if (currentZoneEndTime > screenRightTime)
+                                currentZoneEndTime = screenRightTime;
+                            bool drawAnyway = this.drawUnbegunSessions && s.DrawMode == SessionDrawMode.Simple;
 
-                            if (s.DrawMode == SessionDrawMode.Simple)
+                            bool startInSession = isInChartArea ? this.IsTimeInSession(currentZoneStartTime) : false;
+                            bool endInSession = isInChartArea ? this.IsTimeInSession(currentZoneEndTime) : false;
+
+                            if (drawAnyway || startInSession || endInSession)
                             {
-                                if (rightCoordinate > leftCoordinate)
-                                    graphics.FillRectangle(s.sessionBrush, leftCoordinate, topY, rightCoordinate - leftCoordinate, panelHeight);
+                                if (!drawAnyway)
+                                {
+                                    if (!startInSession)
+                                        currentZoneStartTime = this.HistoricalData[(int)this.HistoricalData.GetIndexByTime(currentZoneStartTime.Ticks, SeekOriginHistory.Begin)+1, SeekOriginHistory.Begin].TimeLeft;
+                                    if (!endInSession)
+                                        currentZoneEndTime = this.HistoricalData[(int)this.HistoricalData.GetIndexByTime(currentZoneStartTime.Ticks, SeekOriginHistory.Begin)-1, SeekOriginHistory.Begin].TimeLeft;
+                                }
+
+                                leftCoordinate = (int)mainWindow.CoordinatesConverter.GetChartX(startTime);
+                                rightCoordinate = (int)mainWindow.CoordinatesConverter.GetChartX(endTime);
+                                if (!s.AllWeekAvailable)
+                                {
+                                    var day = startTime.ToLocalTime().DayOfWeek;
+                                    if (!s.IsDayEnabled(day))
+                                    {
+                                        startTime = startTime.AddDays(1);
+                                        endTime   = endTime.AddDays(1);
+                                        continue;
+                                    }
+                                }
+                                int topY = 0;
+                                int height = panelHeight;
+                                if (s.DrawMode == SessionDrawMode.Simple)
+                                {
+                                    if (rightCoordinate > leftCoordinate)
+                                        graphics.FillRectangle(s.sessionBrush, leftCoordinate, topY, rightCoordinate - leftCoordinate, panelHeight);
+                                }
+                                else
+                                {
+                                    double hi = double.MinValue;
+                                    double lo = double.MaxValue;
+                                    bool hasBars = false;
+
+                                    for (int k = 0; k < this.Count; k++)
+                                    {
+                                        var t = this.Time(k);
+
+                                        if (t >= endTime)
+                                            continue;
+
+                                        if (t < startTime)
+                                            break;
+
+                                        var bar = this.HistoricalData[k, SeekOriginHistory.End];
+                                        double bh = bar[PriceType.High];
+                                        double bl = bar[PriceType.Low];
+
+                                        if (bh > hi) hi = bh;
+                                        if (bl < lo) lo = bl;
+                                        hasBars = true;
+                                    }
+
+                                    if (hasBars && hi > lo && rightCoordinate > leftCoordinate)
+                                    {
+                                        int yHigh = (int)this.CurrentChart.MainWindow.CoordinatesConverter.GetChartY(hi);
+                                        int yLow = (int)this.CurrentChart.MainWindow.CoordinatesConverter.GetChartY(lo);
+
+                                        topY = Math.Min(yHigh, yLow);
+                                        height = Math.Abs(yHigh - yLow);
+
+                                        if (height > 0)
+                                            graphics.FillRectangle(s.sessionBrush, leftCoordinate, topY, rightCoordinate - leftCoordinate, height);
+
+                                    }
+                                }
+
+                                if (s.DrawBorder && currentZoneStartTime != currentZoneEndTime)
+                                {
+                                    var tmpPen = new Pen(s.BorderLineOptions.Color, s.BorderLineOptions.Width);
+                                    tmpPen.DashStyle = (DashStyle)s.BorderLineOptions.LineStyle;
+                                    graphics.DrawRectangle(tmpPen, leftCoordinate-tmpPen.Width/2, topY-tmpPen.Width/2, rightCoordinate - leftCoordinate, height+tmpPen.Width);
+                                }
                                 if (s.DrawInnerArea)
                                 {
-                                    var startBar = this.HistoricalData[(int)mainWindow.CoordinatesConverter.GetBarIndex(startTime), SeekOriginHistory.Begin];
-                                    var endBar = this.HistoricalData[(int)mainWindow.CoordinatesConverter.GetBarIndex(endTime), SeekOriginHistory.Begin];
-                                    int zoneOpenY = (int)mainWindow.CoordinatesConverter.GetChartY(startBar[PriceType.Open]);
-                                    int zoneCloseY = (int)mainWindow.CoordinatesConverter.GetChartY(endBar[PriceType.Close]);
-                                    int areaY = zoneOpenY < zoneCloseY ? zoneOpenY : zoneCloseY;
-                                    graphics.FillRectangle(s.sessionBrush, leftCoordinate, areaY, rightCoordinate - leftCoordinate, Math.Abs(zoneOpenY-zoneCloseY));
-
+                                    int startIndex = (int)mainWindow.CoordinatesConverter.GetBarIndex(startTime);
+                                    int endIndex = (int)mainWindow.CoordinatesConverter.GetBarIndex(endTime)-1;
+                                    if(!((endIndex >= this.HistoricalData.Count && startIndex >= this.HistoricalData.Count)|| (endIndex < 0 && startIndex < 0)))
+                                    {
+                                        if (endIndex >= this.HistoricalData.Count)
+                                            endIndex = this.HistoricalData.Count-1;
+                                        if (startIndex >= this.HistoricalData.Count)
+                                            startIndex = this.HistoricalData.Count-1;
+                                        if (startIndex < 0)
+                                            startIndex = 0;
+                                        if (endIndex < 0)
+                                            endIndex = 0;
+                                        var startBar = this.HistoricalData[startIndex, SeekOriginHistory.Begin];
+                                        var endBar = this.HistoricalData[endIndex, SeekOriginHistory.Begin];
+                                        int zoneOpenY = (int)mainWindow.CoordinatesConverter.GetChartY(startBar[PriceType.Open]);
+                                        int zoneCloseY = (int)mainWindow.CoordinatesConverter.GetChartY(endBar[PriceType.Close]);
+                                        int areaY = zoneOpenY < zoneCloseY ? zoneOpenY : zoneCloseY;
+                                        graphics.FillRectangle(s.sessionBrush, leftCoordinate, areaY, rightCoordinate - leftCoordinate, Math.Abs(zoneOpenY-zoneCloseY));
+                                    }
                                 }
-                            }
-                            else
-                            {
-                                double hi = double.MinValue;
-                                double lo = double.MaxValue;
-                                bool hasBars = false;
-
-                                for (int k = 0; k < this.Count; k++)
+                                if (s.ShowLabel)
                                 {
-                                    var t = this.Time(k);
+                                    leftCoordinate = (int)mainWindow.CoordinatesConverter.GetChartX(startTime);
+                                    rightCoordinate = (int)mainWindow.CoordinatesConverter.GetChartX(endTime);
+                                    var labelRect = new Rectangle(
+                                        leftCoordinate,
+                                        topY,
+                                        Math.Max(0, rightCoordinate - leftCoordinate),
+                                        Math.Max(0, height)
+                                    );
 
-                                    if (t >= endTime)
-                                        continue;
-
-                                    if (t < startTime)
-                                        break;
-
-                                    var bar = this.HistoricalData[k, SeekOriginHistory.End];
-                                    double bh = bar[PriceType.High];
-                                    double bl = bar[PriceType.Low];
-
-                                    if (bh > hi) hi = bh;
-                                    if (bl < lo) lo = bl;
-                                    hasBars = true;
-                                }
-
-                                if (hasBars && hi > lo && rightCoordinate > leftCoordinate)
-                                {
-                                    int yHigh = (int)this.CurrentChart.MainWindow.CoordinatesConverter.GetChartY(hi);
-                                    int yLow = (int)this.CurrentChart.MainWindow.CoordinatesConverter.GetChartY(lo);
-
-                                    topY = Math.Min(yHigh, yLow);
-                                    height = Math.Abs(yHigh - yLow);
-
-                                    if (height > 0)
-                                        graphics.FillRectangle(s.sessionBrush, leftCoordinate, topY, rightCoordinate - leftCoordinate, height);
-
+                                    this.DrawSessionLabel(graphics, labelRect, s, startTime, endTime);
                                 }
                             }
-                            if (s.DrawBorder)
-                            {
-                                var tmpPen = new Pen(s.BorderLineOptions.Color, s.BorderLineOptions.Width);
-                                tmpPen.DashStyle = (DashStyle)s.BorderLineOptions.LineStyle;
-                                graphics.DrawRectangle(tmpPen, leftCoordinate, topY, rightCoordinate - leftCoordinate, height);
-                            }
-                            if (s.ShowLabel)
-                            {
-                                var labelRect = new Rectangle(
-                                    leftCoordinate,
-                                    topY,
-                                    Math.Max(0, rightCoordinate - leftCoordinate),
-                                    Math.Max(0, height)
-                                );
 
-                                this.DrawSessionLabel(graphics, labelRect, s, startTime, endTime);
-                            }
                         }
-
                         startTime = startTime.AddDays(1);
                         endTime = endTime.AddDays(1);
                     }
@@ -206,6 +253,11 @@ namespace VolumeIndicators
             get
             {
                 var settings = base.Settings;
+                settings.Add(new SettingItemBooleanSwitcher("drawUnbegunSessions", this.drawUnbegunSessions)
+                {
+                    Text = "Draw unincluded sessions",
+                    SortIndex = 0,
+                });
                 for (int i = 0; i < this.sessions.Length; i++)
                     settings.Add(new SettingItemGroup(this.sessions[i].SessionName, this.sessions[i].Settings));
                 return settings;
@@ -213,6 +265,8 @@ namespace VolumeIndicators
             set
             {
                 base.Settings = value;
+                if (value.TryGetValue("drawUnbegunSessions", out bool drawUnbegunSessions))
+                    this.drawUnbegunSessions = drawUnbegunSessions;
                 for (int i = 0; i < this.sessions.Length; i++)
                     this.sessions[i].Settings = value;
             }
@@ -228,25 +282,46 @@ namespace VolumeIndicators
             {
                 var mainWindow = this.CurrentChart.MainWindow;
                 int iStart = (int)mainWindow.CoordinatesConverter.GetBarIndex(startTime);
-                int iEnd = (int)mainWindow.CoordinatesConverter.GetBarIndex(endTime);
+                int iEnd = (int)mainWindow.CoordinatesConverter.GetBarIndex(endTime)-1;
 
                 iStart = Math.Max(0, Math.Min(iStart, this.HistoricalData.Count - 1));
                 iEnd   = Math.Max(0, Math.Min(iEnd, this.HistoricalData.Count - 1));
 
                 var startBar = this.HistoricalData[iStart, SeekOriginHistory.Begin];
                 var endBar = this.HistoricalData[iEnd, SeekOriginHistory.Begin];
-
                 double open = startBar?[PriceType.Open]  ?? double.NaN;
                 double close = endBar?[PriceType.Close]   ?? double.NaN;
-
+                int prec = this.Symbol != null
+                        ? Math.Max(0, (int)Math.Round(-Math.Log10(this.Symbol.TickSize)))
+                        : 2;
                 if (!double.IsNaN(open) && !double.IsNaN(close))
                 {
                     double delta = close - open;
+                    switch (s.DeltaPriceType)
+                    {
+                        case DeltaLabelType.Delta:
+                            delta = delta;
+                            break;
 
-                    int prec = this.Symbol != null
-                        ? Math.Max(0, (int)Math.Round(-Math.Log10(this.Symbol.TickSize)))
-                        : 2;
+                        case DeltaLabelType.Ticks:
+                            delta = Math.Round(delta/this.Symbol.TickSize, 0);
+                            prec = 0;
+                            break;
+
+                        case DeltaLabelType.Percent:
+                            delta = Math.Round(delta/open*100, 2);
+                            prec = 2;
+                            break;
+
+                        default:
+                            break;
+                    }
                     string deltaStr = delta.ToString("F" + prec);
+                    if (s.DeltaPriceType == DeltaLabelType.Percent && s.ShowUnit)
+                        deltaStr += "%";
+
+                    if (s.DeltaPriceType == DeltaLabelType.Ticks && s.ShowUnit)
+                        deltaStr += " tick";
 
                     text = string.IsNullOrEmpty(text) ? $"Δ {deltaStr}" : $"{text}  Δ {deltaStr}";
                 }
@@ -255,8 +330,8 @@ namespace VolumeIndicators
             if (string.IsNullOrEmpty(text))
                 return;
 
-            var font = s.LabelFont; 
-            var brush = s.LabelBrush;  
+            var font = s.LabelFont;
+            var brush = s.LabelBrush;
             var size = g.MeasureString(text, font);
 
 
@@ -274,13 +349,13 @@ namespace VolumeIndicators
                     _ => rect.Left + (rect.Width - size.Width) / 2f
                 };
             }
-            else 
+            else
             {
                 x = s.LabelHAlign switch
                 {
-                    NativeAlignment.Left => rect.Left  - size.Width - pad,
-                    NativeAlignment.Center => rect.Left  + (rect.Width - size.Width) / 2f, 
-                    NativeAlignment.Right => rect.Right + pad,
+                    NativeAlignment.Left => rect.Left  -  pad,
+                    NativeAlignment.Center => rect.Left  + (rect.Width - size.Width) / 2f,
+                    NativeAlignment.Right => rect.Right - size.Width  + pad,
                     _ => rect.Left + (rect.Width - size.Width) / 2f
                 };
             }
@@ -308,6 +383,18 @@ namespace VolumeIndicators
             }
 
             g.DrawString(text, font, brush, new PointF(x, y));
+        }
+        private bool IsTimeInSession(DateTime time)
+        {
+            if (this.HistoricalData.Count < 2)
+                return false;
+           int index = (int)this.HistoricalData.GetIndexByTime(time.Ticks, SeekOriginHistory.Begin);
+           TimeSpan barSpan = this.HistoricalData[1, SeekOriginHistory.Begin].TimeLeft - this.HistoricalData[0, SeekOriginHistory.Begin].TimeLeft;
+
+            if (time == this.HistoricalData[index, SeekOriginHistory.Begin].TimeLeft ||
+                (time >= this.HistoricalData[index, SeekOriginHistory.Begin].TimeLeft && time < this.HistoricalData[index, SeekOriginHistory.Begin].TimeLeft + barSpan))
+                return true;
+            return false;
         }
     }
 
@@ -343,25 +430,46 @@ namespace VolumeIndicators
 
         public bool ShowLabel { get; set; }        
         public string LabelText { get; set; }          
-        public bool ShowDelta { get; set; }         
-
+        public bool ShowDelta { get; set; }
+        public bool ShowUnit { get; set; }
         public Font LabelFont { get; set; }
         public Color LabelColor { get; set; }
         public SolidBrush LabelBrush { get; set; }
 
-        public LabelPlacement LabelPlacement { get; set; } = LabelPlacement.Inside; 
-        public NativeAlignment LabelHAlign { get; set; } = NativeAlignment.Center;
-        public LabelVAlign LabelVAlign { get; set; } = LabelVAlign.Middle;
+        public LabelPlacement LabelPlacement { get; set; } = LabelPlacement.Outside; 
+        public NativeAlignment LabelHAlign { get; set; } = NativeAlignment.Left;
+        public LabelVAlign LabelVAlign { get; set; } = LabelVAlign.Bottom;
 
+        public DeltaLabelType DeltaPriceType { get; set; } = DeltaLabelType.Delta;
+        public bool AllWeekAvailable { get; set; } = true;
+
+        public bool Monday { get; set; } = true;
+        public bool Tuesday { get; set; } = true;
+        public bool Wednesday { get; set; } = true;
+        public bool Thursday { get; set; } = true;
+        public bool Friday { get; set; } = true;
+        public bool Saturday { get; set; } = true;
+        public bool Sunday { get; set; } = true;
+
+        public bool IsDayEnabled(DayOfWeek dow) => dow switch
+        {
+            DayOfWeek.Monday => Monday,
+            DayOfWeek.Tuesday => Tuesday,
+            DayOfWeek.Wednesday => Wednesday,
+            DayOfWeek.Thursday => Thursday,
+            DayOfWeek.Friday => Friday,
+            DayOfWeek.Saturday => Saturday,
+            DayOfWeek.Sunday => Sunday,
+            _ => true
+        };
         public Session(Color color, string name = "Session X", int sortingIndex = 20)
         {
             this.SessionName = name;
             this.sessionSortIndex = sortingIndex;
             this.SessionColor = Color.FromArgb(51, color);
-            this.SessionFirstTime = new DateTime();
-            this.SessionSecondTime = new DateTime();
+            this.SessionFirstTime = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, 0, 0, 0, DateTimeKind.Local);
+            this.SessionSecondTime = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, 1, 0, 0, DateTimeKind.Local);
             this.SessionVisibility = false;
-
             this.sessionBrush = new SolidBrush(this.SessionColor);
 
             this._borderLineOptions = new LineOptions();
@@ -379,14 +487,16 @@ namespace VolumeIndicators
             this.DrawInnerArea = false;
 
             this.ShowLabel     = false;
+            this.ShowUnit     = true;
             this.LabelText     = string.Empty;
             this.ShowDelta     = false;
-            this.LabelFont     = new Font("Arial", 9f, FontStyle.Regular);
+            this.LabelFont     = new Font("Tahoma", 12f, FontStyle.Regular);
             this.LabelColor    = Color.Yellow;
             this.LabelBrush    = new SolidBrush(this.LabelColor);
-            this.LabelPlacement= LabelPlacement.Inside;
-            this.LabelHAlign   = NativeAlignment.Center;
-            this.LabelVAlign   = LabelVAlign.Top;
+            this.LabelPlacement= LabelPlacement.Outside;
+            this.LabelHAlign   = NativeAlignment.Left;
+            this.LabelVAlign   = LabelVAlign.Bottom;
+            this.DeltaPriceType = DeltaLabelType.Delta;
         }
 
         public IList<SettingItem> Settings
@@ -405,10 +515,10 @@ namespace VolumeIndicators
                 });
                 var visibleRelation = new SettingItemRelationVisibility(visibleRelationName, true);
 
-                var simple = new SelectItem("Simple", SessionDrawMode.Simple);
+                var simple = new SelectItem("Area", SessionDrawMode.Simple);
                 var box = new SelectItem("Box", SessionDrawMode.Box);
                 settings.Add(new SettingItemSelectorLocalized(
-                    "SessionDrawMode",
+                    this.SessionName+"SessionDrawMode",
                     new SelectItem("SessionDrawMode", this.DrawMode),
                     new List<SelectItem> { simple, box })
                 {
@@ -428,7 +538,7 @@ namespace VolumeIndicators
                     SeparatorGroup = separatorGroup1,
                     Relation = visibleRelation
                 });
-
+                
                 settings.Add(new SettingItemDateTime("SessionSecondTime", this.SessionSecondTime)
                 {
                     Text = "End Time",
@@ -457,7 +567,6 @@ namespace VolumeIndicators
                     Relation = visibleRelation
                 });
                 var borderRelation = new SettingItemMultipleRelation(visibleRelation, new SettingItemRelationVisibility(borderVisibleName, true));
-                
 
                 settings.Add(new SettingItemLineOptions("BorderLineOptions", this._borderLineOptions)
                 {
@@ -475,49 +584,70 @@ namespace VolumeIndicators
                     SeparatorGroup = separatorGroup1,
                     Relation = visibleRelation
                 });
-                settings.Add(new SettingItemBoolean("ShowLabel", this.ShowLabel)
+                string labelVisibleName = $"{this.SessionName}ShowLabel";
+                settings.Add(new SettingItemBoolean(labelVisibleName, this.ShowLabel)
                 {
                     Text = "Show label",
                     SortIndex = sessionSortIndex,
                     SeparatorGroup = separatorGroup1,
                     Relation = visibleRelation
                 });
-                var labelVisibleRelation = new SettingItemRelationVisibility("ShowLabel", true);
-
+                var labelRelation = new SettingItemRelationVisibility(labelVisibleName, true);
                 settings.Add(new SettingItemTextArea("LabelText", this.LabelText)
                 {
                     Text = "Custom text",
                     SortIndex = sessionSortIndex,
                     SeparatorGroup = separatorGroup1,
-                    Relation = labelVisibleRelation
+                    Relation = labelRelation
                 });
-
-                settings.Add(new SettingItemBoolean("ShowDelta", this.ShowDelta)
+                string deltaVisibleName = $"{this.SessionName}ShowDelta";
+                settings.Add(new SettingItemBoolean(deltaVisibleName, this.ShowDelta)
                 {
-                    Text = "Append Δ price",
+                    Text = "Show change",
                     SortIndex = sessionSortIndex,
                     SeparatorGroup = separatorGroup1,
-                    Relation = labelVisibleRelation
+                    Relation = labelRelation
                 });
-
+                var deltaRelation = new SettingItemRelationVisibility(deltaVisibleName, true);
+                var delta = new SelectItem("Price", DeltaLabelType.Delta);
+                var ticks = new SelectItem("Ticks", DeltaLabelType.Ticks);
+                var percents = new SelectItem("Percents", DeltaLabelType.Percent);
+                settings.Add(new SettingItemSelectorLocalized(
+                    "DeltaPriceType",
+                    this.DeltaPriceType,
+                    new List<SelectItem> { delta, ticks, percents })
+                {
+                    Text = "Change Type",
+                    SortIndex = sessionSortIndex,
+                    SeparatorGroup = separatorGroup1,
+                    Relation = deltaRelation,
+                    ValueChangingBehavior = SettingItemValueChangingBehavior.WithConfirmation
+                });
+                settings.Add(new SettingItemBoolean("ShowUnit", this.ShowUnit)
+                {
+                    Text = "Show units",
+                    SortIndex = sessionSortIndex,
+                    SeparatorGroup = separatorGroup1,
+                    Relation = deltaRelation
+                });
                 settings.Add(new SettingItemFont("LabelFont", this.LabelFont)
                 {
                     Text = "Label font",
                     SortIndex = sessionSortIndex,
                     SeparatorGroup = separatorGroup1,
-                    Relation = labelVisibleRelation
+                    Relation = labelRelation
                 });
                 settings.Add(new SettingItemColor("LabelColor", this.LabelColor)
                 {
                     Text = "Label color",
                     SortIndex = sessionSortIndex,
                     SeparatorGroup = separatorGroup1,
-                    Relation = labelVisibleRelation
+                    Relation = labelRelation
                 });
-
+                var boxRelation = new SettingItemRelationVisibility(this.SessionName+"SessionDrawMode", SessionDrawMode.Box);
                 var allowOutsideRelation = new SettingItemMultipleRelation(
-                    labelVisibleRelation,
-                    new SettingItemRelationVisibility("SessionDrawMode", SessionDrawMode.Box) 
+                    labelRelation,
+                    boxRelation
                 );
 
                 settings.Add(new SettingItemSelectorLocalized("LabelPlacement", this.LabelPlacement,
@@ -536,7 +666,7 @@ namespace VolumeIndicators
                     Text = "Horizontal align",
                     SortIndex = sessionSortIndex,
                     SeparatorGroup = separatorGroup1,
-                    Relation = labelVisibleRelation
+                    Relation = labelRelation
                 });
 
                 settings.Add(new SettingItemSelectorLocalized("LabelVAlign", this.LabelVAlign,
@@ -549,8 +679,74 @@ namespace VolumeIndicators
                     Text = "Vertical align",
                     SortIndex = sessionSortIndex,
                     SeparatorGroup = separatorGroup1,
-                    Relation = labelVisibleRelation
+                    Relation = labelRelation
                 });
+
+                string ALLWEEK_KEY = "allWeekAvailable"+this.SessionName;
+                settings.Add(new SettingItemBooleanSwitcher(ALLWEEK_KEY, this.AllWeekAvailable)
+                {
+                    Text = "All week",
+                    SortIndex = sessionSortIndex,
+                    SeparatorGroup = separatorGroup1,
+                    Relation = visibleRelation
+                });
+
+                var notAllWeekRel = new SettingItemRelationVisibility(ALLWEEK_KEY, false);
+                var daysRelation = new SettingItemMultipleRelation(visibleRelation, notAllWeekRel)
+                {
+                    MultipleRelationCondition = MultipleRelationCondition.IfAll
+                };
+
+                settings.Add(new SettingItemBoolean("Monday", this.Monday)
+                {
+                    Text = "Monday",
+                    SortIndex = sessionSortIndex,
+                    SeparatorGroup = separatorGroup1,
+                    Relation = daysRelation
+                });
+                settings.Add(new SettingItemBoolean("Tuesday", this.Tuesday)
+                {
+                    Text = "Tuesday",
+                    SortIndex = sessionSortIndex,
+                    SeparatorGroup = separatorGroup1,
+                    Relation = daysRelation
+                });
+                settings.Add(new SettingItemBoolean("Wednesday", this.Wednesday)
+                {
+                    Text = "Wednesday",
+                    SortIndex = sessionSortIndex,
+                    SeparatorGroup = separatorGroup1,
+                    Relation = daysRelation
+                });
+                settings.Add(new SettingItemBoolean("Thursday", this.Thursday)
+                {
+                    Text = "Thursday",
+                    SortIndex = sessionSortIndex,
+                    SeparatorGroup = separatorGroup1,
+                    Relation = daysRelation
+                });
+                settings.Add(new SettingItemBoolean("Friday", this.Friday)
+                {
+                    Text = "Friday",
+                    SortIndex = sessionSortIndex,
+                    SeparatorGroup = separatorGroup1,
+                    Relation = daysRelation
+                });
+                settings.Add(new SettingItemBoolean("Saturday", this.Saturday)
+                {
+                    Text = "Saturday",
+                    SortIndex = sessionSortIndex,
+                    SeparatorGroup = separatorGroup1,
+                    Relation = daysRelation
+                });
+                settings.Add(new SettingItemBoolean("Sunday", this.Sunday)
+                {
+                    Text = "Sunday",
+                    SortIndex = sessionSortIndex,
+                    SeparatorGroup = separatorGroup1,
+                    Relation = daysRelation
+                });
+
                 return settings;
             }
             set
@@ -564,14 +760,14 @@ namespace VolumeIndicators
                 if (settings.TryGetValue($"{this.SessionName}SessionVisibility", out bool SessionVisibility))
                     this.SessionVisibility = SessionVisibility;
 
-                if (settings.TryGetValue("SessionDrawMode", out SessionDrawMode drawMode))
+                if (settings.TryGetValue(this.SessionName+"SessionDrawMode", out SessionDrawMode drawMode))
                     this.DrawMode = drawMode;
 
                 if (settings.TryGetValue("SessionFirstTime", out DateTime SessionFirstTime))
-                    this.SessionFirstTime = SessionFirstTime;
+                    this.SessionFirstTime = SessionFirstTime.ToUniversalTime();
 
                 if (settings.TryGetValue("SessionSecondTime", out DateTime SessionSecondTime))
-                    this.SessionSecondTime = SessionSecondTime;
+                    this.SessionSecondTime = SessionSecondTime.ToUniversalTime();
 
                 if (settings.TryGetValue("SessionColor", out Color SessionColor))
                 {
@@ -588,14 +784,17 @@ namespace VolumeIndicators
                 if (settings.TryGetValue("DrawInnerArea", out bool DrawInnerArea))
                     this.DrawInnerArea = DrawInnerArea;
 
-                if (settings.TryGetValue("ShowLabel", out bool showLabel))
+                if (settings.TryGetValue($"{this.SessionName}ShowLabel", out bool showLabel))
                     this.ShowLabel = showLabel;
 
                 if (settings.TryGetValue("LabelText", out string labelText))
                     this.LabelText = labelText;
 
-                if (settings.TryGetValue("ShowDelta", out bool showDelta))
+                if (settings.TryGetValue($"{this.SessionName}ShowDelta", out bool showDelta))
                     this.ShowDelta = showDelta;
+
+                if (settings.TryGetValue("ShowUnit", out bool showUnit))
+                    this.ShowUnit = showUnit;
 
                 if (settings.TryGetValue("LabelFont", out Font labelFont))
                     this.LabelFont = labelFont;
@@ -614,6 +813,28 @@ namespace VolumeIndicators
 
                 if (settings.TryGetValue("LabelVAlign", out LabelVAlign vAlign))
                     this.LabelVAlign = vAlign;
+
+                if (settings.TryGetValue("DeltaPriceType", out DeltaLabelType DeltaPriceType))
+                    this.DeltaPriceType = DeltaPriceType;
+
+
+                if (settings.TryGetValue("allWeekAvailable", out bool allWeekAvailable))
+                    this.AllWeekAvailable = allWeekAvailable;
+
+                if (settings.TryGetValue("Monday", out bool Monday))
+                    this.Monday = Monday;
+                if (settings.TryGetValue("Tuesday", out bool Tuesday))
+                    this.Tuesday = Tuesday;
+                if (settings.TryGetValue("Wednesday", out bool Wednesday))
+                    this.Wednesday = Wednesday;
+                if (settings.TryGetValue("Thursday", out bool Thursday))
+                    this.Thursday = Thursday;
+                if (settings.TryGetValue("Friday", out bool Friday))
+                    this.Friday = Friday;
+                if (settings.TryGetValue("Saturday", out bool Saturday))
+                    this.Saturday = Saturday;
+                if (settings.TryGetValue("Sunday", out bool Sunday))
+                    this.Sunday = Sunday;
             }
         }
     }
@@ -622,6 +843,7 @@ namespace VolumeIndicators
         Simple = 0,
         Box = 1
     }
+    internal enum DeltaLabelType { Delta = 0, Ticks = 1, Percent }
     internal enum LabelPlacement { Inside = 0, Outside = 1 }  
     internal enum LabelVAlign { Top = 0, Middle = 1, Bottom = 2 }
 }

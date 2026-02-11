@@ -69,9 +69,11 @@ public class IndicatorDeltaDots : Indicator, IVolumeAnalysisIndicator
     private DisplayMode displayMode = DisplayMode.DomSide;
     private DDMode ddMode = DDMode.PerBar;
     private PriceType perBarPriceType = PriceType.High;
-    private ReferenseValue referenseValue = ReferenseValue.MinVolume;
-    private DeltaReferense deltaReferense = DeltaReferense.AllMax;
-
+    private ReferenceValue referenceValue = ReferenceValue.MinVolume;
+    private DeltaReference deltaReference = DeltaReference.AllMax;
+    private bool drawValues = false;
+    private Color valueColor = Color.White;
+    private Font valueFont;
     public bool IsRequirePriceLevelsCalculation => true;
     private bool volumeDataLoaded = false;
 
@@ -89,6 +91,8 @@ public class IndicatorDeltaDots : Indicator, IVolumeAnalysisIndicator
         this.askMinBrush = new SolidBrush(Color.FromArgb(20, Color.Green));
         this.bidMaxBrush = new SolidBrush(Color.FromArgb(90, Color.Red));
         this.bidMinBrush = new SolidBrush(Color.FromArgb(20, Color.Red));
+        this.valueFont = new Font("Tahoma", 12);
+        this.volumeDataLoaded = false;
     }
     protected override void OnInit()
     {
@@ -107,33 +111,40 @@ public class IndicatorDeltaDots : Indicator, IVolumeAnalysisIndicator
         gr.SetClip(args.Rectangle);
         try
         {
+            var t = this.HistoricalData[0, SeekOriginHistory.Begin].VolumeAnalysisData;
+            var b = this.HistoricalData;
             int leftIndex = args.LeftVisibleBarIndex;
             int rightIndex = args.RightVisibleBarIndex;
-            double referenseValue = 1;
-            if (this.referenseValue != ReferenseValue.MinVolume)
+            double referenceValue = 1;
+            if (this.referenceValue != ReferenceValue.MinVolume)
             {
-                int startIndex = this.referenseValue == ReferenseValue.VisibleAverage ? leftIndex : 0;
-                int endIndex = this.referenseValue == ReferenseValue.VisibleAverage ? rightIndex : this.HistoricalData.Count - 1;
+                int startIndex = this.referenceValue == ReferenceValue.VisibleAverage ? leftIndex : 0;
+                int endIndex = this.referenceValue == ReferenceValue.VisibleAverage ? rightIndex : this.HistoricalData.Count - 1;
                 double volumeSum = 0;
                 double tradesCount = 1;
                 for (int i = startIndex; i <= endIndex; i++)
                 {
-                    var volumeData = this.HistoricalData[i, SeekOriginHistory.Begin].VolumeAnalysisData.Total;
-                    volumeSum += volumeData.Volume;
-                    tradesCount += volumeData.Trades;
+                    var volumeData = this.HistoricalData[i, SeekOriginHistory.Begin].VolumeAnalysisData;
+                    if (volumeData == null)
+                        continue;
+                    volumeSum += volumeData.Total.Volume;
+                    tradesCount += volumeData.Total.Trades;
                 }
-                referenseValue = volumeSum / (endIndex-startIndex+1);
+                referenceValue = volumeSum / (endIndex-startIndex+1);
             }
             else
-                referenseValue = this.minimumVolume;
+                referenceValue = this.minimumVolume;
             double maxDelta = 0;
             if (this.useVariableIntensity && this.displayMode == DisplayMode.DomSide)
             {
-                int startIndex = this.deltaReferense == DeltaReferense.VisibleMax ? leftIndex : 0;
-                int endIndex = this.deltaReferense == DeltaReferense.VisibleMax ? rightIndex : this.HistoricalData.Count - 1;
+                int startIndex = this.deltaReference == DeltaReference.VisibleMax ? leftIndex : 0;
+                int endIndex = this.deltaReference == DeltaReference.VisibleMax ? rightIndex : this.HistoricalData.Count - 1;
                 for (int i = startIndex; i <= endIndex; i++)
                 {
-                    double currDelta = Math.Abs(this.HistoricalData[i, SeekOriginHistory.Begin].VolumeAnalysisData.Total.Delta);
+                    var volumeData = this.HistoricalData[i, SeekOriginHistory.Begin].VolumeAnalysisData;
+                    if (volumeData == null)
+                        continue;
+                    double currDelta = Math.Abs(volumeData.Total.Delta);
                     if (currDelta >= maxDelta)
                         maxDelta = currDelta;
                 }
@@ -142,6 +153,8 @@ public class IndicatorDeltaDots : Indicator, IVolumeAnalysisIndicator
             {
                 RectangleF currentClip = gr.ClipBounds;
                 var currentData = (IHistoryItem)(this.HistoricalData[i, SeekOriginHistory.Begin].Clone());
+                if(currentData.VolumeAnalysisData == null)
+                    continue;
                 Dictionary<double, VolumeAnalysisItem> volumeData = new Dictionary<double, VolumeAnalysisItem>();
                 RectangleF dotRect = new RectangleF();
                 dotRect.X = (float)(currWindow.CoordinatesConverter.GetChartX(this.HistoricalData[i, SeekOriginHistory.Begin].TimeLeft) + this.CurrentChart.BarsWidth / 2);
@@ -187,7 +200,7 @@ public class IndicatorDeltaDots : Indicator, IVolumeAnalysisIndicator
                     if (item.Value.Volume <= minimumVolume && !this.showSmallerVolume || (sellValue <= this.compareTreshold && buyValue <= this.compareTreshold))
                         continue;
                     dotRect.Y = (float)currWindow.CoordinatesConverter.GetChartY(item.Key);
-                    dotRect = DotCalculation(totalValue, dotRect, referenseValue);
+                    dotRect = DotCalculation(totalValue, dotRect, referenceValue);
                     if (this.displayMode == DisplayMode.DomSide || this.displayMode == DisplayMode.Gradient)
                     {
                         currentBrush = GetBrush(maxDelta, buyValue, totalValue, dotRect);
@@ -222,6 +235,16 @@ public class IndicatorDeltaDots : Indicator, IVolumeAnalysisIndicator
                     }
                     if (drawBorders)
                         gr.DrawEllipse(borderPen, dotRect);
+                    if(drawValues)
+                    {
+                        string volumeText = item.Value.Volume.ToString("N0");
+                        SizeF textSize = gr.MeasureString(volumeText, this.valueFont);
+                        PointF textPosition = new PointF(dotRect.X + (dotRect.Width - textSize.Width) / 2, dotRect.Y + (dotRect.Height - textSize.Height) / 2);
+                        using (Brush textBrush = new SolidBrush(this.valueColor))
+                        {
+                            gr.DrawString(volumeText, this.valueFont, textBrush, textPosition);
+                        }
+                    }
                     gr.SetClip(currentClip);
                     dotRect.X += dotRect.Width / 2;
                 }
@@ -234,13 +257,13 @@ public class IndicatorDeltaDots : Indicator, IVolumeAnalysisIndicator
             gr.SetClip(prevClipRectangle);
         }
     }
-    private RectangleF DotCalculation(double volume, RectangleF currRect, double referenseValue)
+    private RectangleF DotCalculation(double volume, RectangleF currRect, double referenceValue)
     {
-        if (referenseValue == 0)
-            referenseValue = (float)volume;
+        if (referenceValue == 0)
+            referenceValue = (float)volume;
         float circleSize = 0;
         float minSize = this.useMinSize ? this.minDotSize : 1;
-        circleSize = (float)(volume / referenseValue) * minSize;
+        circleSize = (float)(volume / referenceValue) * minSize;
         if (circleSize > maxDotSize && useMaxSize && !useCustomSize)
         {
             circleSize = maxDotSize;
@@ -282,7 +305,7 @@ public class IndicatorDeltaDots : Indicator, IVolumeAnalysisIndicator
                 double currDelta = Math.Abs(buyValue-(totalValue-buyValue));
                 Color minColor = Color.White;
                 Color maxColor = Color.White;
-                double colorRatio = this.deltaReferense == DeltaReferense.NoDelta ? buyValue / totalValue : currDelta/maxDelta;
+                double colorRatio = this.deltaReference == DeltaReference.NoDelta ? buyValue / totalValue : currDelta/maxDelta;
                 if (buyValue > (totalValue - buyValue))
                 {
                     minColor = this.askMinColor;
@@ -292,7 +315,7 @@ public class IndicatorDeltaDots : Indicator, IVolumeAnalysisIndicator
                 {
                     minColor = this.bidMinColor;
                     maxColor = this.bidMaxColor;
-                    if (this.deltaReferense == DeltaReferense.NoDelta)
+                    if (this.deltaReference == DeltaReference.NoDelta)
                         colorRatio = 1-colorRatio;
                 }
                 double minAlpha = ((double)this.minColorIntensity / 100) * 255;
@@ -321,6 +344,7 @@ public class IndicatorDeltaDots : Indicator, IVolumeAnalysisIndicator
     public void VolumeAnalysisData_Loaded()
     {
         volumeDataLoaded = true;
+        var t = this.HistoricalData[0].VolumeAnalysisData;
     }
     public override IList<SettingItem> Settings
     {
@@ -331,6 +355,7 @@ public class IndicatorDeltaDots : Indicator, IVolumeAnalysisIndicator
             SettingItemSeparatorGroup groupCalculation = new SettingItemSeparatorGroup("Calculation Settings", 1);
             SettingItemSeparatorGroup groupTreshold = new SettingItemSeparatorGroup("Treshold Settings", 2);
             SettingItemSeparatorGroup groupSize = new SettingItemSeparatorGroup("Circle Size Settings", 3);
+            SettingItemSeparatorGroup valueSettings = new SettingItemSeparatorGroup("Volume display settings", 4);
             settings.Add(new SettingItemColor("askDominantColor", this.askDominantColor)
             {
                 Text = "Ask Color",
@@ -426,16 +451,16 @@ public class IndicatorDeltaDots : Indicator, IVolumeAnalysisIndicator
                 Relation = useVariableIntensityRelation,
                 SeparatorGroup = groupColor,
             });
-            settings.Add(new SettingItemSelectorLocalized("deltaReferense", this.deltaReferense, new List<SelectItem> { new SelectItem("Current Bar Total Volume", DeltaReferense.NoDelta), new SelectItem("Visible Chart Maximum Delta", DeltaReferense.VisibleMax), new SelectItem("All Chart Maximum Delta", DeltaReferense.AllMax) })
+            settings.Add(new SettingItemSelectorLocalized("deltaReference", this.deltaReference, new List<SelectItem> { new SelectItem("Current Bar Total Volume", DeltaReference.NoDelta), new SelectItem("Visible Chart Maximum Delta", DeltaReference.VisibleMax), new SelectItem("All Chart Maximum Delta", DeltaReference.AllMax) })
             {
                 Text = "Intencity Precentage Reference Value",
                 SortIndex = 1,
                 SeparatorGroup = groupColor,
                 Relation = useVariableIntensityRelation,
             });
-            settings.Add(new SettingItemSelectorLocalized("referenseValue", this.referenseValue, new List<SelectItem> { new SelectItem("Visible Chart Average Size", ReferenseValue.VisibleAverage), new SelectItem("All Chart Average Size", ReferenseValue.AllAverage), new SelectItem("Minimum Volume", ReferenseValue.MinVolume) })
+            settings.Add(new SettingItemSelectorLocalized("referenceValue", this.referenceValue, new List<SelectItem> { new SelectItem("Visible Chart Average Size", ReferenceValue.VisibleAverage), new SelectItem("All Chart Average Size", ReferenceValue.AllAverage), new SelectItem("Minimum Volume", ReferenceValue.MinVolume) })
             {
-                Text = "Trade Size Referense Value",
+                Text = "Trade Size Reference Value",
                 SortIndex = 1,
                 SeparatorGroup = groupCalculation,
             });
@@ -534,6 +559,27 @@ public class IndicatorDeltaDots : Indicator, IVolumeAnalysisIndicator
                 Relation = maximumNotCustom,
                 SeparatorGroup = groupSize,
             });
+            settings.Add(new SettingItemBoolean("drawValues", this.drawValues)
+            {
+                Text = "Draw Volume",
+                SortIndex = 1,
+                SeparatorGroup = valueSettings,
+            });
+            SettingItemRelationVisibility drawValuesRelation = new SettingItemRelationVisibility("drawValues", true);
+            settings.Add(new SettingItemFont("valueFont", this.valueFont)
+            {
+                Text = "Value Font",
+                SortIndex = 1,
+                SeparatorGroup = valueSettings,
+                Relation = drawValuesRelation
+            });
+            settings.Add(new SettingItemColor("valueColor", this.valueColor)
+            {
+                Text = "Value Color",
+                SortIndex = 1,
+                SeparatorGroup = valueSettings,
+                Relation = drawValuesRelation
+            });
             return settings;
         }
         set
@@ -554,8 +600,8 @@ public class IndicatorDeltaDots : Indicator, IVolumeAnalysisIndicator
                 this.ddMode = ddMode;
             if (value.TryGetValue("displayMode", out DisplayMode displayMode))
                 this.displayMode = displayMode;
-            if (value.TryGetValue("deltaReferense", out DeltaReferense deltaReferense))
-                this.deltaReferense = deltaReferense;
+            if (value.TryGetValue("deltaReference", out DeltaReference deltaReference))
+                this.deltaReference = deltaReference;
             if (value.TryGetValue("minimumlVolume", out double minimumlVolume))
                 this.minimumVolume = minimumlVolume;
             if (value.TryGetValue("compareTreshold", out double compareTreshold))
@@ -584,12 +630,18 @@ public class IndicatorDeltaDots : Indicator, IVolumeAnalysisIndicator
                 this.useMaxSize = useMaxSize;
             if (value.TryGetValue("perBarPriceType", out PriceType perBarPriceType))
                 this.perBarPriceType = perBarPriceType;
-            if (value.TryGetValue("referenseValue", out ReferenseValue referenseValue))
-                this.referenseValue = referenseValue;
+            if (value.TryGetValue("referenceValue", out ReferenceValue referenceValue))
+                this.referenceValue = referenceValue;
             if (value.TryGetValue("useCustomSize", out bool useCustomSize))
                 this.useCustomSize = useCustomSize;
             if (value.TryGetValue("customDotSize", out int customDotSize))
                 this.customDotSize = customDotSize;
+            if (value.TryGetValue("drawValues", out bool drawValues))
+                this.drawValues = drawValues;
+            if (value.TryGetValue("valueFont", out Font valueFont))
+                this.valueFont = valueFont;
+            if (value.TryGetValue("valueColor", out Color valueColor))
+                this.valueColor = valueColor;
             this.OnSettingsUpdated();
         }
     }
@@ -606,13 +658,13 @@ public enum DisplayMode
     Pie,
     Gradient
 }
-public enum ReferenseValue
+public enum ReferenceValue
 {
     MinVolume,
     VisibleAverage,
     AllAverage,
 }
-public enum DeltaReferense
+public enum DeltaReference
 {
     NoDelta,
     VisibleMax,

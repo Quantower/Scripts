@@ -29,7 +29,8 @@ public class IndicatorATRTrailingStopWithFibRetracements : Indicator
 
 
     public double fibLvl1 = 1.618, fibLvl2 = 2.618, fibLvl3 = 4.23, fib1, fib2, fib3, fibTgt1, fibTgt2, fibTgt3;
-    public double trailStop, trend, trendUp, trendDown, ex, currClose, switchVal, diff, loss;
+    public double trailStop, trend, trendUp, trendDown, ex, switchVal, diff, loss;
+    private double _prevTrend, _prevTrendUp, _prevTrendDown, _prevEx, _prevSwitchVal, _prevDiff, _prevFibTgt1;
     public bool trendChange;
     private Indicator atr;
     public override string ShortName => $"ATRTrailStop ({this.Period})";
@@ -63,9 +64,23 @@ public class IndicatorATRTrailingStopWithFibRetracements : Indicator
 
     protected override void OnUpdate(UpdateArgs args)
     {
-        double prevClose = currClose;
+        bool isBar = args.Reason == UpdateReason.NewBar || args.Reason == UpdateReason.HistoricalBar;
 
-        currClose = GetPrice(PriceType.Close);
+        if (this.Count < Math.Max(this.Period + 2, 3))
+            return;
+        if (isBar)
+        {
+            _prevTrend      = this.trend;
+            _prevTrendUp    = this.trendUp;
+            _prevTrendDown  = this.trendDown;
+            _prevEx         = this.ex;
+            _prevSwitchVal  = this.switchVal;
+            _prevDiff       = this.diff;
+            _prevFibTgt1    = this.fibTgt1;
+        }
+        double prevClose = GetPrice(PriceType.Close, 1);
+
+        double currClose = GetPrice(PriceType.Close);
         double currHigh = GetPrice(PriceType.High);
         double currLow = GetPrice(PriceType.Low);
 
@@ -73,9 +88,9 @@ public class IndicatorATRTrailingStopWithFibRetracements : Indicator
         double up = currClose - loss;
         double down = currClose + loss;
 
-        double prevTrend = trend;
-        double prevTrendUp = trendUp;
-        double prevTrendDown = trendDown;
+        double prevTrend = _prevTrend;
+        double prevTrendUp = _prevTrendUp;
+        double prevTrendDown = _prevTrendDown;
 
         trendUp = prevClose > prevTrendUp ? Math.Max(up, prevTrendUp) : up;
         trendDown = prevClose < prevTrendDown ? Math.Min(down, prevTrendDown) : down;
@@ -83,23 +98,23 @@ public class IndicatorATRTrailingStopWithFibRetracements : Indicator
 
         trailStop = trend == 1 ? trendUp : trendDown;
 
-        double prevEx = ex;
+        double prevEx = _prevEx;
         ex = (trend > 0 && prevTrend < 0) ? currHigh : (trend < 0 && prevTrend > 0) ? currLow : trend == 1 ? Math.Max(prevEx, currHigh) : trend == -1 ? Math.Min(prevEx, currLow) : prevEx;
 
         fib1 = ex + (trailStop - ex) * Fib1Lvl / 100;
         fib2 = ex + (trailStop - ex) * Fib2Lvl / 100;
         fib3 = ex + (trailStop - ex) * Fib3Lvl / 100;
 
-        double prevSwitchVal = switchVal;
-        double prevDiff = diff;
+        double prevSwitchVal = _prevSwitchVal;
+        double prevDiff = _prevDiff;
         trendChange = trend == prevTrend ? false : true;
         switchVal = trendChange ? trailStop : prevSwitchVal;
         diff = trendChange ? currClose - switchVal : prevDiff;
+        double prevfibTgt1 = _prevFibTgt1;
 
         fibTgt1 = switchVal + (diff * fibLvl1);
         fibTgt2 = switchVal + (diff * fibLvl2);
         fibTgt3 = switchVal + (diff * fibLvl3);
-        double prevfibTgt1 = fibTgt1;
 
         SetValue(trailStop);
         if (trend == 1 && fibTgt1 == prevfibTgt1)

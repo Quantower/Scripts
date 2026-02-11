@@ -12,10 +12,11 @@ namespace ChanneIsIndicators;
 
 public class IndicatorDailyOHLC : Indicator
 {
-    #region Parameters   
+    #region Parameters
 
     public DailyOHLCSessionType DailySessionType = DailyOHLCSessionType.AllDay;
     public string CustomSessionName = string.Empty;
+
     public DateTime CustomRangeStartTime
     {
         get
@@ -30,6 +31,7 @@ public class IndicatorDailyOHLC : Indicator
         set => this.customRangeStartTime = value;
     }
     private DateTime customRangeStartTime;
+
     public DateTime CustomRangeEndTime
     {
         get
@@ -42,10 +44,13 @@ public class IndicatorDailyOHLC : Indicator
         set => this.customRangeEndTime = value;
     }
     private DateTime customRangeEndTime;
+
     public int DaysCount = 10;
     public int PreviousDataOffset = 0;
+
     public bool UseExtendLines = false;
-    public bool AllowToDrawExtendLines => this.UseExtendLines && this.DailySessionType != DailyOHLCSessionType.AllDay;
+    public bool AllowToDrawExtendLines => this.UseExtendLines;
+
     public DateTime ExtendRangeStartTime
     {
         get
@@ -58,6 +63,7 @@ public class IndicatorDailyOHLC : Indicator
         set => this.extendRangeStartTime = value;
     }
     private DateTime extendRangeStartTime;
+
     public DateTime ExtendRangeEndTime
     {
         get
@@ -70,12 +76,22 @@ public class IndicatorDailyOHLC : Indicator
         set => this.extendRangeEndTime = value;
     }
     private DateTime extendRangeEndTime;
+
     public NativeAlignment LabelAlignment { get; set; }
     public int labelFormat { get; set; }
     public int labelPosition { get; set; }
     public int LabelHorizontalMode { get; set; } = 0;
     public int LastLabelsCount { get; set; } = 1;
+    public int OpenLabelOffsetPx { get; set; } = 0;
+    public int HighLabelOffsetPx { get; set; } = 0;
+    public int LowLabelOffsetPx { get; set; } = 0;
+    public int CloseLabelOffsetPx { get; set; } = 0;
+    public int MiddleLabelOffsetPx { get; set; } = 0;
+
+
     public bool ShowLabel { get; private set; }
+
+    // --- Open ---
     public LineOptions OpenLineOptions
     {
         get => this.openLineOptions;
@@ -87,6 +103,7 @@ public class IndicatorDailyOHLC : Indicator
     }
     private LineOptions openLineOptions;
     private Pen openLinePen;
+
     public LineOptions OpenExtendLineOptions
     {
         get => this.openExtendLineOptions;
@@ -98,8 +115,14 @@ public class IndicatorDailyOHLC : Indicator
     }
     private LineOptions openExtendLineOptions;
     private Pen openExtendLinePen;
+
     public bool ShowOpenLineLabel { get; private set; }
 
+    public int OpenLabelHorizontalMode { get; set; } = 0; // Right / Left / Center / RightEdge / PriceScale
+    public int OpenLabelPosition { get; set; } = 1;       // Below(0) / Above(1) / Center(2)
+    public int OpenLastLabelsCount { get; set; } = 1;
+
+    // --- High ---
     public LineOptions HighLineOptions
     {
         get => this.highLineOptions;
@@ -111,6 +134,7 @@ public class IndicatorDailyOHLC : Indicator
     }
     private LineOptions highLineOptions;
     private Pen highLinePen;
+
     public LineOptions HighExtendLineOptions
     {
         get => this.highExtendLineOptions;
@@ -122,8 +146,14 @@ public class IndicatorDailyOHLC : Indicator
     }
     private LineOptions highExtendLineOptions;
     private Pen highExtendLinePen;
+
     public bool ShowHighLineLabel { get; private set; }
 
+    public int HighLabelHorizontalMode { get; set; } = 0;
+    public int HighLabelPosition { get; set; } = 1;
+    public int HighLastLabelsCount { get; set; } = 1;
+
+    // --- Low ---
     public LineOptions LowLineOptions
     {
         get => this.lowLineOptions;
@@ -135,6 +165,7 @@ public class IndicatorDailyOHLC : Indicator
     }
     private LineOptions lowLineOptions;
     private Pen lowLinePen;
+
     public LineOptions LowExtendLineOptions
     {
         get => this.lowExtendLineOptions;
@@ -146,8 +177,14 @@ public class IndicatorDailyOHLC : Indicator
     }
     private LineOptions lowExtendLineOptions;
     private Pen lowExtendLinePen;
+
     public bool ShowLowLineLabel { get; private set; }
 
+    public int LowLabelHorizontalMode { get; set; } = 0;
+    public int LowLabelPosition { get; set; } = 1;
+    public int LowLastLabelsCount { get; set; } = 1;
+
+    // --- Close ---
     public LineOptions CloseLineOptions
     {
         get => this.closeLineOptions;
@@ -159,6 +196,7 @@ public class IndicatorDailyOHLC : Indicator
     }
     private LineOptions closeLineOptions;
     private Pen closeLinePen;
+
     public LineOptions CloseExtendLineOptions
     {
         get => this.closeExtendLineOptions;
@@ -170,8 +208,14 @@ public class IndicatorDailyOHLC : Indicator
     }
     private LineOptions closeExtendLineOptions;
     private Pen closeExtendLinePen;
+
     public bool ShowCloseLineLabel { get; private set; }
 
+    public int CloseLabelHorizontalMode { get; set; } = 0;
+    public int CloseLabelPosition { get; set; } = 1;
+    public int CloseLastLabelsCount { get; set; } = 1;
+
+    // --- Middle ---
     public LineOptions MiddleLineOptions
     {
         get => this.middleLineOptions;
@@ -183,6 +227,7 @@ public class IndicatorDailyOHLC : Indicator
     }
     private LineOptions middleLineOptions;
     private Pen middleLinePen;
+
     public LineOptions MiddleExtendLineOptions
     {
         get => this.middleExtendLineOptions;
@@ -194,8 +239,15 @@ public class IndicatorDailyOHLC : Indicator
     }
     private LineOptions middleExtendLineOptions;
     private Pen middleExtendLinePen;
+
     public bool ShowMiddleLineLabel { get; private set; }
+
+    public int MiddleLabelHorizontalMode { get; set; } = 0;
+    public int MiddleLabelPosition { get; set; } = 1;
+    public int MiddleLastLabelsCount { get; set; } = 1;
+
     public Font CurrentFont { get; private set; }
+
     public string OpenCustomText = "O: ", HighCustomText = "H: ", LowCustomText = "L: ", CloseCustomText = "C: ", MiddleCustomText = "M: ";
 
     private readonly IList<DailyRangeItem> rangeCache;
@@ -351,7 +403,26 @@ public class IndicatorDailyOHLC : Indicator
 
         if (this.UseExtendLines)
             this.extendSession = new Session("Extend session", this.ExtendRangeStartTime.TimeOfDay, this.ExtendRangeEndTime.TimeOfDay);
+
+        this.OpenLabelHorizontalMode   = this.LabelHorizontalMode;
+        this.HighLabelHorizontalMode   = this.LabelHorizontalMode;
+        this.LowLabelHorizontalMode    = this.LabelHorizontalMode;
+        this.CloseLabelHorizontalMode  = this.LabelHorizontalMode;
+        this.MiddleLabelHorizontalMode = this.LabelHorizontalMode;
+
+        this.OpenLabelPosition   = this.labelPosition;
+        this.HighLabelPosition   = this.labelPosition;
+        this.LowLabelPosition    = this.labelPosition;
+        this.CloseLabelPosition  = this.labelPosition;
+        this.MiddleLabelPosition = this.labelPosition;
+
+        this.OpenLastLabelsCount   = this.LastLabelsCount;
+        this.HighLastLabelsCount   = this.LastLabelsCount;
+        this.LowLastLabelsCount    = this.LastLabelsCount;
+        this.CloseLastLabelsCount  = this.LastLabelsCount;
+        this.MiddleLastLabelsCount = this.LastLabelsCount;
     }
+
     protected override void OnUpdate(UpdateArgs args)
     {
         if (this.currentSession == null)
@@ -396,6 +467,7 @@ public class IndicatorDailyOHLC : Indicator
             }
         }
     }
+
     protected override void OnClear()
     {
         this.currentRange = null;
@@ -408,6 +480,7 @@ public class IndicatorDailyOHLC : Indicator
 
         this.rangeCache?.Clear();
     }
+
     public override void Dispose()
     {
         if (this.CurrentChart != null)
@@ -415,6 +488,7 @@ public class IndicatorDailyOHLC : Indicator
 
         base.Dispose();
     }
+
     public override IList<SettingItem> Settings
     {
         get
@@ -443,11 +517,11 @@ public class IndicatorDailyOHLC : Indicator
             var defaultSeparator = settings.FirstOrDefault()?.SeparatorGroup;
 
             settings.Add(new SettingItemSelectorLocalized("Session type", new SelectItem("Session type", this.DailySessionType), new List<SelectItem>
-                             {
-                                 allDay,
-                                 specifiedSession,
-                                 customRange
-                             })
+                                 {
+                                     allDay,
+                                     specifiedSession,
+                                     customRange
+                                 })
             {
                 SeparatorGroup = defaultSeparator,
                 Text = "Session type",
@@ -492,25 +566,23 @@ public class IndicatorDailyOHLC : Indicator
             {
                 SeparatorGroup = defaultSeparator,
                 Text = loc._("Show extend lines"),
-                Relation = new SettingItemRelationVisibility("Session type", specifiedSession, customRange)
             });
-            settings.Add(new SettingItemDateTime("Start extend time", this.extendRangeStartTime, 45)
+            settings.Add(new SettingItemDateTime("Start extend time", this.CustomRangeStartTime, 45)
             {
                 SeparatorGroup = defaultSeparator,
                 Text = loc._("Start extend time"),
                 Format = DatePickerFormat.LongTime,
                 ValueChangingBehavior = SettingItemValueChangingBehavior.WithConfirmation,
-                Relation = new SettingItemRelationVisibility("ShowExtendLines", true)
+                Relation = new SettingItemRelationVisibility("Show extend lines", true)
             });
-            settings.Add(new SettingItemDateTime("End extend time", this.extendRangeEndTime, 50)
+            settings.Add(new SettingItemDateTime("End extend time", this.CustomRangeEndTime, 50)
             {
                 SeparatorGroup = defaultSeparator,
                 Text = loc._("End extend time"),
                 Format = DatePickerFormat.LongTime,
                 ValueChangingBehavior = SettingItemValueChangingBehavior.WithConfirmation,
-                Relation = new SettingItemRelationVisibility("ShowExtendLines", true)
+                Relation = new SettingItemRelationVisibility("Show extend lines", true)
             });
-            //
             settings.Add(new SettingItemBoolean("ShowLabel", this.ShowLabel, 60)
             {
                 SeparatorGroup = defaultSeparator,
@@ -522,48 +594,8 @@ public class IndicatorDailyOHLC : Indicator
                 Text = loc._("Font"),
                 Relation = new SettingItemRelationVisibility("ShowLabel", true)
             });
-            settings.Add(new SettingItemSelectorLocalized(
-                             "Label alignment",                                     // имя ключа остаётся прежним
-                             new SelectItem("Label alignment", this.LabelHorizontalMode),
-                             new List<SelectItem> { labRight, labLeft, labCentered, labRightEdge, labPriceScale })
-            {
-                SeparatorGroup = defaultSeparator,
-                Text = loc._("Label alignment"),
-                SortIndex = 60,
-                Relation = new SettingItemRelationVisibility("ShowLabel", true)
-            });
-            settings.Add(new SettingItemInteger("Last labels count", this.LastLabelsCount, 61)
-            {
-                SeparatorGroup = defaultSeparator,
-                Text = loc._("Last labels count"),
-                // показываем только когда выбран Right Edge или Price Scale
-                Relation = new SettingItemRelationVisibility("Label alignment", labRightEdge, labPriceScale)
-            });
-            settings.Add(new SettingItemSelectorLocalized("Label position", new SelectItem("Label position", this.labelPosition), new List<SelectItem>
-                             {
-                                 belowTL,
-                                 aboveTL,
-                                 centerTL
-                             })
-            {
-                SeparatorGroup = defaultSeparator,
-                Text = "Label position",
-                SortIndex = 60,
-                Relation = new SettingItemRelationVisibility("ShowLabel", true)
-            });
-            settings.Add(new SettingItemSelectorLocalized("Format", new SelectItem("Format", this.labelFormat), new List<SelectItem>
-                             {
-                                 formatPrice,
-                                 formatTextPrice,
-                                 formatText
-                             })
-            {
-                SeparatorGroup = defaultSeparator,
-                Text = "Format",
-                SortIndex = 60,
-                Relation = new SettingItemRelationVisibility("ShowLabel", true)
-            });
-            //
+
+            // --- OPEN group ---
             var openLineStyleSeparator = new SettingItemSeparatorGroup("Open line style", -999);
             settings.Add(new SettingItemLineOptions("OpenLineOptions", this.OpenLineOptions, 60)
             {
@@ -588,7 +620,40 @@ public class IndicatorDailyOHLC : Indicator
                 Text = loc._("Custom text"),
                 Relation = new SettingItemRelationVisibility("Format", formatText, formatTextPrice)
             });
-            //
+            settings.Add(new SettingItemSelectorLocalized(
+                "Open label alignment",
+                new SelectItem("Open label alignment", this.OpenLabelHorizontalMode),
+                new List<SelectItem> { labRight, labLeft, labCentered, labRightEdge, labPriceScale })
+            {
+                SeparatorGroup = openLineStyleSeparator,
+                Text = loc._("Label alignment"),
+                Relation = new SettingItemRelationVisibility("ShowLabel", true)
+            });
+            settings.Add(new SettingItemInteger("Open last labels count", this.OpenLastLabelsCount, 61)
+            {
+                SeparatorGroup = openLineStyleSeparator,
+                Text = loc._("Last labels count"),
+                Relation = new SettingItemRelationVisibility("Open label alignment", labRightEdge, labPriceScale),
+                Minimum = 1
+            });
+            settings.Add(new SettingItemSelectorLocalized(
+                "Open label position",
+                new SelectItem("Open label position", this.OpenLabelPosition),
+                new List<SelectItem> { belowTL, aboveTL, centerTL })
+            {
+                SeparatorGroup = openLineStyleSeparator,
+                Text = loc._("Label position"),
+                Relation = new SettingItemRelationVisibility("ShowLabel", true)
+            });
+            settings.Add(new SettingItemInteger("Open label offset (px)", this.OpenLabelOffsetPx, 62)
+            {
+                SeparatorGroup = openLineStyleSeparator,
+                Text = "Label offset (last day, px)",
+                Relation = new SettingItemRelationVisibility("ShowOpenLineLabel", true),
+                Minimum = -2000
+            });
+            // --- HIGH group ---
+
             var highLineStyleSeparator = new SettingItemSeparatorGroup("High line style", -999);
             settings.Add(new SettingItemLineOptions("HighLineOptions", this.HighLineOptions, 60)
             {
@@ -613,7 +678,16 @@ public class IndicatorDailyOHLC : Indicator
                 Text = loc._("Custom text"),
                 Relation = new SettingItemRelationVisibility("Format", formatText, formatTextPrice)
             });
-            //
+            settings.Add(new SettingItemInteger("High label offset (px)", this.HighLabelOffsetPx, 62)
+            {
+                SeparatorGroup = highLineStyleSeparator,
+                Text = "Label offset (last day, px)",
+                Relation = new SettingItemRelationVisibility("ShowHighLineLabel", true),
+                Minimum = -2000
+            });
+
+
+            // --- LOW group ---
             var lowLineStyleSeparator = new SettingItemSeparatorGroup("Low line style", -999);
             settings.Add(new SettingItemLineOptions("LowLineOptions", this.LowLineOptions, 60)
             {
@@ -638,7 +712,41 @@ public class IndicatorDailyOHLC : Indicator
                 Text = loc._("Custom text"),
                 Relation = new SettingItemRelationVisibility("Format", formatText, formatTextPrice)
             });
-            //
+            settings.Add(new SettingItemSelectorLocalized(
+                "Low label alignment",
+                new SelectItem("Low label alignment", this.LowLabelHorizontalMode),
+                new List<SelectItem> { labRight, labLeft, labCentered, labRightEdge, labPriceScale })
+            {
+                SeparatorGroup = lowLineStyleSeparator,
+                Text = loc._("Label alignment"),
+                Relation = new SettingItemRelationVisibility("ShowLabel", true)
+            });
+            settings.Add(new SettingItemInteger("Low last labels count", this.LowLastLabelsCount, 61)
+            {
+                SeparatorGroup = lowLineStyleSeparator,
+                Text = loc._("Last labels count"),
+                Relation = new SettingItemRelationVisibility("Low label alignment", labRightEdge, labPriceScale),
+                Minimum = 1
+            });
+            settings.Add(new SettingItemSelectorLocalized(
+                "Low label position",
+                new SelectItem("Low label position", this.LowLabelPosition),
+                new List<SelectItem> { belowTL, aboveTL, centerTL })
+            {
+                SeparatorGroup = lowLineStyleSeparator,
+                Text = loc._("Label position"),
+                Relation = new SettingItemRelationVisibility("ShowLabel", true)
+            });
+            settings.Add(new SettingItemInteger("Low label offset (px)", this.LowLabelOffsetPx, 62)
+            {
+                SeparatorGroup = lowLineStyleSeparator,
+                Text = "Label offset (last day, px)",
+                Relation = new SettingItemRelationVisibility("ShowLowLineLabel", true),
+                Minimum = -2000
+            });
+
+
+            // --- CLOSE group ---
             var closeLineStyleSeparator = new SettingItemSeparatorGroup("Close line style", -999);
             settings.Add(new SettingItemLineOptions("CloseLineOptions", this.CloseLineOptions, 60)
             {
@@ -664,6 +772,40 @@ public class IndicatorDailyOHLC : Indicator
                 Relation = new SettingItemRelationVisibility("Format", formatText, formatTextPrice)
             });
             //
+            settings.Add(new SettingItemSelectorLocalized(
+                "Close label alignment",
+                new SelectItem("Close label alignment", this.CloseLabelHorizontalMode),
+                new List<SelectItem> { labRight, labLeft, labCentered, labRightEdge, labPriceScale })
+            {
+                SeparatorGroup = closeLineStyleSeparator,
+                Text = loc._("Label alignment"),
+                Relation = new SettingItemRelationVisibility("ShowLabel", true)
+            });
+            settings.Add(new SettingItemInteger("Close last labels count", this.CloseLastLabelsCount, 61)
+            {
+                SeparatorGroup = closeLineStyleSeparator,
+                Text = loc._("Last labels count"),
+                Relation = new SettingItemRelationVisibility("Close label alignment", labRightEdge, labPriceScale),
+                Minimum = 1
+            });
+            settings.Add(new SettingItemSelectorLocalized(
+                "Close label position",
+                new SelectItem("Close label position", this.CloseLabelPosition),
+                new List<SelectItem> { belowTL, aboveTL, centerTL })
+            {
+                SeparatorGroup = closeLineStyleSeparator,
+                Text = loc._("Label position"),
+                Relation = new SettingItemRelationVisibility("ShowLabel", true)
+            });
+            settings.Add(new SettingItemInteger("Close label offset (px)", this.CloseLabelOffsetPx, 62)
+            {
+                SeparatorGroup = closeLineStyleSeparator,
+                Text = "Label offset (last day, px)",
+                Relation = new SettingItemRelationVisibility("ShowCloseLineLabel", true),
+                Minimum = -2000
+            });
+
+            // --- MIDDLE group ---
             var middleLineStyleSeparator = new SettingItemSeparatorGroup("Middle line style", -999);
             settings.Add(new SettingItemLineOptions("MiddleLineOptions", this.MiddleLineOptions, 60)
             {
@@ -688,6 +830,39 @@ public class IndicatorDailyOHLC : Indicator
                 Text = loc._("Custom text"),
                 Relation = new SettingItemRelationVisibility("Format", formatText, formatTextPrice)
             });
+            settings.Add(new SettingItemSelectorLocalized(
+                "Middle label alignment",
+                new SelectItem("Middle label alignment", this.MiddleLabelHorizontalMode),
+                new List<SelectItem> { labRight, labLeft, labCentered, labRightEdge, labPriceScale })
+            {
+                SeparatorGroup = middleLineStyleSeparator,
+                Text = loc._("Label alignment"),
+                Relation = new SettingItemRelationVisibility("ShowLabel", true)
+            });
+            settings.Add(new SettingItemInteger("Middle last labels count", this.MiddleLastLabelsCount, 61)
+            {
+                SeparatorGroup = middleLineStyleSeparator,
+                Text = loc._("Last labels count"),
+                Relation = new SettingItemRelationVisibility("Middle label alignment", labRightEdge, labPriceScale),
+                Minimum = 1
+            });
+            settings.Add(new SettingItemSelectorLocalized(
+                "Middle label position",
+                new SelectItem("Middle label position", this.MiddleLabelPosition),
+                new List<SelectItem> { belowTL, aboveTL, centerTL })
+            {
+                SeparatorGroup = middleLineStyleSeparator,
+                Text = loc._("Label position"),
+                Relation = new SettingItemRelationVisibility("ShowLabel", true)
+            });
+            settings.Add(new SettingItemInteger("Middle label offset (px)", this.MiddleLabelOffsetPx, 62)
+            {
+                SeparatorGroup = middleLineStyleSeparator,
+                Text = "Label offset (last day, px)",
+                Relation = new SettingItemRelationVisibility("ShowMiddleLineLabel", true),
+                Minimum = -2000
+            });
+
 
             return settings;
         }
@@ -695,6 +870,7 @@ public class IndicatorDailyOHLC : Indicator
         {
             var holder = new SettingsHolder(value);
 
+            // Open
             if (holder.TryGetValue("OpenLineOptions", out SettingItem item) && item.Value is LineOptions openOptions)
                 this.OpenLineOptions = openOptions;
             if (holder.TryGetValue("OpenExtendLineOptions", out item) && item.Value is LineOptions openExtendOptions)
@@ -703,7 +879,10 @@ public class IndicatorDailyOHLC : Indicator
                 this.ShowOpenLineLabel = showOpenLabel;
             if (holder.TryGetValue("OpenCustomText", out item) && item.Value is string openCustomText)
                 this.OpenCustomText = openCustomText;
+            if (holder.TryGetValue("Open label offset (px)", out item)   && item.Value is int oOff)
+                this.OpenLabelOffsetPx   = oOff;
 
+            // High
             if (holder.TryGetValue("HighLineOptions", out item) && item.Value is LineOptions highOptions)
                 this.HighLineOptions = highOptions;
             if (holder.TryGetValue("HighExtendLineOptions", out item) && item.Value is LineOptions highExtendOptions)
@@ -712,7 +891,10 @@ public class IndicatorDailyOHLC : Indicator
                 this.ShowHighLineLabel = showHighLabel;
             if (holder.TryGetValue("HighCustomText", out item) && item.Value is string highCustomText)
                 this.HighCustomText = highCustomText;
+            if (holder.TryGetValue("High label offset (px)", out item)   && item.Value is int hOff)
+                this.HighLabelOffsetPx   = hOff;
 
+            // Low
             if (holder.TryGetValue("LowLineOptions", out item) && item.Value is LineOptions lowOptions)
                 this.LowLineOptions = lowOptions;
             if (holder.TryGetValue("LowExtendLineOptions", out item) && item.Value is LineOptions lowExtendOptions)
@@ -721,7 +903,11 @@ public class IndicatorDailyOHLC : Indicator
                 this.ShowLowLineLabel = showLowLabel;
             if (holder.TryGetValue("LowCustomText", out item) && item.Value is string lowCustomText)
                 this.LowCustomText = lowCustomText;
+            if (holder.TryGetValue("Low label offset (px)", out item)    && item.Value is int lOff)
+                this.LowLabelOffsetPx    = lOff;
 
+
+            // Close
             if (holder.TryGetValue("CloseLineOptions", out item) && item.Value is LineOptions closeOptions)
                 this.CloseLineOptions = closeOptions;
             if (holder.TryGetValue("CloseExtendLineOptions", out item) && item.Value is LineOptions closeExtendOptions)
@@ -730,7 +916,11 @@ public class IndicatorDailyOHLC : Indicator
                 this.ShowCloseLineLabel = showCloseLabel;
             if (holder.TryGetValue("CloseCustomText", out item) && item.Value is string closeCustomText)
                 this.CloseCustomText = closeCustomText;
+            if (holder.TryGetValue("Close label offset (px)", out item)  && item.Value is int cOff)
+                this.CloseLabelOffsetPx  = cOff;
 
+
+            // Middle
             if (holder.TryGetValue("MiddleLineOptions", out item) && item.Value is LineOptions middleOptions)
                 this.MiddleLineOptions = middleOptions;
             if (holder.TryGetValue("MiddleExtendLineOptions", out item) && item.Value is LineOptions middleExtendOptions)
@@ -739,6 +929,9 @@ public class IndicatorDailyOHLC : Indicator
                 this.ShowMiddleLineLabel = showMiddleLabel;
             if (holder.TryGetValue("MiddleCustomText", out item) && item.Value is string middleCustomText)
                 this.MiddleCustomText = middleCustomText;
+            if (holder.TryGetValue("Middle label offset (px)", out item) && item.Value is int mOff)
+                this.MiddleLabelOffsetPx = mOff;
+
 
             var needRefresh = false;
             if (holder.TryGetValue("Session type", out item) && item.GetValue<DailyOHLCSessionType>() != this.DailySessionType)
@@ -774,20 +967,53 @@ public class IndicatorDailyOHLC : Indicator
                 this.extendRangeEndTime = dtEndExtendTime;
                 needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
             }
+
             if (holder.TryGetValue("Font", out item) && item.Value is Font font)
                 this.CurrentFont = font;
-            if (holder.TryGetValue("Label alignment", out var laItem) && laItem.GetValue<int>() != this.LabelHorizontalMode)
-                this.LabelHorizontalMode = laItem.GetValue<int>();
             if (holder.TryGetValue("ShowLabel", out item) && item.Value is bool showLabel)
                 this.ShowLabel = showLabel;
-            if (holder.TryGetValue("Label position", out var lpitem)&& lpitem.GetValue<int>() != this.labelPosition)
-                this.labelPosition = lpitem.GetValue<int>();
             if (holder.TryGetValue("Last labels count", out item) && item.Value is int lastLabels)
                 this.LastLabelsCount = lastLabels;
-            if (holder.TryGetValue("Format", out var lfitem)&& lfitem.GetValue<int>() != this.labelFormat)
-                this.labelFormat = lfitem.GetValue<int>();
+
+            // Open
+            if (holder.TryGetValue("Open label alignment", out var oAlign))
+                this.OpenLabelHorizontalMode = oAlign.GetValue<int>();
+            if (holder.TryGetValue("Open label position", out var oPos))
+                this.OpenLabelPosition = oPos.GetValue<int>();
+            if (holder.TryGetValue("Open last labels count", out var oCnt) && oCnt.Value is int olc)
+                this.OpenLastLabelsCount = olc;
+            // High
+            if (holder.TryGetValue("High label alignment", out var hAlign))
+                this.HighLabelHorizontalMode = hAlign.GetValue<int>();
+            if (holder.TryGetValue("High label position", out var hPos))
+                this.HighLabelPosition = hPos.GetValue<int>();
+            if (holder.TryGetValue("High last labels count", out var hCnt) && hCnt.Value is int hlc)
+                this.HighLastLabelsCount = hlc;
+            // Low
+            if (holder.TryGetValue("Low label alignment", out var lAlign))
+                this.LowLabelHorizontalMode = lAlign.GetValue<int>();
+            if (holder.TryGetValue("Low label position", out var lPos))
+                this.LowLabelPosition = lPos.GetValue<int>();
+            if (holder.TryGetValue("Low last labels count", out var lCnt) && lCnt.Value is int llc)
+                this.LowLastLabelsCount = llc;
+            // Close
+            if (holder.TryGetValue("Close label alignment", out var cAlign))
+                this.CloseLabelHorizontalMode = cAlign.GetValue<int>();
+            if (holder.TryGetValue("Close label position", out var cPos))
+                this.CloseLabelPosition = cPos.GetValue<int>();
+            if (holder.TryGetValue("Close last labels count", out var cCnt) && cCnt.Value is int clc)
+                this.CloseLastLabelsCount = clc;
+            // Middle
+            if (holder.TryGetValue("Middle label alignment", out var mAlign))
+                this.MiddleLabelHorizontalMode = mAlign.GetValue<int>();
+            if (holder.TryGetValue("Middle label position", out var mPos))
+                this.MiddleLabelPosition = mPos.GetValue<int>();
+            if (holder.TryGetValue("Middle last labels count", out var mCnt) && mCnt.Value is int mlc)
+                this.MiddleLastLabelsCount = mlc;
+
             if (needRefresh)
                 this.Refresh();
+
             base.Settings = value;
         }
     }
@@ -813,15 +1039,20 @@ public class IndicatorDailyOHLC : Indicator
                     break;
 
                 var range = this.rangeCache[i];
+                bool isMainRangeOutside = range.EndDateTime < leftTime || range.StartDateTime > rightTime;
+                bool needDrawExtendLines = this.UseExtendLines && range.ExtendStartDateTime != range.ExtendEndDateTime; 
 
-                bool isMainRangeOuside = range.EndDateTime < leftTime || range.StartDateTime > rightTime;
-                bool needDrawExtendLines = this.AllowToDrawExtendLines && range.ExtendStartDateTime != range.ExtendEndDateTime;
+                bool anyEdgeLabelWanted =
+                    (this.ShowHighLineLabel   && IsEdgeMode(this.HighLabelHorizontalMode))   ||
+                    (this.ShowLowLineLabel    && IsEdgeMode(this.LowLabelHorizontalMode))    ||
+                    (this.ShowOpenLineLabel   && IsEdgeMode(this.OpenLabelHorizontalMode))   ||
+                    (this.ShowCloseLineLabel  && IsEdgeMode(this.CloseLabelHorizontalMode))  ||
+                    (this.ShowMiddleLineLabel && IsEdgeMode(this.MiddleLabelHorizontalMode));
 
-                if (isMainRangeOuside)
-                {
-                    if (!isMainRangeOuside || range.ExtendEndDateTime < leftTime || range.ExtendStartDateTime > rightTime)
-                        continue;
-                }
+                bool extendIsOutside = (!needDrawExtendLines || range.ExtendEndDateTime < leftTime || range.ExtendStartDateTime > rightTime);
+
+                if (isMainRangeOutside && extendIsOutside && !anyEdgeLabelWanted)
+                    continue;
 
                 int prevDailyRangeOffset = i + this.PreviousDataOffset;
                 bool needUsePreviosRange = prevDailyRangeOffset != i;
@@ -857,109 +1088,141 @@ public class IndicatorDailyOHLC : Indicator
                 // get previous date
                 if (needUsePreviosRange)
                     range = this.rangeCache[prevDailyRangeOffset];
-                bool restrictLabels = this.LabelHorizontalMode == 3 || this.LabelHorizontalMode == 4;
-                int maxLabelDays = restrictLabels ? Math.Max(0, Math.Min(this.LastLabelsCount, this.DaysCount)) : int.MaxValue;
-                bool allowLabelForThisDay = i < maxLabelDays;
-                if (this.HighLineOptions.Enabled || this.HighExtendLineOptions.Enabled)
+
+                // --- HIGH ---
+                if (this.HighLineOptions.Enabled || this.HighExtendLineOptions.Enabled || (this.ShowHighLineLabel && IsEdgeMode(this.HighLabelHorizontalMode)))
                 {
-                    float highY = (float)currentWindow.CoordinatesConverter.GetChartY(range.High);
-                    if (highY > top && highY < bottom)
+                    float highYReal = (float)currentWindow.CoordinatesConverter.GetChartY(range.High);
+                    bool yVisible = highYReal > top && highYReal < bottom;
+
+                    if (yVisible && !isMainRangeOutside && this.HighLineOptions.Enabled)
+                        gr.DrawLine(this.highLinePen, leftX, highYReal, rightX, highYReal);
+
+                    if (yVisible && needDrawExtendLines && this.HighExtendLineOptions.Enabled)
+                        gr.DrawLine(this.highExtendLinePen, leftExtendX, highYReal, rightExtendX, highYReal);
+                    bool edgeMode = IsEdgeMode(this.HighLabelHorizontalMode);
+                    int maxHighDays = edgeMode ? Math.Max(0, Math.Min(this.HighLastLabelsCount, this.DaysCount)) : int.MaxValue;
+                    bool allowHighLabel = this.ShowHighLineLabel && (((yVisible && !isMainRangeOutside)) || edgeMode) && i < maxHighDays;
+
+                    if (allowHighLabel)
                     {
-                        if (!isMainRangeOuside && this.HighLineOptions.Enabled)
-                        {
-                            gr.DrawLine(this.highLinePen, leftX, highY, rightX, highY);
+                        float yForLabel = edgeMode ? ClampY(highYReal, args.Rectangle, this.highLineOptions.Width + 1) : highYReal;
+                        int offsetForLastDay = (i == 0) ? this.HighLabelOffsetPx : 0;
 
-                            if (this.ShowHighLineLabel)
-                                if (this.ShowHighLineLabel)
-                                    this.DrawBillet(gr, range.High, ref leftX, ref rightX, ref highY,
-                                        this.CurrentFont, this.highLineOptions, this.highLinePen, this.centerNearSF, args.Rectangle, HighCustomText);
-
-                        }
-
-                        if (needDrawExtendLines && this.HighExtendLineOptions.Enabled)
-                            gr.DrawLine(this.highExtendLinePen, leftExtendX, highY, rightExtendX, highY);
+                        this.DrawBillet(gr, range.High, ref leftX, ref rightX, ref yForLabel,
+                            this.CurrentFont, this.highLineOptions, this.highLinePen, this.centerNearSF, args.Rectangle, HighCustomText,
+                            this.HighLabelPosition, this.HighLabelHorizontalMode, offsetForLastDay);
                     }
                 }
 
-                if (this.LowLineOptions.Enabled || this.LowExtendLineOptions.Enabled)
+                // --- LOW ---
+                if (this.LowLineOptions.Enabled || this.LowExtendLineOptions.Enabled || (this.ShowLowLineLabel && IsEdgeMode(this.LowLabelHorizontalMode)))
                 {
-                    float lowY = (float)currentWindow.CoordinatesConverter.GetChartY(range.Low);
-                    if (lowY > top && lowY < bottom)
+                    float lowYReal = (float)currentWindow.CoordinatesConverter.GetChartY(range.Low);
+                    bool yVisible = lowYReal > top && lowYReal < bottom;
+
+                    if (yVisible && !isMainRangeOutside && this.LowLineOptions.Enabled)
+                        gr.DrawLine(this.lowLinePen, leftX, lowYReal, rightX, lowYReal);
+
+                    if (yVisible && needDrawExtendLines && this.LowExtendLineOptions.Enabled)
+                        gr.DrawLine(this.lowExtendLinePen, leftExtendX, lowYReal, rightExtendX, lowYReal);
+
+                    bool edgeMode = IsEdgeMode(this.LowLabelHorizontalMode);
+                    int maxLowDays = edgeMode ? Math.Max(0, Math.Min(this.LowLastLabelsCount, this.DaysCount)) : int.MaxValue;
+                    bool allowLowLabel = this.ShowLowLineLabel && (((yVisible && !isMainRangeOutside)) || edgeMode) && i < maxLowDays;
+
+                    if (allowLowLabel)
                     {
-                        if (!isMainRangeOuside && this.LowLineOptions.Enabled)
-                        {
-                            gr.DrawLine(this.lowLinePen, leftX, lowY, rightX, lowY);
-
-                                if (allowLabelForThisDay && this.ShowLowLineLabel)
-                                    this.DrawBillet(gr, range.Low, ref leftX, ref rightX, ref lowY,
-                                        this.CurrentFont, this.lowLineOptions, this.lowLinePen, this.centerNearSF, args.Rectangle, LowCustomText);
-
-                        }
-
-                        if (needDrawExtendLines && this.LowExtendLineOptions.Enabled)
-                            gr.DrawLine(this.lowExtendLinePen, leftExtendX, lowY, rightExtendX, lowY);
+                        float yForLabel = edgeMode ? ClampY(lowYReal, args.Rectangle, this.lowLineOptions.Width + 1) : lowYReal;
+                        int offsetForLastDay = (i == 0) ? this.LowLabelOffsetPx : 0;
+                        this.DrawBillet(gr, range.Low, ref leftX, ref rightX, ref yForLabel,
+                            this.CurrentFont, this.lowLineOptions, this.lowLinePen, this.centerNearSF, args.Rectangle, LowCustomText,
+                            this.LowLabelPosition, this.LowLabelHorizontalMode, offsetForLastDay);
                     }
                 }
 
-                if (this.OpenLineOptions.Enabled || this.OpenExtendLineOptions.Enabled)
+
+                // --- OPEN ---
+                if (this.OpenLineOptions.Enabled || this.OpenExtendLineOptions.Enabled || (this.ShowOpenLineLabel && IsEdgeMode(this.OpenLabelHorizontalMode)))
                 {
-                    float openY = (float)currentWindow.CoordinatesConverter.GetChartY(range.Open);
-                    if (openY > top && openY < bottom)
+                    float openYReal = (float)currentWindow.CoordinatesConverter.GetChartY(range.Open);
+                    bool yVisible = openYReal > top && openYReal < bottom;
+
+                    if (yVisible && !isMainRangeOutside && this.OpenLineOptions.Enabled)
+                        gr.DrawLine(this.openLinePen, leftX, openYReal, rightX, openYReal);
+
+                    if (yVisible && needDrawExtendLines && this.OpenExtendLineOptions.Enabled)
+                        gr.DrawLine(this.openExtendLinePen, leftExtendX, openYReal, rightExtendX, openYReal);
+
+                    bool edgeMode = IsEdgeMode(this.OpenLabelHorizontalMode);
+                    int maxOpenDays = edgeMode ? Math.Max(0, Math.Min(this.OpenLastLabelsCount, this.DaysCount)) : int.MaxValue;
+                    bool allowOpenLabel = this.ShowOpenLineLabel && (((yVisible && !isMainRangeOutside)) || edgeMode) && i < maxOpenDays;
+
+                    if (allowOpenLabel)
                     {
-                        if (!isMainRangeOuside && this.OpenLineOptions.Enabled)
-                        {
-                            gr.DrawLine(this.openLinePen, leftX, openY, rightX, openY);
+                        float yForLabel = edgeMode ? ClampY(openYReal, args.Rectangle, this.openLineOptions.Width + 1) : openYReal;
+                        int offsetForLastDay = (i == 0) ? this.OpenLabelOffsetPx : 0;
+                        this.DrawBillet(gr, range.Open, ref leftX, ref rightX, ref yForLabel,
+                            this.CurrentFont, this.openLineOptions, this.openLinePen, this.centerNearSF, args.Rectangle, OpenCustomText,
+                            this.OpenLabelPosition, this.OpenLabelHorizontalMode, offsetForLastDay);
 
-                                if (allowLabelForThisDay && this.ShowOpenLineLabel)
-                                    this.DrawBillet(gr, range.Open, ref leftX, ref rightX, ref openY,
-                                        this.CurrentFont, this.openLineOptions, this.openLinePen, this.centerNearSF, args.Rectangle, OpenCustomText);
-
-                        }
-
-                        if (needDrawExtendLines && this.OpenExtendLineOptions.Enabled)
-                            gr.DrawLine(this.openExtendLinePen, leftExtendX, openY, rightExtendX, openY);
                     }
                 }
 
-                if (this.CloseLineOptions.Enabled || this.CloseExtendLineOptions.Enabled)
+
+                // --- CLOSE ---
+                if (this.CloseLineOptions.Enabled || this.CloseExtendLineOptions.Enabled || (this.ShowCloseLineLabel && IsEdgeMode(this.CloseLabelHorizontalMode)))
                 {
-                    float closeY = (float)currentWindow.CoordinatesConverter.GetChartY(range.Close);
-                    if (closeY > top && closeY < bottom)
+                    float closeYReal = (float)currentWindow.CoordinatesConverter.GetChartY(range.Close);
+                    bool yVisible = closeYReal > top && closeYReal < bottom;
+
+                    if (yVisible && !isMainRangeOutside && this.CloseLineOptions.Enabled)
+                        gr.DrawLine(this.closeLinePen, leftX, closeYReal, rightX, closeYReal);
+
+                    if (yVisible && needDrawExtendLines && this.CloseExtendLineOptions.Enabled)
+                        gr.DrawLine(this.closeExtendLinePen, leftExtendX, closeYReal, rightExtendX, closeYReal);
+
+                    bool edgeMode = IsEdgeMode(this.CloseLabelHorizontalMode);
+                    int maxCloseDays = edgeMode ? Math.Max(0, Math.Min(this.CloseLastLabelsCount, this.DaysCount)) : int.MaxValue;
+                    bool allowCloseLabel = this.ShowCloseLineLabel && (((yVisible && !isMainRangeOutside)) || edgeMode) && i < maxCloseDays;
+
+                    if (allowCloseLabel)
                     {
-                        if (!isMainRangeOuside && this.CloseLineOptions.Enabled)
-                        {
-                            gr.DrawLine(this.closeLinePen, leftX, closeY, rightX, closeY);
-
-                                if (allowLabelForThisDay && this.ShowCloseLineLabel)
-                                    this.DrawBillet(gr, range.Close, ref leftX, ref rightX, ref closeY,
-                                        this.CurrentFont, this.closeLineOptions, this.closeLinePen, this.centerNearSF, args.Rectangle, CloseCustomText);
-
-                        }
-
-                        if (needDrawExtendLines && this.CloseExtendLineOptions.Enabled)
-                            gr.DrawLine(this.closeExtendLinePen, leftExtendX, closeY, rightExtendX, closeY);
+                        float yForLabel = edgeMode ? ClampY(closeYReal, args.Rectangle, this.closeLineOptions.Width + 1) : closeYReal;
+                        int offsetForLastDay = (i == 0) ? this.CloseLabelOffsetPx : 0;
+                        this.DrawBillet(gr, range.Close, ref leftX, ref rightX, ref yForLabel,
+                            this.CurrentFont, this.closeLineOptions, this.closeLinePen, this.centerNearSF, args.Rectangle, CloseCustomText,
+                            this.CloseLabelPosition, this.CloseLabelHorizontalMode, offsetForLastDay);
                     }
                 }
 
-                if (this.MiddleLineOptions.Enabled || this.MiddleExtendLineOptions.Enabled)
+
+                // --- MIDDLE ---
+                if (this.MiddleLineOptions.Enabled || this.MiddleExtendLineOptions.Enabled || (this.ShowMiddleLineLabel && IsEdgeMode(this.MiddleLabelHorizontalMode)))
                 {
-                    float middleY = (float)currentWindow.CoordinatesConverter.GetChartY(range.MiddlePrice);
-                    if (middleY > top && middleY < bottom)
+                    float middleYReal = (float)currentWindow.CoordinatesConverter.GetChartY(range.MiddlePrice);
+                    bool yVisible = middleYReal > top && middleYReal < bottom;
+
+                    if (yVisible && !isMainRangeOutside && this.MiddleLineOptions.Enabled)
+                        gr.DrawLine(this.middleLinePen, leftX, middleYReal, rightX, middleYReal);
+
+                    if (yVisible && needDrawExtendLines && this.MiddleExtendLineOptions.Enabled)
+                        gr.DrawLine(this.middleExtendLinePen, leftExtendX, middleYReal, rightExtendX, middleYReal);
+
+                    bool edgeMode = IsEdgeMode(this.MiddleLabelHorizontalMode);
+                    int maxMiddleDays = edgeMode ? Math.Max(0, Math.Min(this.MiddleLastLabelsCount, this.DaysCount)) : int.MaxValue;
+                    bool allowMiddleLabel = this.ShowMiddleLineLabel && (((yVisible && !isMainRangeOutside)) || edgeMode) && i < maxMiddleDays;
+
+                    if (allowMiddleLabel)
                     {
-                        if (!isMainRangeOuside && this.MiddleLineOptions.Enabled)
-                        {
-                            gr.DrawLine(this.middleLinePen, leftX, middleY, rightX, middleY);
-
-                                if (allowLabelForThisDay && this.ShowMiddleLineLabel)
-                                    this.DrawBillet(gr, range.MiddlePrice, ref leftX, ref rightX, ref middleY,
-                                        this.CurrentFont, this.middleLineOptions, this.middleLinePen, this.centerNearSF, args.Rectangle, MiddleCustomText);
-
-                        }
-
-                        if (needDrawExtendLines && this.MiddleExtendLineOptions.Enabled)
-                            gr.DrawLine(this.middleExtendLinePen, leftExtendX, middleY, rightExtendX, middleY);
+                        float yForLabel = edgeMode ? ClampY(middleYReal, args.Rectangle, this.middleLineOptions.Width + 1) : middleYReal;
+                        int offsetForLastDay = (i == 0) ? this.MiddleLabelOffsetPx : 0;
+                        this.DrawBillet(gr, range.MiddlePrice, ref leftX, ref rightX, ref yForLabel,
+                            this.CurrentFont, this.middleLineOptions, this.middleLinePen, this.centerNearSF, args.Rectangle, MiddleCustomText,
+                            this.MiddleLabelPosition, this.MiddleLabelHorizontalMode, offsetForLastDay);
                     }
                 }
+
             }
         }
         catch (Exception ex)
@@ -971,11 +1234,13 @@ public class IndicatorDailyOHLC : Indicator
             gr.SetClip(restoredClip);
         }
     }
+
     protected override bool OnTryGetMinMax(int fromOffset, int toOffset, out double min, out double max)
     {
         min = Const.DOUBLE_UNDEFINED;
         max = Const.DOUBLE_UNDEFINED;
-
+        if(fromOffset >= this.HistoricalData.Count)
+            fromOffset = this.HistoricalData.Count - 1;
         var fromTime = this.HistoricalData[toOffset].TicksLeft;
         var toTime = this.HistoricalData[fromOffset].TicksLeft;
 
@@ -1030,8 +1295,9 @@ public class IndicatorDailyOHLC : Indicator
     }
 
     private void DrawBillet(Graphics gr, double price, ref float leftX, ref float rightX, ref float priceY,
-                         Font font, LineOptions lineOptions, Pen pen, StringFormat stringFormat,
-                         Rectangle chartRect, string prefix)
+                             Font font, LineOptions lineOptions, Pen pen, StringFormat stringFormat,
+                             Rectangle chartRect, string prefix,
+                             int labelPosition, int horizontalMode, int offsetPx = 0)
     {
         string label = "";
         if (ShowLabel)
@@ -1044,68 +1310,60 @@ public class IndicatorDailyOHLC : Indicator
         var rect = new RectangleF()
         {
             Height = labelSize.Height,
-            Width  = labelSize.Width + 5
-            // Y выставим ниже
+            Width = labelSize.Width + 5
         };
 
-        // === Вертикальное позиционирование:
-        // 0 — ниже линии; 1 — выше линии; 2 — по центру линии (добавлено ранее)
-        if (this.labelPosition == 1)            // Above
+        if (labelPosition == 1)            // Above
             rect.Y = priceY - labelSize.Height - lineOptions.Width;
-        else if (this.labelPosition == 2)       // Center on the line
+        else if (labelPosition == 2)       // Center on the line
             rect.Y = priceY - labelSize.Height / 2f;
-        else                                    // Below (0)
+        else                               // Below (0)
             rect.Y = priceY - lineOptions.Width + 1;
 
-        // === Горизонтальное позиционирование (5 вариантов):
-        switch (this.LabelHorizontalMode)
+        switch (horizontalMode)
         {
-            case 2:
-                rect.X = (rightX - leftX) / 2f + leftX - rect.Width / 2f;
+            case 2: // Centered
+                rect.X = (rightX - leftX) / 2f + leftX - rect.Width / 2f + offsetPx;
                 break;
 
-            case 1:
-                rect.X = leftX;
+            case 1: // Left
+                rect.X = leftX + offsetPx;
                 break;
 
-            case 0:
-                rect.X = rightX - rect.Width;
+            case 0: // Right
+                rect.X = rightX - rect.Width + offsetPx;
                 break;
 
-            case 3:
-                // Приклеиваемся к правому краю видимой области окна графика
-                rect.X = chartRect.Right - rect.Width;
+            case 3: // Right Edge
+                rect.X = chartRect.Right - rect.Width + offsetPx;
                 break;
 
-            case 4:
-                // Рисуем в области правой ценовой шкалы: выходим из клипа графика,
-                // ставим X чуть правее правой границы области чарта и возвращаем клип назад.
+            case 4: // Price Scale
                 {
-                    var savedClip = gr.Clip; // Region
+                    var savedClip = gr.Clip;
                     try
                     {
-                        gr.ResetClip(); // разрешаем рисовать вне области args.Rectangle
-                        rect.X = chartRect.Right + 4; // сместились внутрь области шкалы (обычно сразу справа от графика)
+                        gr.ResetClip();
+                        rect.X = chartRect.Right - 13 + offsetPx;
                         gr.FillRectangle(pen.Brush, rect);
                         gr.DrawString(label, font, Brushes.White, rect, stringFormat);
-                        return; // уже всё нарисовали
+                        return;
                     }
                     finally
                     {
-                        // вернуть предыдущий клип
                         gr.SetClip(savedClip, System.Drawing.Drawing2D.CombineMode.Replace);
                     }
                 }
 
             default:
-                rect.X = rightX - rect.Width; // безопасный дефолт — как Right
+                rect.X = rightX - rect.Width + offsetPx; // дефолт
                 break;
         }
+
 
         gr.FillRectangle(pen.Brush, rect);
         gr.DrawString(label, font, Brushes.White, rect, stringFormat);
     }
-
 
     private Session CreateDefaultSession()
     {
@@ -1119,8 +1377,20 @@ public class IndicatorDailyOHLC : Indicator
             Core.Instance.TimeUtils.ConvertFromTimeZoneToUTC(startTime, timeZone).TimeOfDay,
             Core.Instance.TimeUtils.ConvertFromTimeZoneToUTC(endTime, timeZone).TimeOfDay);
     }
+
     private IList<ISession> GetAvailableCustomChartSessions() => this.chartSessionContainer?.ActiveSessions?.ToList() ?? new List<ISession>();
     private IList<ISession> GetAvailableSymbolSessions() => this.Symbol?.CurrentSessionsInfo?.ActiveSessions?.ToList() ?? new List<ISession>();
+
+    private static bool IsEdgeMode(int horizontalMode) => horizontalMode == 3 || horizontalMode == 4;
+    private static float ClampY(float y, Rectangle rect, int padPx)
+    {
+        float minY = rect.Top + padPx;
+        float maxY = rect.Bottom - padPx;
+        if (y < minY) return minY;
+        if (y > maxY) return maxY;
+        return y;
+    }
+
 
     private static Pen ProcessPen(Pen pen, LineOptions lineOptions)
     {
@@ -1171,80 +1441,80 @@ public class IndicatorDailyOHLC : Indicator
     }
 }
 
-#region Nested
+    #region Nested
 
-internal class DailyRangeItem
-{
-    public double High { get; private set; }
-    public double Low { get; private set; }
-    public double Open { get; private set; }
-    public double Close { get; private set; }
-    public double MiddlePrice => (this.High + this.Low) / 2;
-
-    public DateTime StartDateTime { get; internal set; }
-    public DateTime EndDateTime { get; internal set; }
-    public DateTime ExtendStartDateTime { get; internal set; }
-    public DateTime ExtendEndDateTime { get; internal set; }
-
-    public DailyRangeItem(DateTime startDateTime, double openPrice)
+    internal class DailyRangeItem
     {
-        this.StartDateTime = startDateTime;
-        this.Open = openPrice;
+        public double High { get; private set; }
+        public double Low { get; private set; }
+        public double Open { get; private set; }
+        public double Close { get; private set; }
+        public double MiddlePrice => (this.High + this.Low) / 2;
 
-        this.High = double.MinValue;
-        this.Low = double.MaxValue;
+        public DateTime StartDateTime { get; internal set; }
+        public DateTime EndDateTime { get; internal set; }
+        public DateTime ExtendStartDateTime { get; internal set; }
+        public DateTime ExtendEndDateTime { get; internal set; }
+
+        public DailyRangeItem(DateTime startDateTime, double openPrice)
+        {
+            this.StartDateTime = startDateTime;
+            this.Open = openPrice;
+
+            this.High = double.MinValue;
+            this.Low = double.MaxValue;
+        }
+
+        public bool TryUpdate(double high, double low, double close)
+        {
+            bool updated = false;
+
+            if (this.High < high)
+            {
+                this.High = high;
+                updated = true;
+            }
+
+            if (this.Low > low)
+            {
+                this.Low = low;
+                updated = true;
+            }
+
+            if (this.Close != close)
+            {
+                this.Close = close;
+                updated = true;
+            }
+
+            return updated;
+        }
+        public bool TryUpdate(double close)
+        {
+            bool updated = false;
+
+            if (this.High < close)
+            {
+                this.High = close;
+                updated = true;
+            }
+
+            if (this.Low > close)
+            {
+                this.Low = close;
+                updated = true;
+            }
+
+            if (this.Close != close)
+            {
+                this.Close = close;
+                updated = true;
+            }
+            return updated;
+        }
     }
 
-    public bool TryUpdate(double high, double low, double close)
-    {
-        bool updated = false;
+    public enum DailyOHLCSessionType { AllDay, SpecifiedSession, CustomRange, }
+    public enum DailyOHLCLabelPosition { Left, Center, Right }
 
-        if (this.High < high)
-        {
-            this.High = high;
-            updated = true;
-        }
-
-        if (this.Low > low)
-        {
-            this.Low = low;
-            updated = true;
-        }
-
-        if (this.Close != close)
-        {
-            this.Close = close;
-            updated = true;
-        }
-
-        return updated;
-    }
-    public bool TryUpdate(double close)
-    {
-        bool updated = false;
-
-        if (this.High < close)
-        {
-            this.High = close;
-            updated = true;
-        }
-
-        if (this.Low > close)
-        {
-            this.Low = close;
-            updated = true;
-        }
-
-        if (this.Close != close)
-        {
-            this.Close = close;
-            updated = true;
-        }
-        return updated;
-    }
-}
-
-public enum DailyOHLCSessionType { AllDay, SpecifiedSession, CustomRange, }
-public enum DailyOHLCLabelPosition { Left, Center, Right }
-
-#endregion Nested
+    #endregion Nested

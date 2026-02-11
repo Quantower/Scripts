@@ -19,13 +19,17 @@ public class IndicatorHistoricalMinMaxChange : Indicator, IWatchlistIndicator
     #endregion Consts
 
     #region Parameters
-
     [InputParameter(HISTORICAL_DEPTH_SI_NAME, 10, variants: new object[]
     {
-        "All available", HistoricalMinMaxDepthType.AllAvailableHistory,
-        "From date", HistoricalMinMaxDepthType.FromDate,
+    "All available", HistoricalMinMaxDepthType.AllAvailableHistory,
+    "From date",      HistoricalMinMaxDepthType.FromDate,
+    "Last periods",   HistoricalMinMaxDepthType.LastNPeriods,
     })]
     public HistoricalMinMaxDepthType DepthType { get; set; }
+    [InputParameter("Last periods count", 30, 1, 1_000_000, 1, 0)]
+    public int LastPeriodsCount { get; set; } = 10;
+
+
 
     [InputParameter(FROM_DATE_SI_NAME, 20)]
     public DateTime FromDateTime { get; set; }
@@ -79,12 +83,12 @@ public class IndicatorHistoricalMinMaxChange : Indicator, IWatchlistIndicator
         if (!this.IsLoadedSuccesfully)
             return;
 
-        var close = this.Close();
+            var close = this.Close();
 
-        this.CheckHighPrice(close);
-        this.CheckLowPrice(close);
-        this.CalculateMinMaxIndicator(close, 0);
-    }
+            this.CheckHighPrice(close);
+            this.CheckLowPrice(close);
+            this.CalculateMinMaxIndicator(close, 0);
+        }
     public override IList<SettingItem> Settings
     {
         get
@@ -93,15 +97,25 @@ public class IndicatorHistoricalMinMaxChange : Indicator, IWatchlistIndicator
 
             if (settings.GetItemByName(FROM_DATE_SI_NAME) is SettingItemDateTime fromDateSi)
             {
-                fromDateSi.Relation = new SettingItemRelationVisibility(HISTORICAL_DEPTH_SI_NAME, new SelectItem("", (int)HistoricalMinMaxDepthType.FromDate));
+                fromDateSi.Relation = new SettingItemRelationVisibility(
+                    HISTORICAL_DEPTH_SI_NAME,
+                    new SelectItem("", (int)HistoricalMinMaxDepthType.FromDate));
                 fromDateSi.ValueChangingBehavior = SettingItemValueChangingBehavior.WithConfirmation;
                 fromDateSi.Format = DatePickerFormat.Date;
+            }
+
+            if (settings.GetItemByName("Last periods count") is SettingItem lastCountSi)
+            {
+                lastCountSi.Relation = new SettingItemRelationVisibility(
+                    HISTORICAL_DEPTH_SI_NAME,
+                    new SelectItem("", (int)HistoricalMinMaxDepthType.LastNPeriods));
             }
 
             return settings;
         }
         set => base.Settings = value;
     }
+
     public override void OnPaintChart(PaintChartEventArgs args)
     {
         if (this.IsLoadedSuccesfully)
@@ -201,6 +215,25 @@ public class IndicatorHistoricalMinMaxChange : Indicator, IWatchlistIndicator
 
                             break;
                         }
+                    case HistoricalMinMaxDepthType.LastNPeriods when this.HistoricalData.Aggregation is HistoryAggregationTime haTime:
+                        {
+                            var from = to.Add(-1*(this.LastPeriodsCount+1)*haTime.Period.Duration);
+                            var hd = this.Symbol.GetHistory(Period.YEAR1, this.Symbol.HistoryType, from, to);
+                            if (token.IsCancellationRequested)
+                                break;
+
+                            if (hd == null || hd.Count == 0)
+                                break;
+
+                            for (int i = 0; i < hd.Count; i++)
+                            {
+                                var item = hd[i];
+
+                                this.CheckHighPrice(item[PriceType.High]);
+                                this.CheckLowPrice(item[PriceType.Low]);
+                            }
+                            break;
+                        }
                 }
 
                 //
@@ -210,6 +243,7 @@ public class IndicatorHistoricalMinMaxChange : Indicator, IWatchlistIndicator
                 //
                 if (!token.IsCancellationRequested)
                 {
+
                     for (int offset = 0; offset < this.HistoricalData.Count; offset++)
                     {
                         var close = this.HistoricalData[offset][PriceType.Close];
@@ -263,5 +297,6 @@ public class IndicatorHistoricalMinMaxChange : Indicator, IWatchlistIndicator
     {
         AllAvailableHistory,
         FromDate,
+        LastNPeriods 
     }
 }

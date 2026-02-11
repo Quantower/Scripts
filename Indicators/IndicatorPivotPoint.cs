@@ -49,6 +49,14 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
     private const int MID_S4_S5 = 23;
     private const int MID_S5_S6 = 24;
 
+    public bool ShowLabels = true;
+    private readonly Font labelFont = new Font("Verdana", 10, GraphicsUnit.Pixel);
+    private readonly StringFormat labelSF = new StringFormat { Alignment = StringAlignment.Near, LineAlignment = StringAlignment.Center };
+    private const int LabelPadX = 6;
+    private const int LabelPadY = 2;
+    public bool ShowPriceInLabels = true;
+    public bool DrawLastPeriodOnly = true; 
+
     public bool OnlyCurrentPeriod = false;
     public string CustomSessionName = string.Empty;
     public DateTime CustomRangeStartTime
@@ -80,7 +88,6 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
     public BasePeriod BasePeriod = BasePeriod.Day;
     public int PeriodValue = 1;
     public CalculationMethod IndicatorCalculationMethod = CalculationMethod.Classic;
-    public bool ShowMidPivots = true;
     public DailySessionType DailySessionType = DailySessionType.AllDay;
     private readonly Color MidColor = Color.FromArgb(128, 128, 128, 128);
     private Task loadingTask;
@@ -108,7 +115,8 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
             }
         }
     }
-    private PivotPointCalculationResponce lastPivotPeriod;
+    private List<PivotPointCalculationResponce> pivotPeriods;
+
     //private readonly StringFormat centerCenterSF;
     //private readonly Brush messageBrush;
     //private readonly Font font;
@@ -177,6 +185,7 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
     {
         base.OnInit();
         this.AbortPreviousTask();
+        this.pivotPeriods = new List<PivotPointCalculationResponce>();
         var token = this.cancellationSource.Token;
 
         if (this.Symbol == null)
@@ -296,17 +305,15 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
     {
         base.OnUpdate(args);
 
-
         if (args.Reason == UpdateReason.NewBar && this.State == IndicatorState.Calculation)
-            this.DrawIndicatorLines(this.lastPivotPeriod, 0, 0);
+            this.DrawIndicatorLines(this.pivotPeriods[this.pivotPeriods.Count-1], 0, 0);
     }
     protected override void OnClear()
     {
         base.OnClear();
 
         this.AbortPreviousTask();
-
-        this.lastPivotPeriod = null;
+        this.pivotPeriods?.Clear();
     }
     public override IList<SettingItem> Settings
     {
@@ -390,6 +397,7 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
             {
                 SeparatorGroup = defaultSeparator,
                 Text = loc._(RANGE_INPUT_PARAMETER),
+                Minimum = 1,
                 ValueChangingBehavior = SettingItemValueChangingBehavior.WithConfirmation
             });
 
@@ -403,12 +411,20 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
                 Text = loc._(CALCULATION_METHOD_INPUT_PARAMETER),
                 SortIndex = 20
             });
-
-            // Show mid pivot points
-            settings.Add(new SettingItemBoolean("Show mid pivot points", this.ShowMidPivots, 90)
+            settings.Add(new SettingItemBoolean("Display labels", this.ShowLabels, 94)
             {
                 SeparatorGroup = defaultSeparator,
-                Text = loc._("Show mid pivot points")
+                Text = "Display labels"
+            });
+            settings.Add(new SettingItemBoolean("Display price", this.ShowPriceInLabels, 95)
+            {
+                SeparatorGroup = defaultSeparator,
+                Text = "Display price"
+            });
+            settings.Add(new SettingItemBoolean("Draw last period only", this.DrawLastPeriodOnly, 96)
+            {
+                SeparatorGroup = defaultSeparator,
+                Text = "Draw last period only"
             });
 
             return settings;
@@ -466,16 +482,20 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
                 this.CustomSessionName = customSessionName;
             if (holder.TryGetValue("Start time", out item) && item.Value is DateTime dtStartTime)
             {
-                this.customRangeStartTime = dtStartTime;
+                this.CustomRangeStartTime = dtStartTime;
                 needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
             }
             if (holder.TryGetValue("End time", out item) && item.Value is DateTime dtEndTime)
             {
-                this.customRangeEndTime = dtEndTime;
+                this.CustomRangeEndTime = dtEndTime;
                 needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
             }
-            if (holder.TryGetValue("Show mid pivot points", out item) && item.Value is bool showMid)
-                this.ShowMidPivots = showMid;
+            if (holder.TryGetValue("Display price", out item) && item.Value is bool showPrice)
+                this.ShowPriceInLabels = showPrice;
+            if (holder.TryGetValue("Display labels", out item) && item.Value is bool showLabels)
+                this.ShowLabels = showLabels;
+            if (holder.TryGetValue("Draw last period only", out item) && item.Value is bool drawLastOnly)
+                this.DrawLastPeriodOnly = drawLastOnly;
 
             if (needRefresh)
                 this.Refresh();
@@ -488,13 +508,131 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
     {
         base.OnPaintChart(args);
 
+        if (!this.ShowLabels || this.CurrentChart == null || this.pivotPeriods == null || this.pivotPeriods.Count == 0)
+            return;
+
+        var wnd = this.CurrentChart.Windows?[args.WindowIndex];
+        if (wnd == null)
+            return;
+
+        var g = args.Graphics;
+        var savedClip = g.Clip;
+
+        try
+        {
+            g.SetClip(args.Rectangle);
+
+            var conv = wnd.CoordinatesConverter;
+
+            IEnumerable<PivotPointCalculationResponce> periodsToDraw =
+                this.DrawLastPeriodOnly
+                    ? new[] { this.pivotPeriods[this.pivotPeriods.Count-1] }
+                    : (this.pivotPeriods ?? Enumerable.Empty<PivotPointCalculationResponce>());
+
+            foreach (var p in periodsToDraw)
+            {
+                DateTime anchorTime = DateTime.MinValue;
+
+                int fromIndex = (int)this.HistoricalData.GetIndexByTime(p.From.Ticks);
+                int toIndex = (int)this.HistoricalData.GetIndexByTime(p.To.Ticks);
+
+                if (fromIndex == -1) fromIndex = this.Count - 1;
+                if (toIndex   == -1) toIndex   = 0;
+
+                for (int y = fromIndex; y >= toIndex; y--)
+                {
+                    var t = this.HistoricalData[y].TimeLeft;
+                    if (t < p.From || t > p.To)
+                        continue;
+
+                    if (!this.currentSession.ContainsDate(t))
+                        continue;
+
+                    if (t > anchorTime)
+                        anchorTime = t;
+                }
+
+                if (anchorTime == DateTime.MinValue)
+                    continue;
+
+                float endX = (float)conv.GetChartX(anchorTime);
+
+                void Draw(string name, double value, Color color)
+                {
+                    if (double.IsNaN(value) || value == 0.0)
+                        return;
+
+                    float y = (float)conv.GetChartY(value);
+                    string label = this.ShowPriceInLabels ? $"{name} {this.Symbol.FormatPrice(value)}" : name;
+                    this.DrawLevelLabel(g, args.Rectangle, y, label, color, endX);
+                }
+
+                bool hasR2 = !double.IsNaN(p.R2) && p.R2 != 0.0;
+                bool hasR3 = !double.IsNaN(p.R3) && p.R3 != 0.0;
+                bool hasR4 = !double.IsNaN(p.R4) && p.R4 != 0.0;
+                bool hasR5 = !double.IsNaN(p.R5) && p.R5 != 0.0;
+                bool hasR6 = !double.IsNaN(p.R6) && p.R6 != 0.0;
+
+                bool hasS2 = !double.IsNaN(p.S2) && p.S2 != 0.0;
+                bool hasS3 = !double.IsNaN(p.S3) && p.S3 != 0.0;
+                bool hasS4 = !double.IsNaN(p.S4) && p.S4 != 0.0;
+                bool hasS5 = !double.IsNaN(p.S5) && p.S5 != 0.0;
+                bool hasS6 = !double.IsNaN(p.S6) && p.S6 != 0.0;
+
+               
+                Draw("PP", p.PP, Color.Gray);
+                Draw("R1", p.R1, Color.Red);
+                Draw("S1", p.S1, Color.DodgerBlue);
+
+                if (p.Method != CalculationMethod.DeMark)
+                {
+                    if (hasR2) Draw("R2", p.R2, Color.Red);
+                    if (hasR3) Draw("R3", p.R3, Color.Red);
+                    if (hasS2) Draw("S2", p.S2, Color.DodgerBlue);
+                    if (hasS3) Draw("S3", p.S3, Color.DodgerBlue);
+                }
+
+                if (p.Method == CalculationMethod.Camarilla)
+                {
+                    if (hasR4) Draw("R4", p.R4, Color.Red);
+                    if (hasR5) Draw("R5", p.R5, Color.Red);
+                    if (hasR6) Draw("R6", p.R6, Color.Red);
+
+                    if (hasS4) Draw("S4", p.S4, Color.DodgerBlue);
+                    if (hasS5) Draw("S5", p.S5, Color.DodgerBlue);
+                    if (hasS6) Draw("S6", p.S6, Color.DodgerBlue);
+                }
+
+                    if (!double.IsNaN(p.R1) && p.R1 != 0.0) Draw("PP–R1", Mid(p.PP, p.R1), this.MidColor);
+                    if (hasR2) Draw("R1–R2", Mid(p.R1, p.R2), this.MidColor);
+                    if (hasR3) Draw("R2–R3", Mid(p.R2, p.R3), this.MidColor);
+                    if (hasR4) Draw("R3–R4", Mid(p.R3, p.R4), this.MidColor);
+                    if (hasR5) Draw("R4–R5", Mid(p.R4, p.R5), this.MidColor);
+                    if (hasR6) Draw("R5–R6", Mid(p.R5, p.R6), this.MidColor);
+
+                    if (!double.IsNaN(p.S1) && p.S1 != 0.0) Draw("PP–S1", Mid(p.PP, p.S1), this.MidColor);
+                    if (hasS2) Draw("S1–S2", Mid(p.S1, p.S2), this.MidColor);
+                    if (hasS3) Draw("S2–S3", Mid(p.S2, p.S3), this.MidColor);
+                    if (hasS4) Draw("S3–S4", Mid(p.S3, p.S4), this.MidColor);
+                    if (hasS5) Draw("S4–S5", Mid(p.S4, p.S5), this.MidColor);
+                    if (hasS6) Draw("S5–S6", Mid(p.S5, p.S6), this.MidColor);
+                
+            }
+        }
+        catch (Exception ex)
+        {
+            Core.Loggers.Log(ex);
+        }
+        finally
+        {
+            g.SetClip(savedClip, System.Drawing.Drawing2D.CombineMode.Replace);
+        }
         //if (this.State == IndicatorState.Ready)
         //    return;
 
         //var gr = Graphics.FromHdc(args.Hdc);
         //gr.TextRenderingHint = System.Drawing.Text.TextRenderingHint.SingleBitPerPixelGridFit;
         //gr.SetClip(args.Rectangle);
-
         //switch (this.State)
         //{
         //    case IndicatorState.Loading:
@@ -528,13 +666,12 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
 
             if (responce != null)
             {
-                if (i == 0)
-                    this.lastPivotPeriod = responce;
-
                 pivotPoints.Add(responce);
             }
         }
-
+        pivotPoints.Reverse();
+        this.pivotPeriods.Clear();
+        this.pivotPeriods.AddRange(pivotPoints);
         this.DrawIndicator(pivotPoints.ToArray());
     }
     private PivotPointCalculationResponce CalculatePivotPoint(HistoricalData hd, int hdOffset)
@@ -550,95 +687,103 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
         var close = currentItem[PriceType.Close];
         var high = currentItem[PriceType.High];
         var low = currentItem[PriceType.Low];
-
         double pp, r1, r2, r3, r4, r5, r6, s1, s2, s3, s4, s5, s6;
         pp = r1 = r2 = r3 = r4 = r5 = r6 = s1 = s2 = s3 = s4 = s5 = s6 = 0;
-
-        switch (this.IndicatorCalculationMethod)
+        if (this.CurrentChart.CurrentSessionContainer == null || this.CurrentChart.CurrentSessionContainer.Contains(currentItem))
         {
-            case CalculationMethod.Classic:
-                {
-                    pp = (high + low + close) / 3;
-
-                    r1 = 2 * pp - low;
-                    r2 = pp + high - low;
-                    r3 = 2 * pp + high - 2 * low;
-
-                    s1 = 2 * pp - high;
-                    s2 = pp + low - high;
-                    s3 = 2 * pp + low - 2 * high;
-                }
-                break;
-            case CalculationMethod.Camarilla:
-                {
-                    pp = (high + low + close) / 3;
-
-                    r1 = close + 0.0916 * (high - low);
-                    r2 = close + 0.183 * (high - low);
-                    r3 = close + 0.275 * (high - low);
-                    r4 = close + 0.55 * (high - low);
-                    r5 = r4 + 1.168 * (r4 - r3);
-                    r6 = (high / low) * close;
-
-                    s1 = close - 0.0916 * (high - low);
-                    s2 = close - 0.183 * (high - low);
-                    s3 = close - 0.275 * (high - low);
-                    s4 = close - 0.55 * (high - low);
-                    s5 = s4 - 1.168 * (s3 - s4);
-                    s6 = close - (r6 - close);
-                }
-                break;
-            case CalculationMethod.Fibonacci:
-                {
-                    pp = (high + low + close) / 3;
-
-                    r1 = pp + 0.382 * (high - low);
-                    r2 = pp + 0.618 * (high - low);
-                    r3 = pp + (high - low);
-
-                    s1 = pp - 0.382 * (high - low);
-                    s2 = pp - 0.618 * (high - low);
-                    s3 = pp - (high - low);
-                }
-                break;
-            case CalculationMethod.Woodie:
-                {
-                    pp = (high + low + 2 * close) / 4;
-
-                    r1 = 2 * pp - low;
-                    r2 = pp + high - low;
-                    r3 = high + 2 * (pp - low);
-
-                    s1 = 2 * pp - high;
-                    s2 = pp + low - high;
-                    s3 = low - 2 * (high - pp);
-                }
-                break;
-            case CalculationMethod.DeMark:
-                {
-                    var x = 0D;
-                    if (hd.Count > hdOffset + 2)
+            switch (this.IndicatorCalculationMethod)
+            {
+                case CalculationMethod.Classic:
                     {
-                        var open0 = hd[hdOffset + 2][PriceType.Open];
+                        pp = (high + low + close) / 3;
+                        var range = high - low;
+                        r1 = 2 * pp - low;
+                        r2 = pp + range;
+                        r3 = r2+range;
+                        r4 = r3+range;
 
-                        if (close < open0)
-                            x = high + 2 * low + close;
-                        else if (close > open0)
-                            x = 2 * high + low + close;
-                        else
-                            x = high + low + 2 * close;
+                        s1 = 2 * pp - high;
+                        s2 = pp - range;
+                        s3 = s2 - range;
+                        s4 = s3 - range;
                     }
+                    break;
+                case CalculationMethod.Camarilla:
+                    {
+                        pp = (high + low + close) / 3;
 
-                    pp = x / 4;
-                    r1 = x / 2 - low;
-                    s1 = x / 2 - high;
+                        r1 = close + 0.0916 * (high - low);
+                        r2 = close + 0.183 * (high - low);
+                        r3 = close + 0.275 * (high - low);
+                        r4 = close + 0.55 * (high - low);
+                        r5 = r4 + 1.168 * (r4 - r3);
+                        r6 = (high / low) * close;
 
-                }
-                break;
+                        s1 = close - 0.0916 * (high - low);
+                        s2 = close - 0.183 * (high - low);
+                        s3 = close - 0.275 * (high - low);
+                        s4 = close - 0.55 * (high - low);
+                        s5 = s4 - 1.168 * (s3 - s4);
+                        s6 = close - (r6 - close);
+                    }
+                    break;
+                case CalculationMethod.Fibonacci:
+                    {
+                        pp = (high + low + close) / 3;
+
+                        r1 = pp + 0.382 * (high - low);
+                        r2 = pp + 0.618 * (high - low);
+                        r3 = pp + (high - low);
+
+                        s1 = pp - 0.382 * (high - low);
+                        s2 = pp - 0.618 * (high - low);
+                        s3 = pp - (high - low);
+                    }
+                    break;
+                case CalculationMethod.Woodie:
+                    {
+                        pp = (high + low + 2 * close) / 4;
+
+                        r1 = 2 * pp - low;
+                        r2 = pp + high - low;
+                        r3 = high + 2 * (pp - low);
+
+                        s1 = 2 * pp - high;
+                        s2 = pp + low - high;
+                        s3 = low - 2 * (high - pp);
+                    }
+                    break;
+                case CalculationMethod.DeMark:
+                    {
+                        var x = 0D;
+                        if (hd.Count > hdOffset + 2)
+                        {
+                            var open0 = hd[hdOffset + 2][PriceType.Open];
+
+                            if (close < open0)
+                                x = high + 2 * low + close;
+                            else if (close > open0)
+                                x = 2 * high + low + close;
+                            else
+                                x = high + low + 2 * close;
+                        }
+
+                        pp = x / 4;
+                        r1 = x / 2 - low;
+                        s1 = x / 2 - high;
+
+                    }
+                    break;
+            }
         }
+        else
+            r1 += 0;
+        var timeZone = this.CurrentChart?.CurrentTimeZone ?? Core.Instance.TimeUtils.SelectedTimeZone;
+        var historyItem = (HistoryItemBar)hd[hdOffset, SeekOriginHistory.End];
+        DateTime startTime = Core.Instance.TimeUtils.ConvertFromTimeZoneToUTC(new DateTime(historyItem.TicksLeft, DateTimeKind.Unspecified), timeZone);
+        DateTime endTime = Core.Instance.TimeUtils.ConvertFromTimeZoneToUTC(new DateTime(historyItem.TicksRight, DateTimeKind.Unspecified), timeZone);
 
-        var historyItem = hd[hdOffset, SeekOriginHistory.End];
-        return new PivotPointCalculationResponce(historyItem.TimeLeft, new DateTime(historyItem.TicksRight, DateTimeKind.Utc))
+        return new PivotPointCalculationResponce(startTime, endTime)
         {
             PP = pp,
             R1 = r1,
@@ -659,11 +804,22 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
     }
     private void CalculateLastPeriod()
     {
-        this.lastPivotPeriod = this.CalculatePivotPoint(this.history, 0);
+        var last = this.CalculatePivotPoint(this.history, 0);
+        if (last == null)
+            return;
 
-        if (this.lastPivotPeriod != null)
-            this.DrawIndicator(this.lastPivotPeriod);
+        if (this.pivotPeriods == null)
+            this.pivotPeriods = new List<PivotPointCalculationResponce>();
+
+        int idx = this.pivotPeriods.FindIndex(pp => pp.From == last.From && pp.To == last.To);
+        if (idx >= 0)
+            this.pivotPeriods[idx] = last; 
+        else
+            this.pivotPeriods.Insert(0, last);
+
+        this.DrawIndicator(this.pivotPeriods[0]);
     }
+
     #endregion Calculation 
 
     #region Drawing
@@ -677,8 +833,9 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
         for (int i = 0; i < pivotPointValues.Count(); i++)
         {
             var ppItem = pivotPointValues[i];
+
             var fromIndex = (int)this.HistoricalData.GetIndexByTime(ppItem.From.Ticks);
-            var toIndex = (int)this.HistoricalData.GetIndexByTime(ppItem.To.Ticks);
+            var toIndex = (int)this.HistoricalData.GetIndexByTime(ppItem.To.ToLocalTime().Ticks);
 
             if (fromIndex == -1)
                 fromIndex = this.Count - 1;
@@ -701,7 +858,7 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
         for (int y = fromIndex; y >= toIndex; y--)
         {
             var currentBarTime = this.HistoricalData[y].TimeLeft;
-            var inSession = this.currentSession.ContainsDate(currentBarTime);
+            var inSession = this.CurrentChart.CurrentSessionContainer.ContainsDate(currentBarTime);
             if (!inSession)
                 continue;
             this.SetValue(pp, PP_LINE_INDEX, y);
@@ -726,48 +883,66 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
                 this.SetValue(s5, S5_LINE_INDEX, y);
                 this.SetValue(s6, S6_LINE_INDEX, y);
             }
-            if (this.ShowMidPivots)
-            {
-                bool hasR2 = !double.IsNaN(r2) && r2 != 0.0;
-                bool hasR3 = !double.IsNaN(r3) && r3 != 0.0;
-                bool hasR4 = !double.IsNaN(r4) && r4 != 0.0;
-                bool hasR5 = !double.IsNaN(r5) && r5 != 0.0;
-                bool hasR6 = !double.IsNaN(r6) && r6 != 0.0;
+            bool hasR2 = !double.IsNaN(r2) && r2 != 0.0;
+            bool hasR3 = !double.IsNaN(r3) && r3 != 0.0;
+            bool hasR4 = !double.IsNaN(r4) && r4 != 0.0;
+            bool hasR5 = !double.IsNaN(r5) && r5 != 0.0;
+            bool hasR6 = !double.IsNaN(r6) && r6 != 0.0;
 
-                bool hasS2 = !double.IsNaN(s2) && s2 != 0.0;
-                bool hasS3 = !double.IsNaN(s3) && s3 != 0.0;
-                bool hasS4 = !double.IsNaN(s4) && s4 != 0.0;
-                bool hasS5 = !double.IsNaN(s5) && s5 != 0.0;
-                bool hasS6 = !double.IsNaN(s6) && s6 != 0.0;
+            bool hasS2 = !double.IsNaN(s2) && s2 != 0.0;
+            bool hasS3 = !double.IsNaN(s3) && s3 != 0.0;
+            bool hasS4 = !double.IsNaN(s4) && s4 != 0.0;
+            bool hasS5 = !double.IsNaN(s5) && s5 != 0.0;
+            bool hasS6 = !double.IsNaN(s6) && s6 != 0.0;
 
-                if (!double.IsNaN(r1) && r1 != 0.0)
-                    this.SetValue(Mid(pp, r1), MID_PP_R1, y);
-                if (hasR2)
-                    this.SetValue(Mid(r1, r2), MID_R1_R2, y);
-                if (hasR3)
-                    this.SetValue(Mid(r2, r3), MID_R2_R3, y);
-                if (hasR4)
-                    this.SetValue(Mid(r3, r4), MID_R3_R4, y);
-                if (hasR5)
-                    this.SetValue(Mid(r4, r5), MID_R4_R5, y);
-                if (hasR6)
-                    this.SetValue(Mid(r5, r6), MID_R5_R6, y);
+            if (!double.IsNaN(r1) && r1 != 0.0)
+                this.SetValue(Mid(pp, r1), MID_PP_R1, y);
+            if (hasR2)
+                this.SetValue(Mid(r1, r2), MID_R1_R2, y);
+            if (hasR3)
+                this.SetValue(Mid(r2, r3), MID_R2_R3, y);
+            if (hasR4)
+                this.SetValue(Mid(r3, r4), MID_R3_R4, y);
+            if (hasR5)
+                this.SetValue(Mid(r4, r5), MID_R4_R5, y);
+            if (hasR6)
+                this.SetValue(Mid(r5, r6), MID_R5_R6, y);
 
-                if (!double.IsNaN(s1) && s1 != 0.0)
-                    this.SetValue(Mid(pp, s1), MID_PP_S1, y);
-                if (hasS2)
-                    this.SetValue(Mid(s1, s2), MID_S1_S2, y);
-                if (hasS3)
-                    this.SetValue(Mid(s2, s3), MID_S2_S3, y);
-                if (hasS4)
-                    this.SetValue(Mid(s3, s4), MID_S3_S4, y);
-                if (hasS5)
-                    this.SetValue(Mid(s4, s5), MID_S4_S5, y);
-                if (hasS6)
-                    this.SetValue(Mid(s5, s6), MID_S5_S6, y);
-            }
+            if (!double.IsNaN(s1) && s1 != 0.0)
+                this.SetValue(Mid(pp, s1), MID_PP_S1, y);
+            if (hasS2)
+                this.SetValue(Mid(s1, s2), MID_S1_S2, y);
+            if (hasS3)
+                this.SetValue(Mid(s2, s3), MID_S2_S3, y);
+            if (hasS4)
+                this.SetValue(Mid(s3, s4), MID_S3_S4, y);
+            if (hasS5)
+                this.SetValue(Mid(s4, s5), MID_S4_S5, y);
+            if (hasS6)
+                this.SetValue(Mid(s5, s6), MID_S5_S6, y);
         }
     }
+
+    private void DrawLevelLabel(Graphics g, Rectangle chartRect, float y, string text, Color backColor, float anchorX)
+    {
+        if (float.IsNaN(y) || y <= chartRect.Top || y >= chartRect.Bottom)
+            return;
+
+        var size = g.MeasureString(text, this.labelFont);
+
+        var rect = new RectangleF(
+            anchorX - (size.Width + LabelPadX * 2f),           // X
+            y - size.Height / 2f - LabelPadY,                  // Y
+            size.Width + LabelPadX * 2f,                       // W
+            size.Height + LabelPadY * 2f                       // H
+        );
+
+        using (var brush = new SolidBrush(backColor))
+            g.FillRectangle(brush, rect);
+
+        g.DrawString(text, this.labelFont, Brushes.White, rect, this.labelSF);
+    }
+
     //private void DrawMessage(Graphics gr, string message, Rectangle rectangle) => gr.DrawString(message, this.font, this.messageBrush, rectangle, this.centerCenterSF);
     #endregion Drawing
 
