@@ -223,39 +223,9 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
         if (this.IsLoading)
             return;
 
-        var currentVolumeData = this.GetVolumeAnalysisData(0);
-
-        //
-        // Try to recalculate prev items
-        //
-        if (currentVolumeData?.Total == null)
-        {
-            var currentIndex = Math.Max(0, this.Count - 1);
-
-            if (this.currentAreaBuider.BarIndex != currentIndex)
-            {
-                for (int i = this.currentAreaBuider.BarIndex; i < this.Count; i++)
-                {
-                    var offset = Math.Max(0, this.Count - i - 1);
-
-                    var prevVolumeDataItem = this.GetVolumeAnalysisData(offset);
-                    if (prevVolumeDataItem == null)
-                        continue;
-
-                    this.CalculateIndicatorByOffset(offset, true, true);
-                }
-            }
-        }
-        //
-        // Try to calculate current item
-        //
-        else
-        {
-            var isNewBar = args.Reason == UpdateReason.NewBar || args.Reason == UpdateReason.HistoricalBar;
-            this.CalculateIndicatorByOffset(0, isNewBar, false);
-        }
-
+        this.CalculateIndicatorByOffset(0, args.Reason == UpdateReason.NewBar || args.Reason == UpdateReason.HistoricalBar);
     }
+
     protected override void OnClear()
     {
         if (this.currentAreaBuider != null)
@@ -467,7 +437,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
 
     #region Misc
 
-    private void CalculateIndicatorByOffset(int offset, bool isNewBar, bool createAfterUpdate = false)
+    private void CalculateIndicatorByOffset(int offset, bool isNewBar)
     {
         if (this.Count <= offset)
             return;
@@ -524,16 +494,14 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
 
         //
         var currentItem = this.GetVolumeAnalysisData(offset);
-        if (currentItem == null || currentItem.Total == null)
-            return;
 
-        //
+        var currentTotalIndex = offset;
+        while (currentItem == null && currentTotalIndex < this.Count)
+            currentItem = this.GetVolumeAnalysisData(++currentTotalIndex);
 
-
-        if (isNewBar && !createAfterUpdate)
-            this.currentAreaBuider.StartNew(index);
-
-        this.currentAreaBuider.Update(currentItem.Total);
+        // update if there is VolumeAnalysisData for the current bar
+        if (currentTotalIndex == offset) 
+            this.currentAreaBuider.Update(currentItem.Total);
 
         this.SetValues(this.currentAreaBuider.Bar.Open, this.currentAreaBuider.Bar.High, this.currentAreaBuider.Bar.Low, this.currentAreaBuider.Bar.Close, offset);
 
@@ -560,7 +528,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
             }
         }
 
-        if (isNewBar && createAfterUpdate)
+        if (isNewBar)
             this.currentAreaBuider.StartNew(++index);
     }
 
@@ -680,8 +648,10 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
                 ? this.Bar.Close
                 : 0d;
 
-            this.Bar.Clear();
             this.Bar.Open = prevClose;
+            this.Bar.Close = prevClose;
+            this.Bar.High = !double.IsNaN(this.Bar.High) ? this.Bar.High : prevClose;
+            this.Bar.Low = !double.IsNaN(this.Bar.Low) ? this.Bar.Low : prevClose;
             this.BarIndex = barIndex;
         }
         internal bool Contains(DateTime dt) => this.Range.Contains(dt);
