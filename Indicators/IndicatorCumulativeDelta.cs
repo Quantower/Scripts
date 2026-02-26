@@ -529,7 +529,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
         }
 
         if (isNewBar)
-            this.currentAreaBuider.StartNew(++index);
+            this.currentAreaBuider.StartNew();
     }
 
     protected override void SetValues(double open, double high, double low, double close, int offset)
@@ -637,12 +637,11 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
             this.Range = range;
 
             this.Bar = new BarBuilder();
-            this.StartNew(0);
         }
 
         internal abstract void Update(VolumeAnalysisItem total);
 
-        internal void StartNew(int barIndex)
+        internal void StartNew()
         {
             var prevClose = !double.IsNaN(this.Bar.Close)
                 ? this.Bar.Close
@@ -650,16 +649,14 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
 
             this.Bar.Open = prevClose;
             this.Bar.Close = prevClose;
-            this.Bar.High = !double.IsNaN(this.Bar.High) ? this.Bar.High : prevClose;
-            this.Bar.Low = !double.IsNaN(this.Bar.Low) ? this.Bar.Low : prevClose;
-            this.BarIndex = barIndex;
+            this.Bar.High = prevClose;
+            this.Bar.Low = prevClose;
         }
         internal bool Contains(DateTime dt) => this.Range.Contains(dt);
         internal void Reset(int barIndex)
         {
             this.Bar.Clear();
             this.Bar.Open = 0;
-            this.BarIndex = barIndex;
         }
 
         public void Dispose()
