@@ -223,7 +223,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
         if (this.IsLoading)
             return;
 
-        this.CalculateIndicatorByOffset(0, args.Reason == UpdateReason.NewBar || args.Reason == UpdateReason.HistoricalBar);
+        this.CalculateIndicatorByOffset(0);
     }
 
     protected override void OnClear()
@@ -437,9 +437,9 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
 
     #region Misc
 
-    private void CalculateIndicatorByOffset(int offset, bool isNewBar)
+    private void CalculateIndicatorByOffset(int offset)
     {
-        if (this.Count <= offset)
+        if (this.Count - 1 <= offset)
             return;
 
         var time = this.Time(offset);
@@ -453,7 +453,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
         {
             if (!this.SessionContainer.ContainsDate(time))
             {
-                this.currentAreaBuider?.Reset(index);
+                this.SetValues(0, double.NaN, double.NaN, double.NaN, offset);
                 return;
             }
         }
@@ -492,30 +492,34 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
             this.currentAreaBuider = this.CreateAreaBuilder(range);
         }
 
-        //
-        var currentItem = this.GetVolumeAnalysisData(offset);
+        var prevDelta = this.CandleHistoricalData[PriceType.Close, offset + 1];
 
-        var currentTotalIndex = offset;
-        while (currentItem == null && currentTotalIndex < this.Count)
-            currentItem = this.GetVolumeAnalysisData(++currentTotalIndex);
+        //reset once a day
+        if (this.HistoricalData[index, SeekOriginHistory.Begin].TimeLeft.Day - this.HistoricalData[index - 1, SeekOriginHistory.Begin].TimeLeft.Day > 0)
+            prevDelta = 0;
 
         // update if there is VolumeAnalysisData for the current bar
-        if (currentTotalIndex == offset) 
-            this.currentAreaBuider.Update(currentItem.Total);
-
-        this.SetValues(this.currentAreaBuider.Bar.Open, this.currentAreaBuider.Bar.High, this.currentAreaBuider.Bar.Low, this.currentAreaBuider.Bar.Close, offset);
-
-        bool isUpColor = this.closeLineСoloringOption switch
+        var currentItem = this.GetVolumeAnalysisData(offset);
+        if (currentItem != null)
         {
-            CloseLineColorOption.Sign => this.LinesSeries[1].GetValue(offset) > 0,
-            CloseLineColorOption.Delta => (this.DeltaSourceType == CumulativeDeltaSourceType.Volume && currentItem.Total.Delta > 0) ||
-                                            (this.DeltaSourceType == CumulativeDeltaSourceType.Trades && (currentItem.Total.BuyTrades - currentItem.Total.SellTrades) > 0),
+            this.currentAreaBuider.Update(currentItem.Total, double.IsNaN(prevDelta) ? 0 : prevDelta);
+            this.SetValues(this.currentAreaBuider.Bar.Open, this.currentAreaBuider.Bar.High, this.currentAreaBuider.Bar.Low, this.currentAreaBuider.Bar.Close, offset);
 
-            _ => true,
-        };
-        this.LinesSeries[1].SetMarker(offset, isUpColor ? this.upLineColor : this.downLineColor);
+            bool isUpColor = this.closeLineСoloringOption switch
+            {
+                CloseLineColorOption.Sign => this.LinesSeries[1].GetValue(offset) > 0,
+                CloseLineColorOption.Delta => (this.DeltaSourceType == CumulativeDeltaSourceType.Volume && currentItem.Total.Delta > 0) ||
+                                                (this.DeltaSourceType == CumulativeDeltaSourceType.Trades && (currentItem.Total.BuyTrades - currentItem.Total.SellTrades) > 0),
 
-        if (this.Count > offset && this.Count > this.MAPeriod)
+                _ => true,
+            };
+            this.LinesSeries[1].SetMarker(offset, isUpColor ? this.upLineColor : this.downLineColor);
+        }
+        else
+            this.SetValues(this.currentAreaBuider.Bar.Open, 0, 0, this.currentAreaBuider.Bar.Open, offset);
+
+
+        if (this.Count > this.MAPeriod)
         {
             switch (this.maLineColorOption)
             {
@@ -527,9 +531,6 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
                     break;
             }
         }
-
-        if (isNewBar)
-            this.currentAreaBuider.StartNew();
     }
 
     protected override void SetValues(double open, double high, double low, double close, int offset)
@@ -630,7 +631,6 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
     {
         internal Interval<DateTime> Range { get; }
         internal BarBuilder Bar { get; private set; }
-        internal int BarIndex { get; private set; }
 
         public AreaBuilder(Interval<DateTime> range)
         {
@@ -639,25 +639,9 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
             this.Bar = new BarBuilder();
         }
 
-        internal abstract void Update(VolumeAnalysisItem total);
+        internal abstract void Update(VolumeAnalysisItem total, double prevDelta);
 
-        internal void StartNew()
-        {
-            var prevClose = !double.IsNaN(this.Bar.Close)
-                ? this.Bar.Close
-                : 0d;
-
-            this.Bar.Open = prevClose;
-            this.Bar.Close = prevClose;
-            this.Bar.High = prevClose;
-            this.Bar.Low = prevClose;
-        }
         internal bool Contains(DateTime dt) => this.Range.Contains(dt);
-        internal void Reset(int barIndex)
-        {
-            this.Bar.Clear();
-            this.Bar.Open = 0;
-        }
 
         public void Dispose()
         {
@@ -670,8 +654,9 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
             : base(range)
         { }
 
-        internal override void Update(VolumeAnalysisItem total)
+        internal override void Update(VolumeAnalysisItem total, double prevDelta)
         {
+            this.Bar.Open = prevDelta;
             this.Bar.Close = this.Bar.Open + total.Delta;
 
             this.Bar.High = !double.IsNaN(total.MaxDelta) && total.MaxDelta != double.MinValue
@@ -689,8 +674,9 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
             : base(range)
         { }
 
-        internal override void Update(VolumeAnalysisItem total)
+        internal override void Update(VolumeAnalysisItem total, double prevDelta)
         {
+            this.Bar.Open = prevDelta;
             this.Bar.Close = this.Bar.Open + (total.BuyTrades - total.SellTrades);
             this.Bar.High = Math.Max(this.Bar.Close, this.Bar.Open);
             this.Bar.Low = Math.Min(this.Bar.Close, this.Bar.Open);
