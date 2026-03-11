@@ -164,7 +164,7 @@ public sealed class IndicatorMovingAverageConvergenceDivergence : Indicator, IWa
         {
             base.Settings = value;
 
-            if (value.GetItemByName("Line_2") is SettingItemGroup lineGroup)
+            if (value.GetItemByName("Line_0") is SettingItemGroup lineGroup)
             {
                 bool needUpdate = false;
                 var colorsHolder = new SettingsHolder(lineGroup.Value as IList<SettingItem>);
