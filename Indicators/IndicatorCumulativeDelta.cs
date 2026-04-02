@@ -24,6 +24,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
     private const string CUSTOM_CLOSE_SESSION_NAME_SI = "Close time";
     private const string RESET_PERIOD_NAME_SI = "ResetPeriod";
     private const string SESSION_TEMPLATE_NAME_SI = "sessionsTemplate";
+    private const string RESET_TIME_NAME_SI = "ResetTime";
 
     private const string RESET_TYPE_NAME_SI = "Reset type";
     private const string BY_PERIOD_SESSION_TYPE = "By period";
@@ -36,6 +37,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
     private const string MA_LINE_COLORS_SI = "MAColorLines";
     private const string MA_LINE_COLOR_BY_SI = "MALineColorBy";
 
+    private const string SHOW_WICKS_SI = "ShowWicks";
     #endregion Consts
 
     #region Parameters
@@ -77,7 +79,6 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
         {
             switch (this.SessionMode)
             {
-                //
                 case CumulativeDeltaSessionMode.SpecifiedSession:
                     {
                         if (this.specifiedSessionContainerId == CHART_SESSION_CONTAINER_SELECT_ITEM)
@@ -85,14 +86,15 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
                         else
                             return this.selectedSessionContainer;
                     }
-                //
+
                 case CumulativeDeltaSessionMode.CustomRange:
                     return this.customSessionContainer;
 
-                //
-                default:
                 case CumulativeDeltaSessionMode.ByPeriod:
+                    return this.byPeriodSessionContainer ?? this.fullDaySessionContainer;
+
                 case CumulativeDeltaSessionMode.FullHistory:
+                default:
                     return this.fullDaySessionContainer;
             }
         }
@@ -101,6 +103,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
     private ISessionsContainer customSessionContainer;
     private ISessionsContainer fullDaySessionContainer;
     private ISessionsContainer selectedSessionContainer;
+    private ISessionsContainer byPeriodSessionContainer;
 
     public DateTime CustomRangeStartTime
     {
@@ -133,6 +136,17 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
     }
     private DateTime customRangeEndTime;
 
+    public DateTime ByPeriodResetTime
+    {
+        get
+        {
+            if (this.byPeriodResetTime == default)
+                this.byPeriodResetTime = new DateTime(DateTime.Today.Ticks, DateTimeKind.Local); // 00:00
+            return this.byPeriodResetTime;
+        }
+        set => this.byPeriodResetTime = value;
+    }
+    private DateTime byPeriodResetTime;
     public Period ResetPeriod { get; private set; }
 
     public override string ShortName
@@ -148,6 +162,8 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
             };
         }
     }
+
+    private bool showWicks = true;
 
     private AreaBuilder currentAreaBuider;
 
@@ -190,28 +206,47 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
 
     protected override void OnInit()
     {
+        var timeZone = this.GetTimeZone();
+
+        this.fullDaySessionContainer = new CustomSessionsContainer("FullDaySession", timeZone, new CustomSession[]
+        {
+        this.CreateCustomSession(TimeSpan.Zero, new TimeSpan(23, 59, 59), timeZone.TimeZoneInfo)
+        });
+
         switch (this.SessionMode)
         {
             case CumulativeDeltaSessionMode.CustomRange:
                 {
-                    this.customSessionContainer = new CustomSessionsContainer("CustomSession", this.GetTimeZone(), new CustomSession[]
+                    this.customSessionContainer = new CustomSessionsContainer("CustomSession", timeZone, new CustomSession[]
                     {
-                        this.CreateCustomSession(this.CustomRangeStartTime.TimeOfDay,this.CustomRangeEndTime.TimeOfDay, this.GetTimeZone().TimeZoneInfo)
+                this.CreateCustomSession(
+                    this.CustomRangeStartTime.TimeOfDay,
+                    this.CustomRangeEndTime.TimeOfDay,
+                    timeZone.TimeZoneInfo)
                     });
                     break;
                 }
-            case CumulativeDeltaSessionMode.FullHistory:
+
             case CumulativeDeltaSessionMode.ByPeriod:
                 {
-                    var timeZone = this.GetTimeZone();
-                    var session = this.GetFullDayTimeInterval(timeZone);
-                    this.fullDaySessionContainer = new CustomSessionsContainer("FullDaySession", timeZone, new CustomSession[]
+                    var resetTime = this.ByPeriodResetTime.TimeOfDay;
+
+                    this.byPeriodSessionContainer = new CustomSessionsContainer("ByPeriodSession", timeZone, new CustomSession[]
                     {
-                        this.CreateCustomSession(session.From.TimeOfDay, session.To.TimeOfDay, this.GetTimeZone().TimeZoneInfo)
+                this.CreateCustomSession(
+                    resetTime,
+                    this.GetByPeriodSessionCloseTime(resetTime),
+                    timeZone.TimeZoneInfo)
                     });
                     break;
                 }
+
+            case CumulativeDeltaSessionMode.FullHistory:
+            case CumulativeDeltaSessionMode.SpecifiedSession:
+            default:
+                break;
         }
+
         base.OnInit();
 
         this.ma = Core.Indicators.BuiltIn.MA(this.MAPeriod, PriceType.Close, this.MaType);
@@ -223,9 +258,39 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
         if (this.IsLoading)
             return;
 
-        this.CalculateIndicatorByOffset(0);
-    }
+        var currentVolumeData = this.GetVolumeAnalysisData(0);
 
+        //
+        // Try to recalculate prev items
+        //
+        if (currentVolumeData?.Total == null)
+        {
+            var currentIndex = Math.Max(0, this.Count - 1);
+
+            if (this.currentAreaBuider!= null && this.currentAreaBuider.BarIndex != currentIndex)
+            {
+                for (int i = this.currentAreaBuider.BarIndex; i < this.Count; i++)
+                {
+                    var offset = Math.Max(0, this.Count - i - 1);
+
+                    var prevVolumeDataItem = this.GetVolumeAnalysisData(offset);
+                    if (prevVolumeDataItem == null)
+                        continue;
+
+                    this.CalculateIndicatorByOffset(offset, true, true);
+                }
+            }
+        }
+        //
+        // Try to calculate current item
+        //
+        else
+        {
+            var isNewBar = args.Reason == UpdateReason.NewBar || args.Reason == UpdateReason.HistoricalBar;
+            this.CalculateIndicatorByOffset(0, isNewBar, false);
+        }
+
+    }
     protected override void OnClear()
     {
         if (this.currentAreaBuider != null)
@@ -296,14 +361,21 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
                 SeparatorGroup = separ,
                 Relation = new SettingItemRelationVisibility(RESET_TYPE_NAME_SI, new SelectItem("", (int)CumulativeDeltaSessionMode.CustomRange))
             });
-
+            settings.Add(new SettingItemDateTime(RESET_TIME_NAME_SI, this.ByPeriodResetTime, 31)
+            {
+                Text = loc._("Reset time"),
+                ValueChangingBehavior = SettingItemValueChangingBehavior.WithConfirmation,
+                Format = DatePickerFormat.Time,
+                SeparatorGroup = separ,
+                Relation = new SettingItemRelationVisibility(RESET_TYPE_NAME_SI, new SelectItem("", (int)CumulativeDeltaSessionMode.ByPeriod))
+            });
             //
             //
             //
             settings.Add(new SettingItemPeriod(RESET_PERIOD_NAME_SI, this.ResetPeriod, 30)
             {
                 Text = loc._("Period"),
-                ExcludedPeriods = new BasePeriod[] { BasePeriod.Tick, BasePeriod.Second, BasePeriod.Minute, BasePeriod.Hour, BasePeriod.Year },
+                ExcludedPeriods = new BasePeriod[] { BasePeriod.Tick, BasePeriod.Second, BasePeriod.Year },
                 SeparatorGroup = separ,
                 Relation = new SettingItemRelationVisibility(RESET_TYPE_NAME_SI, new SelectItem("", (int)CumulativeDeltaSessionMode.ByPeriod))
             });
@@ -326,6 +398,18 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
                 SeparatorGroup = separ,
                 Relation = new SettingItemRelationVisibility(MA_LINE_COLOR_BY_SI, new object[] { lineColorOptions[0], lineColorOptions[1] })
             });
+            var candlesRelationVisibility = new SettingItemRelationVisibility(
+                "VisualStyle",
+                new SelectItem("", (int)CandleDrawIndicatorVisualMode.Candles)
+            );
+
+            settings.Add(new SettingItemBoolean(SHOW_WICKS_SI, this.showWicks, 19)
+            {
+                Text = loc._("Show wick, if available"),
+                SeparatorGroup = separ,
+                Relation = candlesRelationVisibility
+            });
+
 
             return settings;
         }
@@ -365,7 +449,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
 
                 if (this.CustomRangeStartTime != newValue)
                 {
-                    this.CustomRangeStartTime = newValue;
+                    this.CustomRangeStartTime = new DateTime(newValue.Ticks, DateTimeKind.Local);
                     needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
                 }
             }
@@ -376,7 +460,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
 
                 if (this.CustomRangeEndTime != newValue)
                 {
-                    this.CustomRangeEndTime = newValue;
+                    this.CustomRangeEndTime = new DateTime(newValue.Ticks, DateTimeKind.Local);
                     needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
                 }
             }
@@ -395,7 +479,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
 
             if (holder.TryGetValue(MA_LINE_COLOR_BY_SI, out item))
             {
-                var newValue =  (MALineColorOption)((SelectItem)item.Value).Value;
+                var newValue = (MALineColorOption)((SelectItem)item.Value).Value;
 
                 if (this.maLineColorOption != newValue)
                 {
@@ -427,6 +511,26 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
                 }
             }
 
+            if (holder.TryGetValue(SHOW_WICKS_SI, out item))
+            {
+                var newValue = item.GetValue<bool>();
+
+                if (this.showWicks != newValue)
+                {
+                    this.showWicks = newValue;
+                    needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
+                }
+            }
+            if (holder.TryGetValue(RESET_TIME_NAME_SI, out item))
+            {
+                var newValue = item.GetValue<DateTime>();
+
+                if (this.ByPeriodResetTime != newValue)
+                {
+                    this.ByPeriodResetTime = new DateTime(newValue.Ticks, DateTimeKind.Local);
+                    needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
+                }
+            }
             //
             if (needRefresh)
                 this.Refresh();
@@ -437,11 +541,10 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
 
     #region Misc
 
-    private void CalculateIndicatorByOffset(int offset)
+    private void CalculateIndicatorByOffset(int offset, bool isNewBar, bool createAfterUpdate = false)
     {
-        if (this.Count - 1 <= offset)
+        if (this.Count <= offset)
             return;
-
         var time = this.Time(offset);
 
         var index = Math.Max(this.Count - offset - 1, 0);
@@ -453,7 +556,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
         {
             if (!this.SessionContainer.ContainsDate(time))
             {
-                this.SetValues(0, double.NaN, double.NaN, double.NaN, offset);
+                this.currentAreaBuider?.Reset(index);
                 return;
             }
         }
@@ -492,34 +595,32 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
             this.currentAreaBuider = this.CreateAreaBuilder(range);
         }
 
-        var prevDelta = this.CandleHistoricalData[PriceType.Close, offset + 1];
-
-        //reset once a day
-        if (this.HistoricalData[index, SeekOriginHistory.Begin].TimeLeft.Day - this.HistoricalData[index - 1, SeekOriginHistory.Begin].TimeLeft.Day > 0)
-            prevDelta = 0;
-
-        // update if there is VolumeAnalysisData for the current bar
+        //
         var currentItem = this.GetVolumeAnalysisData(offset);
-        if (currentItem != null)
+        if (currentItem == null || currentItem.Total == null)
+            return;
+
+        //
+
+
+        if (isNewBar && !createAfterUpdate)
+            this.currentAreaBuider.StartNew(index);
+
+        this.currentAreaBuider.Update(currentItem.Total);
+
+        this.SetValues(this.currentAreaBuider.Bar.Open, this.currentAreaBuider.Bar.High, this.currentAreaBuider.Bar.Low, this.currentAreaBuider.Bar.Close, offset);
+
+        bool isUpColor = this.closeLineСoloringOption switch
         {
-            this.currentAreaBuider.Update(currentItem.Total, double.IsNaN(prevDelta) ? 0 : prevDelta);
-            this.SetValues(this.currentAreaBuider.Bar.Open, this.currentAreaBuider.Bar.High, this.currentAreaBuider.Bar.Low, this.currentAreaBuider.Bar.Close, offset);
+            CloseLineColorOption.Sign => this.LinesSeries[1].GetValue(offset) > 0,
+            CloseLineColorOption.Delta => (this.DeltaSourceType == CumulativeDeltaSourceType.Volume && currentItem.Total.Delta > 0) ||
+                                            (this.DeltaSourceType == CumulativeDeltaSourceType.Trades && (currentItem.Total.BuyTrades - currentItem.Total.SellTrades) > 0),
 
-            bool isUpColor = this.closeLineСoloringOption switch
-            {
-                CloseLineColorOption.Sign => this.LinesSeries[1].GetValue(offset) > 0,
-                CloseLineColorOption.Delta => (this.DeltaSourceType == CumulativeDeltaSourceType.Volume && currentItem.Total.Delta > 0) ||
-                                                (this.DeltaSourceType == CumulativeDeltaSourceType.Trades && (currentItem.Total.BuyTrades - currentItem.Total.SellTrades) > 0),
+            _ => true,
+        };
+        this.LinesSeries[1].SetMarker(offset, isUpColor ? this.upLineColor : this.downLineColor);
 
-                _ => true,
-            };
-            this.LinesSeries[1].SetMarker(offset, isUpColor ? this.upLineColor : this.downLineColor);
-        }
-        else
-            this.SetValues(this.currentAreaBuider.Bar.Open, 0, 0, this.currentAreaBuider.Bar.Open, offset);
-
-
-        if (this.Count > this.MAPeriod)
+        if (this.Count > offset && this.Count > this.MAPeriod)
         {
             switch (this.maLineColorOption)
             {
@@ -531,13 +632,20 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
                     break;
             }
         }
+
+        if (isNewBar && createAfterUpdate)
+            this.currentAreaBuider.StartNew(++index);
     }
 
     protected override void SetValues(double open, double high, double low, double close, int offset)
     {
         if (!IsValidPrice(open) || !IsValidPrice(close))
             return;
-
+        if (!this.showWicks)
+        {
+            high = Math.Max(open, close);
+            low  = Math.Min(open, close);
+        }
         base.SetValues(open, high, low, close, offset);
 
         if (this.Count > offset && this.Count > this.MAPeriod)
@@ -573,6 +681,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
             Days = Enum.GetValues(typeof(DayOfWeek)).Cast<DayOfWeek>().ToArray(),
             Type = SessionType.Main
         };
+        session.RecalculateOpenCloseTime(info);
         return session;
     }
     private AreaBuilder CreateAreaBuilder(Interval<DateTime> range)
@@ -583,6 +692,15 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
 
             _ => new AreaBuilderByVolume(range),
         };
+    }
+    private TimeSpan GetByPeriodSessionCloseTime(TimeSpan resetTime)
+    {
+        var close = resetTime - TimeSpan.FromSeconds(1);
+
+        if (close < TimeSpan.Zero)
+            close += TimeSpan.FromDays(1);
+
+        return close;
     }
 
     #endregion Misc
@@ -631,17 +749,35 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
     {
         internal Interval<DateTime> Range { get; }
         internal BarBuilder Bar { get; private set; }
+        internal int BarIndex { get; private set; }
 
         public AreaBuilder(Interval<DateTime> range)
         {
             this.Range = range;
 
             this.Bar = new BarBuilder();
+            this.StartNew(0);
         }
 
-        internal abstract void Update(VolumeAnalysisItem total, double prevDelta);
+        internal abstract void Update(VolumeAnalysisItem total);
 
+        internal void StartNew(int barIndex)
+        {
+            var prevClose = !double.IsNaN(this.Bar.Close)
+                ? this.Bar.Close
+                : 0d;
+
+            this.Bar.Clear();
+            this.Bar.Open = prevClose;
+            this.BarIndex = barIndex;
+        }
         internal bool Contains(DateTime dt) => this.Range.Contains(dt);
+        internal void Reset(int barIndex)
+        {
+            this.Bar.Clear();
+            this.Bar.Open = 0;
+            this.BarIndex = barIndex;
+        }
 
         public void Dispose()
         {
@@ -654,9 +790,8 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
             : base(range)
         { }
 
-        internal override void Update(VolumeAnalysisItem total, double prevDelta)
+        internal override void Update(VolumeAnalysisItem total)
         {
-            this.Bar.Open = prevDelta;
             this.Bar.Close = this.Bar.Open + total.Delta;
 
             this.Bar.High = !double.IsNaN(total.MaxDelta) && total.MaxDelta != double.MinValue
@@ -674,9 +809,8 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
             : base(range)
         { }
 
-        internal override void Update(VolumeAnalysisItem total, double prevDelta)
+        internal override void Update(VolumeAnalysisItem total)
         {
-            this.Bar.Open = prevDelta;
             this.Bar.Close = this.Bar.Open + (total.BuyTrades - total.SellTrades);
             this.Bar.High = Math.Max(this.Bar.Close, this.Bar.Open);
             this.Bar.Low = Math.Min(this.Bar.Close, this.Bar.Open);
