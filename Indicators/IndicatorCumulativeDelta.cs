@@ -58,10 +58,10 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
     })]
     public CumulativeDeltaSessionMode SessionMode;
 
-    [InputParameter("Period of Moving Average", 31, 1, 9999, 1, 1)]
+    [InputParameter("Period of Moving Average", 32, 1, 9999, 1, 1)]
     public int MAPeriod = 20;
 
-    [InputParameter("Average Type", 32, variants: new object[]{
+    [InputParameter("Average Type", 31, variants: new object[]{
             "Simple Moving Average", MaMode.SMA,
             "Exponential Moving Average", MaMode.EMA,
             "Smoothed Moving Average", MaMode.SMMA,
@@ -337,7 +337,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
 
             var selectedItem = items.FirstOrDefault(i => i.Value.Equals(this.specifiedSessionContainerId)) ?? items.First();
 
-            settings.Add(new SettingItemSelectorLocalized(SESSION_TEMPLATE_NAME_SI, selectedItem, items, 20)
+            settings.Add(new SettingItemSelectorLocalized(SESSION_TEMPLATE_NAME_SI, selectedItem, items, 31)
             {
                 Text = loc._("Sessions template"),
                 SeparatorGroup = separ,
@@ -347,21 +347,21 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
             //
             //
             //
-            settings.Add(new SettingItemDateTime(CUSTOM_OPEN_SESSION_NAME_SI, this.CustomRangeStartTime, 30)
+            settings.Add(new SettingItemDateTime(CUSTOM_OPEN_SESSION_NAME_SI, this.CustomRangeStartTime, 31)
             {
                 ValueChangingBehavior = SettingItemValueChangingBehavior.WithConfirmation,
                 Format = DatePickerFormat.Time,
                 SeparatorGroup = separ,
                 Relation = new SettingItemRelationVisibility(RESET_TYPE_NAME_SI, new SelectItem("", (int)CumulativeDeltaSessionMode.CustomRange))
             });
-            settings.Add(new SettingItemDateTime(CUSTOM_CLOSE_SESSION_NAME_SI, this.CustomRangeEndTime, 30)
+            settings.Add(new SettingItemDateTime(CUSTOM_CLOSE_SESSION_NAME_SI, this.CustomRangeEndTime, 32)
             {
                 ValueChangingBehavior = SettingItemValueChangingBehavior.WithConfirmation,
                 Format = DatePickerFormat.Time,
                 SeparatorGroup = separ,
                 Relation = new SettingItemRelationVisibility(RESET_TYPE_NAME_SI, new SelectItem("", (int)CumulativeDeltaSessionMode.CustomRange))
             });
-            settings.Add(new SettingItemDateTime(RESET_TIME_NAME_SI, this.ByPeriodResetTime, 31)
+            settings.Add(new SettingItemDateTime(RESET_TIME_NAME_SI, this.ByPeriodResetTime, 32)
             {
                 Text = loc._("Reset time"),
                 ValueChangingBehavior = SettingItemValueChangingBehavior.WithConfirmation,
@@ -372,7 +372,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
             //
             //
             //
-            settings.Add(new SettingItemPeriod(RESET_PERIOD_NAME_SI, this.ResetPeriod, 30)
+            settings.Add(new SettingItemPeriod(RESET_PERIOD_NAME_SI, this.ResetPeriod, 31)
             {
                 Text = loc._("Period"),
                 ExcludedPeriods = new BasePeriod[] { BasePeriod.Tick, BasePeriod.Second, BasePeriod.Year },
