@@ -388,8 +388,8 @@ namespace VolumeIndicators
         {
             if (this.HistoricalData.Count < 2)
                 return false;
-           int index = (int)this.HistoricalData.GetIndexByTime(time.Ticks, SeekOriginHistory.Begin);
-           TimeSpan barSpan = this.HistoricalData[1, SeekOriginHistory.Begin].TimeLeft - this.HistoricalData[0, SeekOriginHistory.Begin].TimeLeft;
+            int index = (int)this.HistoricalData.GetIndexByTime(time.Ticks, SeekOriginHistory.Begin);
+            TimeSpan barSpan = this.HistoricalData[1, SeekOriginHistory.Begin].TimeLeft - this.HistoricalData[0, SeekOriginHistory.Begin].TimeLeft;
 
             if (time == this.HistoricalData[index, SeekOriginHistory.Begin].TimeLeft ||
                 (time >= this.HistoricalData[index, SeekOriginHistory.Begin].TimeLeft && time < this.HistoricalData[index, SeekOriginHistory.Begin].TimeLeft + barSpan))
@@ -428,15 +428,15 @@ namespace VolumeIndicators
 
         public bool DrawInnerArea { get; set; }
 
-        public bool ShowLabel { get; set; }        
-        public string LabelText { get; set; }          
+        public bool ShowLabel { get; set; }
+        public string LabelText { get; set; }
         public bool ShowDelta { get; set; }
         public bool ShowUnit { get; set; }
         public Font LabelFont { get; set; }
         public Color LabelColor { get; set; }
         public SolidBrush LabelBrush { get; set; }
 
-        public LabelPlacement LabelPlacement { get; set; } = LabelPlacement.Outside; 
+        public LabelPlacement LabelPlacement { get; set; } = LabelPlacement.Outside;
         public NativeAlignment LabelHAlign { get; set; } = NativeAlignment.Left;
         public LabelVAlign LabelVAlign { get; set; } = LabelVAlign.Bottom;
 
@@ -504,16 +504,18 @@ namespace VolumeIndicators
             get
             {
                 var settings = new List<SettingItem>();
-                var separatorGroup1 = new SettingItemSeparatorGroup(this.SessionName, this.sessionSortIndex);
-
+                var separatorGroup1 = new SettingItemSeparatorGroup(this.SessionName, this.sessionSortIndex)
+                {
+                    ItemsEnabilitySettingName = $"{this.SessionName}SessionVisibility"
+                };
                 string visibleRelationName = $"{this.SessionName}SessionVisibility";
-                settings.Add(new SettingItemBoolean(visibleRelationName, this.SessionVisibility)
+                settings.Add(new SettingItemBooleanSwitcher(visibleRelationName, this.SessionVisibility)
                 {
                     Text = "Visible",
                     SortIndex = sessionSortIndex,
                     SeparatorGroup = separatorGroup1,
                 });
-                var visibleRelation = new SettingItemRelationVisibility(visibleRelationName, true);
+                var visibleRelation = new SettingItemRelationEnability(visibleRelationName, true);
 
                 var simple = new SelectItem("Area", SessionDrawMode.Simple);
                 var box = new SelectItem("Box", SessionDrawMode.Box);
@@ -538,7 +540,7 @@ namespace VolumeIndicators
                     SeparatorGroup = separatorGroup1,
                     Relation = visibleRelation
                 });
-                
+
                 settings.Add(new SettingItemDateTime("SessionSecondTime", this.SessionSecondTime)
                 {
                     Text = "End Time",
@@ -548,7 +550,7 @@ namespace VolumeIndicators
                     Relation = visibleRelation
                 });
 
-                
+
                 settings.Add(new SettingItemColor("SessionColor", this.SessionColor)
                 {
                     Text = "Color",
@@ -573,8 +575,8 @@ namespace VolumeIndicators
                     Text = "Border line",
                     SortIndex = sessionSortIndex,
                     SeparatorGroup = separatorGroup1,
-                    Relation = borderRelation,        
-                    UseEnabilityToggler = true,       
+                    Relation = borderRelation,
+                    UseEnabilityToggler = true,
                     ExcludedStyles = new LineStyle[] { LineStyle.Histogramm, LineStyle.Points }
                 });
                 settings.Add(new SettingItemBoolean("DrawInnerArea", this.DrawInnerArea)
@@ -844,6 +846,6 @@ namespace VolumeIndicators
         Box = 1
     }
     internal enum DeltaLabelType { Delta = 0, Ticks = 1, Percent }
-    internal enum LabelPlacement { Inside = 0, Outside = 1 }  
+    internal enum LabelPlacement { Inside = 0, Outside = 1 }
     internal enum LabelVAlign { Top = 0, Middle = 1, Bottom = 2 }
 }
