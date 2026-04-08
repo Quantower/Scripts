@@ -42,14 +42,14 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
 
     #region Parameters
 
-    [InputParameter("Delta source", 9, variants: new object[]
+    [InputParameter("Delta source", 1, variants: new object[]
     {
         BY_VOLUME_TYPE, CumulativeDeltaSourceType.Volume,
         BY_TRADES_TYPE, CumulativeDeltaSourceType.Trades
     })]
     public CumulativeDeltaSourceType DeltaSourceType;
 
-    [InputParameter(RESET_TYPE_NAME_SI, 30, variants: new object[]
+    [InputParameter(RESET_TYPE_NAME_SI, 4, variants: new object[]
     {
         BY_PERIOD_SESSION_TYPE, CumulativeDeltaSessionMode.ByPeriod,
         FULL_HISTORY_SESSION_TYPE, CumulativeDeltaSessionMode.FullHistory,
@@ -58,10 +58,10 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
     })]
     public CumulativeDeltaSessionMode SessionMode;
 
-    [InputParameter("Period of Moving Average", 32, 1, 9999, 1, 1)]
+    [InputParameter("Period of Moving Average", 3, 1, 9999, 1, 1)]
     public int MAPeriod = 20;
 
-    [InputParameter("Average Type", 31, variants: new object[]{
+    [InputParameter("Average Type", 2, variants: new object[]{
             "Simple Moving Average", MaMode.SMA,
             "Exponential Moving Average", MaMode.EMA,
             "Smoothed Moving Average", MaMode.SMMA,
@@ -114,7 +114,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
                 var session = this.GetFullDayTimeInterval(this.GetTimeZone());
                 this.customRangeStartTime = session.From;
             }
-            return this.customRangeStartTime;
+            return DateTime.SpecifyKind(this.customRangeStartTime, DateTimeKind.Local);
         }
         set => this.customRangeStartTime = value;
     }
@@ -130,7 +130,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
                 this.customRangeEndTime = session.To;
             }
 
-            return this.customRangeEndTime;
+            return DateTime.SpecifyKind(this.customRangeEndTime, DateTimeKind.Local);
         }
         set => this.customRangeEndTime = value;
     }
@@ -141,8 +141,8 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
         get
         {
             if (this.byPeriodResetTime == default)
-                this.byPeriodResetTime = new DateTime(DateTime.Today.Ticks, DateTimeKind.Local); // 00:00
-            return this.byPeriodResetTime;
+                this.byPeriodResetTime = DateTime.Today; // 00:00
+            return DateTime.SpecifyKind(this.byPeriodResetTime, DateTimeKind.Local);
         }
         set => this.byPeriodResetTime = value;
     }
@@ -315,13 +315,13 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
                 new SelectItem(loc._("By Delta"), CloseLineColorOption.Delta),
                 new SelectItem(loc._("By Sign"), CloseLineColorOption.Sign),
             };
-            settings.Add(new SettingItemSelectorLocalized(CLOSE_LINE_COLOR_BY_SI, closeLineColorOptions.GetItemByValue(this.closeLineСoloringOption), closeLineColorOptions, 20)
+            settings.Add(new SettingItemSelectorLocalized(CLOSE_LINE_COLOR_BY_SI, closeLineColorOptions.GetItemByValue(this.closeLineСoloringOption), closeLineColorOptions, 5)
             {
                 Text = loc._("Coloring mode"),
                 SeparatorGroup = separ,
                 Relation = lineRelationVisibility
             });
-            settings.Add(new SettingItemPairColor(LINE_COLORS_SI, new PairColor(this.upLineColor, this.downLineColor, loc._("Up"), loc._("Down")), 20)
+            settings.Add(new SettingItemPairColor(LINE_COLORS_SI, new PairColor(this.upLineColor, this.downLineColor, loc._("Up"), loc._("Down")), 6)
             {
                 Text = loc._("Lines"),
                 SeparatorGroup = separ,
@@ -337,7 +337,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
 
             var selectedItem = items.FirstOrDefault(i => i.Value.Equals(this.specifiedSessionContainerId)) ?? items.First();
 
-            settings.Add(new SettingItemSelectorLocalized(SESSION_TEMPLATE_NAME_SI, selectedItem, items, 31)
+            settings.Add(new SettingItemSelectorLocalized(SESSION_TEMPLATE_NAME_SI, selectedItem, items, 5)
             {
                 Text = loc._("Sessions template"),
                 SeparatorGroup = separ,
@@ -347,32 +347,32 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
             //
             //
             //
-            settings.Add(new SettingItemDateTime(CUSTOM_OPEN_SESSION_NAME_SI, this.CustomRangeStartTime, 31)
+            settings.Add(new SettingItemDateTime(CUSTOM_OPEN_SESSION_NAME_SI, this.CustomRangeStartTime, 6)
             {
                 ValueChangingBehavior = SettingItemValueChangingBehavior.WithConfirmation,
                 Format = DatePickerFormat.Time,
                 SeparatorGroup = separ,
                 Relation = new SettingItemRelationVisibility(RESET_TYPE_NAME_SI, new SelectItem("", (int)CumulativeDeltaSessionMode.CustomRange))
             });
-            settings.Add(new SettingItemDateTime(CUSTOM_CLOSE_SESSION_NAME_SI, this.CustomRangeEndTime, 32)
+            settings.Add(new SettingItemDateTime(CUSTOM_CLOSE_SESSION_NAME_SI, this.CustomRangeEndTime, 6)
             {
                 ValueChangingBehavior = SettingItemValueChangingBehavior.WithConfirmation,
                 Format = DatePickerFormat.Time,
                 SeparatorGroup = separ,
                 Relation = new SettingItemRelationVisibility(RESET_TYPE_NAME_SI, new SelectItem("", (int)CumulativeDeltaSessionMode.CustomRange))
             });
-            settings.Add(new SettingItemDateTime(RESET_TIME_NAME_SI, this.ByPeriodResetTime, 32)
+            settings.Add(new SettingItemDateTime(RESET_TIME_NAME_SI, this.ByPeriodResetTime, 6)
             {
                 Text = loc._("Reset time"),
                 ValueChangingBehavior = SettingItemValueChangingBehavior.WithConfirmation,
                 Format = DatePickerFormat.Time,
                 SeparatorGroup = separ,
-                Relation = new SettingItemRelationVisibility(RESET_TYPE_NAME_SI, new SelectItem("", (int)CumulativeDeltaSessionMode.ByPeriod))
+                Relation = new SettingItemRelationVisibility(RESET_TYPE_NAME_SI, new SelectItem("", (int)CumulativeDeltaSessionMode.ByPeriod)),
             });
             //
             //
             //
-            settings.Add(new SettingItemPeriod(RESET_PERIOD_NAME_SI, this.ResetPeriod, 31)
+            settings.Add(new SettingItemPeriod(RESET_PERIOD_NAME_SI, this.ResetPeriod, 7)
             {
                 Text = loc._("Period"),
                 ExcludedPeriods = new BasePeriod[] { BasePeriod.Tick, BasePeriod.Second, BasePeriod.Year },
@@ -386,13 +386,13 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
                 new SelectItem(loc._("Value Change (Up/Down)"), MALineColorOption.ValueChange),
                 new SelectItem(loc._("Solid Color"), MALineColorOption.SolidColor)
             };
-            settings.Add(new SettingItemSelectorLocalized(MA_LINE_COLOR_BY_SI, lineColorOptions.GetItemByValue(this.maLineColorOption), lineColorOptions, 40)
+            settings.Add(new SettingItemSelectorLocalized(MA_LINE_COLOR_BY_SI, lineColorOptions.GetItemByValue(this.maLineColorOption), lineColorOptions, 12)
             {
                 Text = loc._("Color by"),
                 SeparatorGroup = separ
             });
 
-            settings.Add(new SettingItemPairColor(MA_LINE_COLORS_SI, new PairColor(this.maUpLineColor, this.maDownLineColor, loc._("Up"), loc._("Down")), 40)
+            settings.Add(new SettingItemPairColor(MA_LINE_COLORS_SI, new PairColor(this.maUpLineColor, this.maDownLineColor, loc._("Up"), loc._("Down")), 3)
             {
                 Text = loc._("Lines"),
                 SeparatorGroup = separ,
@@ -403,7 +403,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
                 new SelectItem("", (int)CandleDrawIndicatorVisualMode.Candles)
             );
 
-            settings.Add(new SettingItemBoolean(SHOW_WICKS_SI, this.showWicks, 19)
+            settings.Add(new SettingItemBoolean(SHOW_WICKS_SI, this.showWicks, 11)
             {
                 Text = loc._("Show wick, if available"),
                 SeparatorGroup = separ,
@@ -445,22 +445,21 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
 
             if (holder.TryGetValue(CUSTOM_OPEN_SESSION_NAME_SI, out item))
             {
-                var newValue = item.GetValue<DateTime>();
+                var newValue = Core.Instance.TimeUtils.ConvertFromUTCToSelectedTimeZone(item.GetValue<DateTime>());
 
                 if (this.CustomRangeStartTime != newValue)
                 {
-                    this.CustomRangeStartTime = new DateTime(newValue.Ticks, DateTimeKind.Local);
+                    this.CustomRangeStartTime = newValue;
                     needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
                 }
             }
 
             if (holder.TryGetValue(CUSTOM_CLOSE_SESSION_NAME_SI, out item))
             {
-                var newValue = item.GetValue<DateTime>();
-
+                var newValue = Core.Instance.TimeUtils.ConvertFromUTCToSelectedTimeZone(item.GetValue<DateTime>());
                 if (this.CustomRangeEndTime != newValue)
                 {
-                    this.CustomRangeEndTime = new DateTime(newValue.Ticks, DateTimeKind.Local);
+                    this.CustomRangeEndTime = newValue;
                     needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
                 }
             }
@@ -523,11 +522,11 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
             }
             if (holder.TryGetValue(RESET_TIME_NAME_SI, out item))
             {
-                var newValue = item.GetValue<DateTime>();
+                var newValue = Core.Instance.TimeUtils.ConvertFromUTCToSelectedTimeZone(item.GetValue<DateTime>());
 
                 if (this.ByPeriodResetTime != newValue)
                 {
-                    this.ByPeriodResetTime = new DateTime(newValue.Ticks, DateTimeKind.Local);
+                    this.ByPeriodResetTime = newValue;
                     needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
                 }
             }
