@@ -37,6 +37,7 @@ public sealed class IndicatorMoneyFlowIndex : Indicator, IWatchlistIndicator
         this.AddLineSeries("MFI", Color.Orange, 1, LineStyle.Solid);
         this.AddLineLevel(80d, "Up", Color.Gray, 1, LineStyle.Dot);
         this.AddLineLevel(20d, "Down", Color.Gray, 1, LineStyle.Dot);
+        this.AddLineLevel(50d, "Middle", Color.Gray, 1, LineStyle.Dot);
 
         this.SeparateWindow = true;
     }
