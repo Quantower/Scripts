@@ -540,7 +540,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
 
     #region Misc
 
-    private void CalculateIndicatorByOffset(int offset, bool isNewBar, bool createAfterUpdate = false)
+    private void CalculateIndicatorByOffset(int offset, bool isNewBar, bool isPrevVolumeDataUsed = false)
     {
         if (this.Count <= offset)
             return;
@@ -602,12 +602,13 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
         //
 
 
-        if (isNewBar && !createAfterUpdate)
-            this.currentAreaBuider.StartNew(index);
+        if (isNewBar)
+            this.currentAreaBuider.StartNew(isPrevVolumeDataUsed ? index + 1: index);
 
-        this.currentAreaBuider.Update(currentItem.Total);
+        if (!isPrevVolumeDataUsed)
+            this.currentAreaBuider.Update(currentItem.Total);
 
-        this.SetValues(this.currentAreaBuider.Bar.Open, this.currentAreaBuider.Bar.High, this.currentAreaBuider.Bar.Low, this.currentAreaBuider.Bar.Close, offset);
+        this.SetValues(this.currentAreaBuider.Bar.Open, this.currentAreaBuider.Bar.High, this.currentAreaBuider.Bar.Low, this.currentAreaBuider.Bar.Close, isPrevVolumeDataUsed ? 0 : offset);
 
         bool isUpColor = this.closeLineСoloringOption switch
         {
@@ -631,9 +632,6 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
                     break;
             }
         }
-
-        if (isNewBar && createAfterUpdate)
-            this.currentAreaBuider.StartNew(++index);
     }
 
     protected override void SetValues(double open, double high, double low, double close, int offset)
@@ -768,6 +766,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
 
             this.Bar.Clear();
             this.Bar.Open = prevClose;
+            this.Bar.Close = prevClose;
             this.BarIndex = barIndex;
         }
         internal bool Contains(DateTime dt) => this.Range.Contains(dt);
