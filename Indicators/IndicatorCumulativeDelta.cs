@@ -263,23 +263,13 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
         //
         // Try to recalculate prev items
         //
-        if (currentVolumeData?.Total == null)
+        if (currentVolumeData?.Total == null && this.currentAreaBuider!= null)
         {
-            var currentIndex = Math.Max(0, this.Count - 1);
+            var offset = 1;
+            while (this.GetVolumeAnalysisData(offset) == null && this.Count > offset)
+                offset++;
 
-            if (this.currentAreaBuider!= null && this.currentAreaBuider.BarIndex != currentIndex)
-            {
-                for (int i = this.currentAreaBuider.BarIndex; i < this.Count; i++)
-                {
-                    var offset = Math.Max(0, this.Count - i - 1);
-
-                    var prevVolumeDataItem = this.GetVolumeAnalysisData(offset);
-                    if (prevVolumeDataItem == null)
-                        continue;
-
-                    this.CalculateIndicatorByOffset(offset, true, true);
-                }
-            }
+            this.CalculateIndicatorByOffset(offset, true, true);
         }
         //
         // Try to calculate current item
@@ -544,9 +534,8 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
     {
         if (this.Count <= offset)
             return;
-        var time = this.Time(offset);
 
-        var index = Math.Max(this.Count - offset - 1, 0);
+        var time = this.Time(offset);
 
         //
         // Check session
@@ -555,7 +544,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
         {
             if (!this.SessionContainer.ContainsDate(time))
             {
-                this.currentAreaBuider?.Reset(index);
+                this.currentAreaBuider?.Reset();
                 return;
             }
         }
@@ -600,15 +589,16 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
             return;
 
         //
-
-
         if (isNewBar)
-            this.currentAreaBuider.StartNew(isPrevVolumeDataUsed ? index + 1: index);
+            this.currentAreaBuider.StartNew();
 
         if (!isPrevVolumeDataUsed)
             this.currentAreaBuider.Update(currentItem.Total);
 
-        this.SetValues(this.currentAreaBuider.Bar.Open, this.currentAreaBuider.Bar.High, this.currentAreaBuider.Bar.Low, this.currentAreaBuider.Bar.Close, isPrevVolumeDataUsed ? 0 : offset);
+        if (isNewBar && isPrevVolumeDataUsed)
+            offset = 0;
+
+        this.SetValues(this.currentAreaBuider.Bar.Open, this.currentAreaBuider.Bar.High, this.currentAreaBuider.Bar.Low, this.currentAreaBuider.Bar.Close, offset);
 
         bool isUpColor = this.closeLineСoloringOption switch
         {
@@ -746,19 +736,18 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
     {
         internal Interval<DateTime> Range { get; }
         internal BarBuilder Bar { get; private set; }
-        internal int BarIndex { get; private set; }
 
         public AreaBuilder(Interval<DateTime> range)
         {
             this.Range = range;
 
             this.Bar = new BarBuilder();
-            this.StartNew(0);
+            this.StartNew();
         }
 
         internal abstract void Update(VolumeAnalysisItem total);
 
-        internal void StartNew(int barIndex)
+        internal void StartNew()
         {
             var prevClose = !double.IsNaN(this.Bar.Close)
                 ? this.Bar.Close
@@ -767,14 +756,12 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
             this.Bar.Clear();
             this.Bar.Open = prevClose;
             this.Bar.Close = prevClose;
-            this.BarIndex = barIndex;
         }
         internal bool Contains(DateTime dt) => this.Range.Contains(dt);
-        internal void Reset(int barIndex)
+        internal void Reset()
         {
             this.Bar.Clear();
             this.Bar.Open = 0;
-            this.BarIndex = barIndex;
         }
 
         public void Dispose()
