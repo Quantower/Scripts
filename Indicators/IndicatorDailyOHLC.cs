@@ -7,6 +7,7 @@ using System.Linq;
 using TradingPlatform.BusinessLayer;
 using TradingPlatform.BusinessLayer.Chart;
 using TradingPlatform.BusinessLayer.Utils;
+using TradingPlatform.BusinessLayer.Utils.IntervalGeneration;
 
 namespace ChanneIsIndicators;
 
@@ -15,18 +16,66 @@ public class IndicatorDailyOHLC : Indicator
     #region Parameters
 
     public DailyOHLCSessionType DailySessionType = DailyOHLCSessionType.AllDay;
-    public string CustomSessionName = string.Empty;
+    private const string SESSION_TYPE_NAME_SI = "Session type";
+    private const string ALL_DAY_SESSION_TYPE = "All day";
+    private const string SPECIFIED_SESSION_TYPE = "Specified session";
+    private const string CUSTOM_RANGE_SESSION_TYPE = "Custom range";
 
+    private const string CHART_SESSION_CONTAINER_SELECT_ITEM = "Chart session";
+    private const string SESSION_TEMPLATE_NAME_SI = "sessionsTemplate";
+    private const string CUSTOM_OPEN_SESSION_NAME_SI = "Open time";
+    private const string CUSTOM_CLOSE_SESSION_NAME_SI = "Close time";
+
+    private const int SERIES_DYNAMIC_HIGH = 0;
+    private const int SERIES_DYNAMIC_LOW = 1;
+    private const int SERIES_DYNAMIC_MIDDLE = 2;
+
+    private string specifiedSessionContainerId = CHART_SESSION_CONTAINER_SELECT_ITEM;
+    private const string PERIOD_TYPE_NAME_SI = "Period type";
+    private const string PERIODS_COUNT_NAME_SI = "Number of periods to calculate";
+    private const string PREVIOUS_DATA_OFFSET_NAME_SI = "Use previous data (offset in periods)";
+    public DailyOHLCPeriodType PeriodType { get; set; } = DailyOHLCPeriodType.Daily;
+
+    private ISessionsContainer fullDaySessionContainer;
+    private ISessionsContainer customSessionContainer;
+    private ISessionsContainer selectedSessionContainer;
+
+    private IntervalGenerator intervalGenerator;
+    private Interval<DateTime> currentSessionRange;
+    private ISessionsContainer SessionContainer
+    {
+        get
+        {
+            if (this.PeriodType != DailyOHLCPeriodType.Daily)
+                return this.fullDaySessionContainer;
+
+            switch (this.DailySessionType)
+            {
+                case DailyOHLCSessionType.SpecifiedSession:
+                    {
+                        if (this.specifiedSessionContainerId == CHART_SESSION_CONTAINER_SELECT_ITEM)
+                            return this.CurrentChart?.CurrentSessionContainer ?? this.fullDaySessionContainer;
+
+                        return this.selectedSessionContainer ?? this.fullDaySessionContainer;
+                    }
+
+                case DailyOHLCSessionType.CustomRange:
+                    return this.customSessionContainer ?? this.fullDaySessionContainer;
+
+                case DailyOHLCSessionType.AllDay:
+                default:
+                    return this.fullDaySessionContainer;
+            }
+        }
+    }
     public DateTime CustomRangeStartTime
     {
         get
         {
             if (this.customRangeStartTime == default)
-            {
-                var session = this.CreateDefaultSession();
-                this.customRangeStartTime = Core.Instance.TimeUtils.DateTimeUtcNow.Date.AddTicks(session.OpenTime.Ticks);
-            }
-            return this.customRangeStartTime;
+                this.customRangeStartTime = DateTime.Today;
+
+            return Core.Instance.TimeUtils.ConvertFromUTCToSelectedTimeZone(this.customRangeStartTime);
         }
         set => this.customRangeStartTime = value;
     }
@@ -37,13 +86,15 @@ public class IndicatorDailyOHLC : Indicator
         get
         {
             if (this.customRangeEndTime == default)
-                this.customRangeEndTime = this.CustomRangeStartTime;
+                this.customRangeEndTime = DateTime.Today;
 
-            return this.customRangeEndTime;
+            return Core.Instance.TimeUtils.ConvertFromUTCToSelectedTimeZone(this.customRangeEndTime);
         }
         set => this.customRangeEndTime = value;
     }
     private DateTime customRangeEndTime;
+
+    public bool DynamicMode { get; set; } = false;
 
     public int DaysCount = 10;
     public int PreviousDataOffset = 0;
@@ -51,14 +102,15 @@ public class IndicatorDailyOHLC : Indicator
     public bool UseExtendLines = false;
     public bool AllowToDrawExtendLines => this.UseExtendLines;
 
+    public bool ShowPriceForLabel { get; set; } = true;
     public DateTime ExtendRangeStartTime
     {
         get
         {
             if (this.extendRangeStartTime == default)
-                this.extendRangeStartTime = this.CustomRangeStartTime;
+                this.extendRangeStartTime = DateTime.Today;
 
-            return this.extendRangeStartTime;
+            return Core.Instance.TimeUtils.ConvertFromUTCToSelectedTimeZone(this.extendRangeStartTime);
         }
         set => this.extendRangeStartTime = value;
     }
@@ -69,9 +121,9 @@ public class IndicatorDailyOHLC : Indicator
         get
         {
             if (this.extendRangeEndTime == default)
-                this.extendRangeEndTime = this.CustomRangeEndTime;
+                this.extendRangeEndTime = DateTime.Today;
 
-            return this.extendRangeEndTime;
+            return Core.Instance.TimeUtils.ConvertFromUTCToSelectedTimeZone(this.extendRangeEndTime);
         }
         set => this.extendRangeEndTime = value;
     }
@@ -253,11 +305,8 @@ public class IndicatorDailyOHLC : Indicator
     private readonly IList<DailyRangeItem> rangeCache;
 
     private DailyRangeItem currentRange;
-    private ISession currentSession;
     private ISession extendSession;
     private ISessionsContainer chartSessionContainer;
-    private DateTime currentSessionOpenDateTime;
-    private DateTime currentSessionCloseDateTime;
     private readonly StringFormat centerNearSF;
 
     public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorDailyOHLC.cs";
@@ -372,6 +421,10 @@ public class IndicatorDailyOHLC : Indicator
             Alignment = StringAlignment.Center,
             LineAlignment = StringAlignment.Near
         };
+
+        this.AddLineSeries("Dynamic High", this.HighLineOptions.Color, this.HighLineOptions.Width, this.HighLineOptions.LineStyle);
+        this.AddLineSeries("Dynamic Low", this.LowLineOptions.Color, this.LowLineOptions.Width, this.LowLineOptions.LineStyle);
+        this.AddLineSeries("Dynamic Middle", this.MiddleLineOptions.Color, this.MiddleLineOptions.Width, this.MiddleLineOptions.LineStyle);
     }
 
     #region Base overrides
@@ -383,26 +436,75 @@ public class IndicatorDailyOHLC : Indicator
         if (this.CurrentChart != null)
             this.CurrentChart.SettingsChanged += this.CurrentChartOnSettingsChanged;
 
-        if (this.DailySessionType == DailyOHLCSessionType.AllDay)
-        {
-            // default session
-            this.currentSession = this.CreateDefaultSession();
-        }
-        else if (this.DailySessionType == DailyOHLCSessionType.SpecifiedSession)
-        {
-            if (!string.IsNullOrEmpty(this.CustomSessionName))
+        var timeZone = this.GetTimeZone();
+
+        this.fullDaySessionContainer = new CustomSessionsContainer(
+            "FullDaySession",
+            timeZone,
+            new[]
             {
-                // selected chart session
-                var sessions = this.GetAvailableCustomChartSessions().Concat(this.GetAvailableSymbolSessions()).ToList();
-                if (sessions.Count > 0)
-                    this.currentSession = sessions.FirstOrDefault(s => s.Name.Equals(this.CustomSessionName) && s.Type == SessionType.Main);
+            this.CreateCustomSession(TimeSpan.Zero, new TimeSpan(23, 59, 59), timeZone.TimeZoneInfo)
+            });
+
+        this.customSessionContainer = null;
+        this.selectedSessionContainer = null;
+
+        if (this.PeriodType == DailyOHLCPeriodType.Daily)
+        {
+            switch (this.DailySessionType)
+            {
+                case DailyOHLCSessionType.CustomRange:
+                    {
+                        this.customSessionContainer = new CustomSessionsContainer(
+                            "CustomSession",
+                            timeZone,
+                            new[]
+                            {
+                        this.CreateCustomSession(
+                            this.CustomRangeStartTime.TimeOfDay,
+                            this.CustomRangeEndTime.TimeOfDay,
+                            timeZone.TimeZoneInfo)
+                            });
+                        break;
+                    }
+
+                case DailyOHLCSessionType.SpecifiedSession:
+                    {
+                        if (!string.IsNullOrEmpty(this.specifiedSessionContainerId) &&
+                            this.specifiedSessionContainerId != CHART_SESSION_CONTAINER_SELECT_ITEM)
+                        {
+                            this.selectedSessionContainer = Core.Instance.CustomSessions[this.specifiedSessionContainerId];
+                        }
+                        break;
+                    }
+
+                case DailyOHLCSessionType.AllDay:
+                default:
+                    break;
             }
         }
-        else if (this.DailySessionType == DailyOHLCSessionType.CustomRange)
-            this.currentSession = new Session("Custom session", this.CustomRangeStartTime.TimeOfDay, this.CustomRangeEndTime.TimeOfDay);
+
+        this.intervalGenerator = null;
+        this.currentSessionRange = default;
+        this.currentRange = null;
 
         if (this.UseExtendLines)
-            this.extendSession = new Session("Extend session", this.ExtendRangeStartTime.TimeOfDay, this.ExtendRangeEndTime.TimeOfDay);
+        {
+            var extendStart = this.ExtendRangeStartTime.TimeOfDay;
+            var extendEnd = this.ExtendRangeEndTime.TimeOfDay;
+
+            if (extendStart == extendEnd)
+            {
+                extendStart = TimeSpan.Zero;
+                extendEnd = new TimeSpan(23, 59, 59);
+            }
+            else if (extendStart > extendEnd)
+            {
+                extendEnd = extendEnd.Add(new TimeSpan(1, 0, 0, 0));
+            }
+
+            this.extendSession = new Session("Extend session", extendStart, extendEnd);
+        }
 
         this.OpenLabelHorizontalMode   = this.LabelHorizontalMode;
         this.HighLabelHorizontalMode   = this.LabelHorizontalMode;
@@ -425,55 +527,141 @@ public class IndicatorDailyOHLC : Indicator
 
     protected override void OnUpdate(UpdateArgs args)
     {
-        if (this.currentSession == null)
+        var sessionContainer = this.SessionContainer;
+        if (sessionContainer == null || this.Count == 0)
             return;
 
-        var currentBarTime = this.Time();
-        var inSession = this.currentSession.ContainsDate(currentBarTime);
 
-        // Main range
-        if (inSession)
+        var barTime = this.Time();
+
+        if (!sessionContainer.ContainsDate(barTime))
         {
-            // create new 'main' range
-            if (this.currentRange == null || currentBarTime >= this.currentSessionCloseDateTime)
+            if (this.DynamicMode)
             {
-                this.currentSessionOpenDateTime = currentBarTime.Date.AddTicks(this.currentSession.OpenTime.Ticks);
-                this.currentSessionCloseDateTime = currentBarTime.Date.AddTicks(this.currentSession.CloseTime.Ticks);
-
-                if (currentBarTime < this.currentSessionOpenDateTime)
-                    this.currentSessionOpenDateTime = this.currentSessionOpenDateTime.AddDays(-1);
-                if (currentBarTime > this.currentSessionCloseDateTime)
-                    this.currentSessionCloseDateTime = this.currentSessionOpenDateTime.AddDays(1);
-
-                this.rangeCache.Insert(0, this.currentRange = new DailyRangeItem(currentBarTime, this.Open()));
+                this.SetValue(double.NaN, SERIES_DYNAMIC_HIGH);
+                this.SetValue(double.NaN, SERIES_DYNAMIC_LOW);
+                this.SetValue(double.NaN, SERIES_DYNAMIC_MIDDLE);
             }
-
-            // update High/Low/Close in history
-            if (args.Reason == UpdateReason.HistoricalBar)
-                this.currentRange.TryUpdate(this.High(), this.Low(), this.Close());
-            else
-                this.currentRange.TryUpdate(this.Close());
-
-            this.currentRange.EndDateTime = currentBarTime;
-
-            // recalcualte extend datetime positions
-            if (this.UseExtendLines)
-            {
-                this.currentRange.ExtendStartDateTime = this.currentRange.EndDateTime.Date.AddTicks(this.extendSession.OpenTime.Ticks);
-                this.currentRange.ExtendEndDateTime = this.currentRange.EndDateTime.Date.AddTicks(this.extendSession.CloseTime.Ticks);
-
-                if (this.extendSession.OpenTime > this.extendSession.CloseTime)
-                    this.currentRange.ExtendEndDateTime = this.currentRange.ExtendEndDateTime.AddDays(1);
-            }
+            return;
         }
+
+        var calculationPeriod = this.PeriodType switch
+        {
+            DailyOHLCPeriodType.Weekly => new Period(BasePeriod.Week, 1),
+            DailyOHLCPeriodType.Monthly => new Period(BasePeriod.Month, 1),
+            _ => new Period(BasePeriod.Day, 1)
+        };
+
+        if (this.intervalGenerator == null)
+        {
+            this.intervalGenerator = new IntervalGenerator(barTime, calculationPeriod, sessionContainer, this.GetTimeZone());
+            this.currentSessionRange = this.intervalGenerator.Current;
+
+            if (this.currentSessionRange.IsEmpty)
+                return;
+
+            this.currentRange = null;
+        }
+        if (!this.currentSessionRange.Contains(barTime))
+        {
+            this.intervalGenerator.MoveUntil(barTime);
+            this.currentSessionRange = this.intervalGenerator.Current;
+
+            if (this.currentSessionRange.IsEmpty)
+                return;
+            this.currentRange = null;
+        }
+
+        if (this.currentRange == null)
+        {
+            this.rangeCache.Insert(0,
+                this.currentRange = new DailyRangeItem(this.currentSessionRange.From, this.Open()));
+        }
+
+        this.currentRange.TryUpdate(this.High(), this.Low(), this.Close());
+        this.currentRange.EndDateTime = barTime;
+
+        if (this.UseExtendLines && this.extendSession != null)
+        {
+            var mainStartUtc = this.currentRange.StartDateTime;
+
+            var startTimeLocal = DateTime.SpecifyKind(
+                this.currentRange.EndDateTime.Date.AddTicks(this.extendSession.OpenTime.Ticks),
+                DateTimeKind.Local);
+
+            var endTimeLocal = DateTime.SpecifyKind(
+                this.currentRange.EndDateTime.Date.AddTicks(this.extendSession.CloseTime.Ticks),
+                DateTimeKind.Local);
+
+            var extendStartUtc = Core.Instance.TimeUtils.ConvertFromSelectedTimeZoneToUTC(startTimeLocal);
+            var extendEndUtc = Core.Instance.TimeUtils.ConvertFromSelectedTimeZoneToUTC(endTimeLocal);
+
+            if (extendStartUtc >= extendEndUtc)
+                extendEndUtc = extendEndUtc.AddDays(1);
+
+            if (extendStartUtc < mainStartUtc && extendEndUtc < mainStartUtc)
+            {
+                extendStartUtc = extendStartUtc.AddDays(1);
+                extendEndUtc = extendEndUtc.AddDays(1);
+            }
+
+            this.currentRange.ExtendStartDateTime = extendStartUtc;
+            this.currentRange.ExtendEndDateTime = extendEndUtc;
+        }
+
+        if (!this.DynamicMode)
+            return;
+
+        int availableVisibleSlots = this.rangeCache.Count - this.PreviousDataOffset;
+        if (availableVisibleSlots < 0)
+            availableVisibleSlots = 0;
+
+        int visibleSlots = Math.Min(this.DaysCount, availableVisibleSlots);
+
+        int drawBegin = this.Count;
+        if (visibleSlots > 0)
+        {
+            int oldestVisibleSlotIndex = visibleSlots - 1;
+
+            int drawBeginIndex = (int)this.HistoricalData.GetIndexByTime(
+                this.rangeCache[oldestVisibleSlotIndex].StartDateTime.Ticks,
+                SeekOriginHistory.Begin);
+
+            if (drawBeginIndex < 0)
+                drawBeginIndex = 0;
+
+            drawBegin = drawBeginIndex;
+        }
+
+        this.LinesSeries[SERIES_DYNAMIC_HIGH].DrawBegin = drawBegin;
+        this.LinesSeries[SERIES_DYNAMIC_LOW].DrawBegin = drawBegin;
+        this.LinesSeries[SERIES_DYNAMIC_MIDDLE].DrawBegin = drawBegin;
+
+        if (visibleSlots <= 0 || this.PreviousDataOffset >= this.rangeCache.Count)
+        {
+            this.SetValue(double.NaN, SERIES_DYNAMIC_HIGH);
+            this.SetValue(double.NaN, SERIES_DYNAMIC_LOW);
+            this.SetValue(double.NaN, SERIES_DYNAMIC_MIDDLE);
+            return;
+        }
+
+        var sourceRange = this.rangeCache[this.PreviousDataOffset];
+
+        this.SetValue(sourceRange.High, SERIES_DYNAMIC_HIGH);
+        this.SetValue(sourceRange.Low, SERIES_DYNAMIC_LOW);
+        this.SetValue(sourceRange.MiddlePrice, SERIES_DYNAMIC_MIDDLE);
     }
 
     protected override void OnClear()
     {
         this.currentRange = null;
-        this.currentSession = null;
-        this.currentSessionCloseDateTime = default;
-        this.currentSessionOpenDateTime = default;
+
+        this.intervalGenerator = null;
+        this.currentSessionRange = default;
+
+        this.fullDaySessionContainer = null;
+        this.customSessionContainer = null;
+        this.selectedSessionContainer = null;
 
         if (this.CurrentChart != null)
             this.CurrentChart.SettingsChanged -= this.CurrentChartOnSettingsChanged;
@@ -495,10 +683,6 @@ public class IndicatorDailyOHLC : Indicator
         {
             var settings = base.Settings;
 
-            var allDay = new SelectItem("All day", DailyOHLCSessionType.AllDay);
-            var specifiedSession = new SelectItem("Specified session", DailyOHLCSessionType.SpecifiedSession);
-            var customRange = new SelectItem("Custom range", DailyOHLCSessionType.CustomRange);
-
             var belowTL = new SelectItem("Below the line", 0);
             var aboveTL = new SelectItem("Above the line", 1);
             var centerTL = new SelectItem("Center on the line", 2);
@@ -513,61 +697,98 @@ public class IndicatorDailyOHLC : Indicator
             var formatTextPrice = new SelectItem("Text and Price", 1);
             var formatText = new SelectItem("Text", 2);
 
+            var daily = new SelectItem("Daily", DailyOHLCPeriodType.Daily);
+            var weekly = new SelectItem("Weekly", DailyOHLCPeriodType.Weekly);
+            var monthly = new SelectItem("Monthly", DailyOHLCPeriodType.Monthly);
+
             //
             var defaultSeparator = settings.FirstOrDefault()?.SeparatorGroup;
 
-            settings.Add(new SettingItemSelectorLocalized("Session type", new SelectItem("Session type", this.DailySessionType), new List<SelectItem>
-                                 {
-                                     allDay,
-                                     specifiedSession,
-                                     customRange
-                                 })
+            var allDay = new SelectItem(ALL_DAY_SESSION_TYPE, DailyOHLCSessionType.AllDay);
+            var specifiedSession = new SelectItem(SPECIFIED_SESSION_TYPE, DailyOHLCSessionType.SpecifiedSession);
+            var customRange = new SelectItem(CUSTOM_RANGE_SESSION_TYPE, DailyOHLCSessionType.CustomRange);
+            var dailyPeriodRelation = new SettingItemRelationVisibility(PERIOD_TYPE_NAME_SI, daily);
+            var specifiedSessionRelation = new SettingItemRelationVisibility(SESSION_TYPE_NAME_SI, specifiedSession);
+            var customRangeRelation = new SettingItemRelationVisibility(SESSION_TYPE_NAME_SI, customRange);
+
+            var specifiedSessionDailyRelation = new SettingItemMultipleRelation(dailyPeriodRelation, specifiedSessionRelation);
+            var customRangeDailyRelation = new SettingItemMultipleRelation(dailyPeriodRelation, customRangeRelation);
+
+            var dynamicModeOffRelation = new SettingItemRelationVisibility("Dynamic mode", false);
+            var dynamicModeOnRelation = new SettingItemRelationVisibility("Dynamic mode", true);
+
+            settings.Add(new SettingItemSelectorLocalized(
+                PERIOD_TYPE_NAME_SI,
+                new SelectItem(PERIOD_TYPE_NAME_SI, this.PeriodType),
+                new List<SelectItem> { daily, weekly, monthly })
             {
                 SeparatorGroup = defaultSeparator,
-                Text = "Session type",
+                Text = PERIOD_TYPE_NAME_SI,
+                SortIndex = 5,
+            });
+
+
+            settings.Add(new SettingItemSelectorLocalized(
+           SESSION_TYPE_NAME_SI,
+           new SelectItem(SESSION_TYPE_NAME_SI, this.DailySessionType),
+           new List<SelectItem> { allDay, specifiedSession, customRange })
+            {
+                SeparatorGroup = defaultSeparator,
+                Text = SESSION_TYPE_NAME_SI,
                 SortIndex = 10,
+                Relation = dailyPeriodRelation
             });
-            //
-            settings.Add(new SettingItemString("Custom session name", this.CustomSessionName, 20)
+
+            var defaultItem = new SelectItem(CHART_SESSION_CONTAINER_SELECT_ITEM);
+            var items = new List<SelectItem> { defaultItem };
+            items.AddRange(Core.Instance.CustomSessions.Select(s => new SelectItem(s.Name, s.Id)));
+
+            var selectedItem = items.FirstOrDefault(i => Equals(i.Value, this.specifiedSessionContainerId)) ?? items.First();
+
+            settings.Add(new SettingItemSelectorLocalized(SESSION_TEMPLATE_NAME_SI, selectedItem, items, 20)
             {
                 SeparatorGroup = defaultSeparator,
-                Text = loc._("Custom session name"),
-                Relation = new SettingItemRelationVisibility("Session type", specifiedSession)
+                Text = loc._("Sessions template"),
+                Relation = specifiedSessionDailyRelation
             });
-            settings.Add(new SettingItemDateTime("Start time", this.customRangeStartTime, 20)
+
+            settings.Add(new SettingItemDateTime(CUSTOM_OPEN_SESSION_NAME_SI, this.CustomRangeStartTime, 20)
             {
                 SeparatorGroup = defaultSeparator,
                 Text = loc._("Start time"),
                 Format = DatePickerFormat.LongTime,
                 ValueChangingBehavior = SettingItemValueChangingBehavior.WithConfirmation,
-                Relation = new SettingItemRelationVisibility("Session type", customRange)
+                Relation = customRangeDailyRelation
             });
-            settings.Add(new SettingItemDateTime("End time", this.customRangeEndTime, 20)
+
+            settings.Add(new SettingItemDateTime(CUSTOM_CLOSE_SESSION_NAME_SI, this.CustomRangeEndTime, 20)
             {
                 SeparatorGroup = defaultSeparator,
                 Text = loc._("End time"),
                 Format = DatePickerFormat.LongTime,
                 ValueChangingBehavior = SettingItemValueChangingBehavior.WithConfirmation,
-                Relation = new SettingItemRelationVisibility("Session type", customRange)
+                Relation = customRangeDailyRelation
             });
-            settings.Add(new SettingItemInteger("Numbers of days to calculate", this.DaysCount, 20)
+
+            settings.Add(new SettingItemInteger(PERIODS_COUNT_NAME_SI, this.DaysCount, 20)
             {
                 SeparatorGroup = defaultSeparator,
-                Text = loc._("Numbers of days to calculate"),
-                Relation = new SettingItemRelationVisibility("Session type", allDay, specifiedSession, customRange)
+                Text = loc._(PERIODS_COUNT_NAME_SI),
+                Minimum = 1
             });
-            settings.Add(new SettingItemInteger("Use previous data (offset in days)", this.PreviousDataOffset, 20)
+
+            settings.Add(new SettingItemInteger(PREVIOUS_DATA_OFFSET_NAME_SI, this.PreviousDataOffset, 20)
             {
                 SeparatorGroup = defaultSeparator,
-                Text = loc._("Use previous data (offset in days)"),
-                Relation = new SettingItemRelationVisibility("Session type", allDay, specifiedSession, customRange)
+                Text = loc._(PREVIOUS_DATA_OFFSET_NAME_SI),
+                Minimum = 0
             });
             settings.Add(new SettingItemBoolean("Show extend lines", this.UseExtendLines, 40)
             {
                 SeparatorGroup = defaultSeparator,
                 Text = loc._("Show extend lines"),
             });
-            settings.Add(new SettingItemDateTime("Start extend time", this.CustomRangeStartTime, 45)
+            settings.Add(new SettingItemDateTime("Start extend time", this.ExtendRangeStartTime, 45)
             {
                 SeparatorGroup = defaultSeparator,
                 Text = loc._("Start extend time"),
@@ -575,7 +796,7 @@ public class IndicatorDailyOHLC : Indicator
                 ValueChangingBehavior = SettingItemValueChangingBehavior.WithConfirmation,
                 Relation = new SettingItemRelationVisibility("Show extend lines", true)
             });
-            settings.Add(new SettingItemDateTime("End extend time", this.CustomRangeEndTime, 50)
+            settings.Add(new SettingItemDateTime("End extend time", this.ExtendRangeEndTime, 50)
             {
                 SeparatorGroup = defaultSeparator,
                 Text = loc._("End extend time"),
@@ -659,13 +880,13 @@ public class IndicatorDailyOHLC : Indicator
             {
                 SeparatorGroup = highLineStyleSeparator,
                 Text = loc._("Main line style"),
-                ExcludedStyles = new LineStyle[] { LineStyle.Points }
+                ExcludedStyles = new LineStyle[] { LineStyle.Points },
             });
             settings.Add(new SettingItemLineOptions("HighExtendLineOptions", this.HighExtendLineOptions, 60)
             {
                 SeparatorGroup = highLineStyleSeparator,
                 Text = loc._("Extend line style"),
-                ExcludedStyles = new LineStyle[] { LineStyle.Points }
+                ExcludedStyles = new LineStyle[] { LineStyle.Points },
             });
             settings.Add(new SettingItemBoolean("ShowHighLineLabel", this.ShowHighLineLabel, 60)
             {
@@ -677,6 +898,33 @@ public class IndicatorDailyOHLC : Indicator
                 SeparatorGroup = highLineStyleSeparator,
                 Text = loc._("Custom text"),
                 Relation = new SettingItemRelationVisibility("Format", formatText, formatTextPrice)
+            });
+            settings.Add(new SettingItemSelectorLocalized(
+            "High label alignment",
+            new SelectItem("High label alignment", this.HighLabelHorizontalMode),
+            new List<SelectItem> { labRight, labLeft, labCentered, labRightEdge, labPriceScale })
+            {
+                SeparatorGroup = highLineStyleSeparator,
+                Text = loc._("Label alignment"),
+                Relation = new SettingItemRelationVisibility("ShowLabel", true)
+            });
+
+            settings.Add(new SettingItemInteger("High last labels count", this.HighLastLabelsCount, 61)
+            {
+                SeparatorGroup = highLineStyleSeparator,
+                Text = loc._("Last labels count"),
+                Relation = new SettingItemRelationVisibility("High label alignment", labRightEdge, labPriceScale),
+                Minimum = 1
+            });
+
+            settings.Add(new SettingItemSelectorLocalized(
+                "High label position",
+                new SelectItem("High label position", this.HighLabelPosition),
+                new List<SelectItem> { belowTL, aboveTL, centerTL })
+            {
+                SeparatorGroup = highLineStyleSeparator,
+                Text = loc._("Label position"),
+                Relation = new SettingItemRelationVisibility("ShowLabel", true)
             });
             settings.Add(new SettingItemInteger("High label offset (px)", this.HighLabelOffsetPx, 62)
             {
@@ -693,13 +941,13 @@ public class IndicatorDailyOHLC : Indicator
             {
                 SeparatorGroup = lowLineStyleSeparator,
                 Text = loc._("Main line style"),
-                ExcludedStyles = new LineStyle[] { LineStyle.Points }
+                ExcludedStyles = new LineStyle[] { LineStyle.Points },
             });
             settings.Add(new SettingItemLineOptions("LowExtendLineOptions", this.LowExtendLineOptions, 60)
             {
                 SeparatorGroup = lowLineStyleSeparator,
                 Text = loc._("Extend line style"),
-                ExcludedStyles = new LineStyle[] { LineStyle.Points }
+                ExcludedStyles = new LineStyle[] { LineStyle.Points },
             });
             settings.Add(new SettingItemBoolean("ShowLowLineLabel", this.ShowLowLineLabel, 60)
             {
@@ -811,13 +1059,13 @@ public class IndicatorDailyOHLC : Indicator
             {
                 SeparatorGroup = middleLineStyleSeparator,
                 Text = loc._("Main line style"),
-                ExcludedStyles = new LineStyle[] { LineStyle.Points }
+                ExcludedStyles = new LineStyle[] { LineStyle.Points },
             });
             settings.Add(new SettingItemLineOptions("MiddleExtendLineOptions", this.MiddleExtendLineOptions, 60)
             {
                 SeparatorGroup = middleLineStyleSeparator,
                 Text = loc._("Extend line style"),
-                ExcludedStyles = new LineStyle[] { LineStyle.Points }
+                ExcludedStyles = new LineStyle[] { LineStyle.Points },
             });
             settings.Add(new SettingItemBoolean("ShowMiddleLineLabel", this.ShowMiddleLineLabel, 60)
             {
@@ -863,6 +1111,18 @@ public class IndicatorDailyOHLC : Indicator
                 Minimum = -2000
             });
 
+            settings.Add(new SettingItemBoolean("Dynamic mode", this.DynamicMode, 39)
+            {
+                SeparatorGroup = defaultSeparator,
+                Text = "Dynamic mode"
+            });
+
+            settings.Add(new SettingItemBoolean("Show price for label", this.ShowPriceForLabel, 60)
+            {
+                SeparatorGroup = defaultSeparator,
+                Text = loc._("Show price for label"),
+                Relation = new SettingItemRelationVisibility("ShowLabel", true)
+            });
 
             return settings;
         }
@@ -934,38 +1194,94 @@ public class IndicatorDailyOHLC : Indicator
 
 
             var needRefresh = false;
-            if (holder.TryGetValue("Session type", out item) && item.GetValue<DailyOHLCSessionType>() != this.DailySessionType)
+            if (holder.TryGetValue(PERIOD_TYPE_NAME_SI, out item))
+            {
+                var newValue = item.GetValue<DailyOHLCPeriodType>();
+
+                if (this.PeriodType != newValue)
+                {
+                    this.PeriodType = newValue;
+                    needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
+                }
+            }
+
+            if (holder.TryGetValue(SESSION_TYPE_NAME_SI, out item) &&
+                item.GetValue<DailyOHLCSessionType>() != this.DailySessionType)
             {
                 this.DailySessionType = item.GetValue<DailyOHLCSessionType>();
                 needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
             }
-            if (holder.TryGetValue("Custom session name", out item) && item.Value is string customSessionName)
-                this.CustomSessionName = customSessionName;
-            if (holder.TryGetValue("Start time", out item) && item.Value is DateTime dtStartTime)
+
+            if (holder.TryGetValue(SESSION_TEMPLATE_NAME_SI, out item))
             {
-                this.customRangeStartTime = dtStartTime;
-                needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
+                var newContainerId = item.GetValue<string>();
+
+                if (newContainerId != this.specifiedSessionContainerId)
+                {
+                    this.specifiedSessionContainerId = newContainerId;
+
+                    if (newContainerId == CHART_SESSION_CONTAINER_SELECT_ITEM)
+                        this.selectedSessionContainer = null;
+                    else
+                        this.selectedSessionContainer = Core.Instance.CustomSessions[this.specifiedSessionContainerId];
+
+                    needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
+                }
             }
-            if (holder.TryGetValue("End time", out item) && item.Value is DateTime dtEndTime)
+
+            if (holder.TryGetValue(CUSTOM_OPEN_SESSION_NAME_SI, out item))
             {
-                this.customRangeEndTime = dtEndTime;
-                needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
+                var newValue = Core.Instance.TimeUtils.ConvertFromSelectedTimeZoneToUTC(item.GetValue<DateTime>());
+
+                if (this.CustomRangeStartTime != newValue)
+                {
+                    this.CustomRangeStartTime = newValue;
+                    needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
+                }
             }
-            if (holder.TryGetValue("Numbers of days to calculate", out item) && item.Value is int daysCount)
+
+            if (holder.TryGetValue(CUSTOM_CLOSE_SESSION_NAME_SI, out item))
+            {
+                var newValue = Core.Instance.TimeUtils.ConvertFromSelectedTimeZoneToUTC(item.GetValue<DateTime>());
+
+                if (this.CustomRangeEndTime != newValue)
+                {
+                    this.CustomRangeEndTime = newValue;
+                    needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
+                }
+            }
+            if (holder.TryGetValue(PERIODS_COUNT_NAME_SI, out item) && item.Value is int daysCount)
+            {
                 this.DaysCount = daysCount;
-            if (holder.TryGetValue("Use previous data (offset in days)", out item) && item.Value is int previousDataOffset)
+                needRefresh = true;
+            }
+            if (holder.TryGetValue(PREVIOUS_DATA_OFFSET_NAME_SI, out item) && item.Value is int previousDataOffset)
+            {
                 this.PreviousDataOffset = previousDataOffset;
+                needRefresh = true;
+            }
             if (holder.TryGetValue("Show extend lines", out item) && item.Value is bool useExtendLines)
                 this.UseExtendLines = useExtendLines;
-            if (holder.TryGetValue("Start extend time", out item) && item.Value is DateTime dtStartExtendTime)
+            if (holder.TryGetValue("Start extend time", out item))
             {
-                this.extendRangeStartTime = dtStartExtendTime;
-                needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
+                var newValue = Core.Instance.TimeUtils.ConvertFromSelectedTimeZoneToUTC(item.GetValue<DateTime>());
+
+                if (this.ExtendRangeStartTime != newValue)
+                {
+                    this.ExtendRangeStartTime = newValue;
+                    needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
+                }
             }
-            if (holder.TryGetValue("End extend time", out item) && item.Value is DateTime dtEndExtendTime)
+
+            if (holder.TryGetValue("End extend time", out item))
             {
-                this.extendRangeEndTime = dtEndExtendTime;
-                needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
+                var newValue = Core.Instance.TimeUtils.ConvertFromSelectedTimeZoneToUTC(item.GetValue<DateTime>());
+
+                if (this.ExtendRangeEndTime != newValue)
+                {
+                    this.ExtendRangeEndTime = newValue;
+                    needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
+                }
             }
 
             if (holder.TryGetValue("Font", out item) && item.Value is Font font)
@@ -1011,6 +1327,17 @@ public class IndicatorDailyOHLC : Indicator
             if (holder.TryGetValue("Middle last labels count", out var mCnt) && mCnt.Value is int mlc)
                 this.MiddleLastLabelsCount = mlc;
 
+            if (holder.TryGetValue("Dynamic mode", out item) && item.Value is bool dynamicMode)
+            {
+                if (this.DynamicMode != dynamicMode)
+                {
+                    this.DynamicMode = dynamicMode;
+                    needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
+                }
+            }
+            if (holder.TryGetValue("Show price for label", out item) && item.Value is bool showPriceForLabel)
+                this.ShowPriceForLabel = showPriceForLabel;
+
             if (needRefresh)
                 this.Refresh();
 
@@ -1037,10 +1364,8 @@ public class IndicatorDailyOHLC : Indicator
             {
                 if (i >= this.rangeCache.Count)
                     break;
-
                 var range = this.rangeCache[i];
                 bool isMainRangeOutside = range.EndDateTime < leftTime || range.StartDateTime > rightTime;
-                bool needDrawExtendLines = this.UseExtendLines && range.ExtendStartDateTime != range.ExtendEndDateTime; 
 
                 bool anyEdgeLabelWanted =
                     (this.ShowHighLineLabel   && IsEdgeMode(this.HighLabelHorizontalMode))   ||
@@ -1049,9 +1374,13 @@ public class IndicatorDailyOHLC : Indicator
                     (this.ShowCloseLineLabel  && IsEdgeMode(this.CloseLabelHorizontalMode))  ||
                     (this.ShowMiddleLineLabel && IsEdgeMode(this.MiddleLabelHorizontalMode));
 
-                bool extendIsOutside = (!needDrawExtendLines || range.ExtendEndDateTime < leftTime || range.ExtendStartDateTime > rightTime);
+                bool needDrawExtendLines =
+                    this.UseExtendLines &&
+                    range.ExtendStartDateTime != range.ExtendEndDateTime &&
+                    range.ExtendEndDateTime >= this.HistoricalData[0, SeekOriginHistory.Begin].TimeLeft &&
+                    range.ExtendStartDateTime >= this.HistoricalData[0, SeekOriginHistory.Begin].TimeLeft;
 
-                if (isMainRangeOutside && extendIsOutside && !anyEdgeLabelWanted)
+                if (isMainRangeOutside && !needDrawExtendLines && !anyEdgeLabelWanted)
                     continue;
 
                 int prevDailyRangeOffset = i + this.PreviousDataOffset;
@@ -1089,17 +1418,18 @@ public class IndicatorDailyOHLC : Indicator
                 if (needUsePreviosRange)
                     range = this.rangeCache[prevDailyRangeOffset];
 
+
                 // --- HIGH ---
                 if (this.HighLineOptions.Enabled || this.HighExtendLineOptions.Enabled || (this.ShowHighLineLabel && IsEdgeMode(this.HighLabelHorizontalMode)))
                 {
                     float highYReal = (float)currentWindow.CoordinatesConverter.GetChartY(range.High);
                     bool yVisible = highYReal > top && highYReal < bottom;
-
-                    if (yVisible && !isMainRangeOutside && this.HighLineOptions.Enabled)
+                    if (!this.DynamicMode && yVisible && !isMainRangeOutside && this.HighLineOptions.Enabled)
                         gr.DrawLine(this.highLinePen, leftX, highYReal, rightX, highYReal);
 
                     if (yVisible && needDrawExtendLines && this.HighExtendLineOptions.Enabled)
                         gr.DrawLine(this.highExtendLinePen, leftExtendX, highYReal, rightExtendX, highYReal);
+
                     bool edgeMode = IsEdgeMode(this.HighLabelHorizontalMode);
                     int maxHighDays = edgeMode ? Math.Max(0, Math.Min(this.HighLastLabelsCount, this.DaysCount)) : int.MaxValue;
                     bool allowHighLabel = this.ShowHighLineLabel && (((yVisible && !isMainRangeOutside)) || edgeMode) && i < maxHighDays;
@@ -1121,7 +1451,7 @@ public class IndicatorDailyOHLC : Indicator
                     float lowYReal = (float)currentWindow.CoordinatesConverter.GetChartY(range.Low);
                     bool yVisible = lowYReal > top && lowYReal < bottom;
 
-                    if (yVisible && !isMainRangeOutside && this.LowLineOptions.Enabled)
+                    if (!this.DynamicMode && yVisible && !isMainRangeOutside && this.LowLineOptions.Enabled)
                         gr.DrawLine(this.lowLinePen, leftX, lowYReal, rightX, lowYReal);
 
                     if (yVisible && needDrawExtendLines && this.LowExtendLineOptions.Enabled)
@@ -1141,6 +1471,31 @@ public class IndicatorDailyOHLC : Indicator
                     }
                 }
 
+                // --- MIDDLE ---
+                if (this.MiddleLineOptions.Enabled || this.MiddleExtendLineOptions.Enabled || (this.ShowMiddleLineLabel && IsEdgeMode(this.MiddleLabelHorizontalMode)))
+                {
+                    float middleYReal = (float)currentWindow.CoordinatesConverter.GetChartY(range.MiddlePrice);
+                    bool yVisible = middleYReal > top && middleYReal < bottom;
+
+                    if (!this.DynamicMode && yVisible && !isMainRangeOutside && this.MiddleLineOptions.Enabled)
+                        gr.DrawLine(this.middleLinePen, leftX, middleYReal, rightX, middleYReal);
+
+                    if (yVisible && needDrawExtendLines && this.MiddleExtendLineOptions.Enabled)
+                        gr.DrawLine(this.middleExtendLinePen, leftExtendX, middleYReal, rightExtendX, middleYReal);
+
+                    bool edgeMode = IsEdgeMode(this.MiddleLabelHorizontalMode);
+                    int maxMiddleDays = edgeMode ? Math.Max(0, Math.Min(this.MiddleLastLabelsCount, this.DaysCount)) : int.MaxValue;
+                    bool allowMiddleLabel = this.ShowMiddleLineLabel && (((yVisible && !isMainRangeOutside)) || edgeMode) && i < maxMiddleDays;
+
+                    if (allowMiddleLabel)
+                    {
+                        float yForLabel = edgeMode ? ClampY(middleYReal, args.Rectangle, this.middleLineOptions.Width + 1) : middleYReal;
+                        int offsetForLastDay = (i == 0) ? this.MiddleLabelOffsetPx : 0;
+                        this.DrawBillet(gr, range.MiddlePrice, ref leftX, ref rightX, ref yForLabel,
+                            this.CurrentFont, this.middleLineOptions, this.middleLinePen, this.centerNearSF, args.Rectangle, MiddleCustomText,
+                            this.MiddleLabelPosition, this.MiddleLabelHorizontalMode, offsetForLastDay);
+                    }
+                }
 
                 // --- OPEN ---
                 if (this.OpenLineOptions.Enabled || this.OpenExtendLineOptions.Enabled || (this.ShowOpenLineLabel && IsEdgeMode(this.OpenLabelHorizontalMode)))
@@ -1195,34 +1550,6 @@ public class IndicatorDailyOHLC : Indicator
                             this.CloseLabelPosition, this.CloseLabelHorizontalMode, offsetForLastDay);
                     }
                 }
-
-
-                // --- MIDDLE ---
-                if (this.MiddleLineOptions.Enabled || this.MiddleExtendLineOptions.Enabled || (this.ShowMiddleLineLabel && IsEdgeMode(this.MiddleLabelHorizontalMode)))
-                {
-                    float middleYReal = (float)currentWindow.CoordinatesConverter.GetChartY(range.MiddlePrice);
-                    bool yVisible = middleYReal > top && middleYReal < bottom;
-
-                    if (yVisible && !isMainRangeOutside && this.MiddleLineOptions.Enabled)
-                        gr.DrawLine(this.middleLinePen, leftX, middleYReal, rightX, middleYReal);
-
-                    if (yVisible && needDrawExtendLines && this.MiddleExtendLineOptions.Enabled)
-                        gr.DrawLine(this.middleExtendLinePen, leftExtendX, middleYReal, rightExtendX, middleYReal);
-
-                    bool edgeMode = IsEdgeMode(this.MiddleLabelHorizontalMode);
-                    int maxMiddleDays = edgeMode ? Math.Max(0, Math.Min(this.MiddleLastLabelsCount, this.DaysCount)) : int.MaxValue;
-                    bool allowMiddleLabel = this.ShowMiddleLineLabel && (((yVisible && !isMainRangeOutside)) || edgeMode) && i < maxMiddleDays;
-
-                    if (allowMiddleLabel)
-                    {
-                        float yForLabel = edgeMode ? ClampY(middleYReal, args.Rectangle, this.middleLineOptions.Width + 1) : middleYReal;
-                        int offsetForLastDay = (i == 0) ? this.MiddleLabelOffsetPx : 0;
-                        this.DrawBillet(gr, range.MiddlePrice, ref leftX, ref rightX, ref yForLabel,
-                            this.CurrentFont, this.middleLineOptions, this.middleLinePen, this.centerNearSF, args.Rectangle, MiddleCustomText,
-                            this.MiddleLabelPosition, this.MiddleLabelHorizontalMode, offsetForLastDay);
-                    }
-                }
-
             }
         }
         catch (Exception ex)
@@ -1239,7 +1566,7 @@ public class IndicatorDailyOHLC : Indicator
     {
         min = Const.DOUBLE_UNDEFINED;
         max = Const.DOUBLE_UNDEFINED;
-        if(fromOffset >= this.HistoricalData.Count)
+        if (fromOffset >= this.HistoricalData.Count)
             fromOffset = this.HistoricalData.Count - 1;
         var fromTime = this.HistoricalData[toOffset].TicksLeft;
         var toTime = this.HistoricalData[fromOffset].TicksLeft;
@@ -1284,14 +1611,38 @@ public class IndicatorDailyOHLC : Indicator
 
     private void CurrentChartOnSettingsChanged(object sender, ChartEventArgs e)
     {
-        if (this.DailySessionType == DailyOHLCSessionType.SpecifiedSession)
+        if (this.DailySessionType == DailyOHLCSessionType.SpecifiedSession &&
+            this.specifiedSessionContainerId == CHART_SESSION_CONTAINER_SELECT_ITEM)
         {
             if (this.CurrentChart?.CurrentSessionContainer == null || this.chartSessionContainer == null)
                 return;
 
             if (!this.chartSessionContainer.Equals(this.CurrentChart.CurrentSessionContainer))
+            {
+                this.chartSessionContainer = this.CurrentChart.CurrentSessionContainer;
                 this.Refresh();
+            }
         }
+    }
+    private TradingPlatform.BusinessLayer.TimeZone GetTimeZone()
+    {
+        return this.CurrentChart?.CurrentTimeZone ?? Core.Instance.TimeUtils.SelectedTimeZone;
+    }
+
+    private CustomSession CreateCustomSession(TimeSpan open, TimeSpan close, TimeZoneInfo info)
+    {
+        var session = new CustomSession
+        {
+            OpenOffset = open,
+            CloseOffset = close,
+            IsActive = true,
+            Name = "Main",
+            Days = Enum.GetValues(typeof(DayOfWeek)).Cast<DayOfWeek>().ToArray(),
+            Type = SessionType.Main
+        };
+
+        session.RecalculateOpenCloseTime(info);
+        return session;
     }
 
     private void DrawBillet(Graphics gr, double price, ref float leftX, ref float rightX, ref float priceY,
@@ -1301,9 +1652,9 @@ public class IndicatorDailyOHLC : Indicator
     {
         string label = "";
         if (ShowLabel)
-            label = labelFormat == 1 ? prefix + this.Symbol.FormatPrice(price)
-                                     : labelFormat == 0 ? this.Symbol.FormatPrice(price)
-                                                        : prefix;
+            label = this.ShowPriceForLabel
+                ? prefix + this.Symbol.FormatPrice(price)
+                : prefix;
 
         var labelSize = gr.MeasureString(label, font);
 
@@ -1365,22 +1716,6 @@ public class IndicatorDailyOHLC : Indicator
         gr.DrawString(label, font, Brushes.White, rect, stringFormat);
     }
 
-    private Session CreateDefaultSession()
-    {
-        // 00:00
-        var startTime = new DateTime(Core.Instance.TimeUtils.DateTimeUtcNow.Date.Ticks, DateTimeKind.Unspecified);
-        // 23:59:59
-        var endTime = new DateTime(Core.Instance.TimeUtils.DateTimeUtcNow.Date.AddHours(23).AddMinutes(59).AddSeconds(59).Ticks, DateTimeKind.Unspecified);
-
-        var timeZone = this.CurrentChart?.CurrentTimeZone ?? Core.Instance.TimeUtils.SelectedTimeZone;
-        return new Session("Default",
-            Core.Instance.TimeUtils.ConvertFromTimeZoneToUTC(startTime, timeZone).TimeOfDay,
-            Core.Instance.TimeUtils.ConvertFromTimeZoneToUTC(endTime, timeZone).TimeOfDay);
-    }
-
-    private IList<ISession> GetAvailableCustomChartSessions() => this.chartSessionContainer?.ActiveSessions?.ToList() ?? new List<ISession>();
-    private IList<ISession> GetAvailableSymbolSessions() => this.Symbol?.CurrentSessionsInfo?.ActiveSessions?.ToList() ?? new List<ISession>();
-
     private static bool IsEdgeMode(int horizontalMode) => horizontalMode == 3 || horizontalMode == 4;
     private static float ClampY(float y, Rectangle rect, int padPx)
     {
@@ -1441,80 +1776,82 @@ public class IndicatorDailyOHLC : Indicator
     }
 }
 
-    #region Nested
+#region Nested
 
-    internal class DailyRangeItem
+internal class DailyRangeItem
+{
+    public double High { get; private set; }
+    public double Low { get; private set; }
+    public double Open { get; private set; }
+    public double Close { get; private set; }
+    public double MiddlePrice => (this.High + this.Low) / 2;
+
+    public DateTime StartDateTime { get; internal set; }
+    public DateTime EndDateTime { get; internal set; }
+    public DateTime ExtendStartDateTime { get; internal set; }
+    public DateTime ExtendEndDateTime { get; internal set; }
+
+    public DailyRangeItem(DateTime startDateTime, double openPrice)
     {
-        public double High { get; private set; }
-        public double Low { get; private set; }
-        public double Open { get; private set; }
-        public double Close { get; private set; }
-        public double MiddlePrice => (this.High + this.Low) / 2;
+        this.StartDateTime = startDateTime;
+        this.Open = openPrice;
 
-        public DateTime StartDateTime { get; internal set; }
-        public DateTime EndDateTime { get; internal set; }
-        public DateTime ExtendStartDateTime { get; internal set; }
-        public DateTime ExtendEndDateTime { get; internal set; }
-
-        public DailyRangeItem(DateTime startDateTime, double openPrice)
-        {
-            this.StartDateTime = startDateTime;
-            this.Open = openPrice;
-
-            this.High = double.MinValue;
-            this.Low = double.MaxValue;
-        }
-
-        public bool TryUpdate(double high, double low, double close)
-        {
-            bool updated = false;
-
-            if (this.High < high)
-            {
-                this.High = high;
-                updated = true;
-            }
-
-            if (this.Low > low)
-            {
-                this.Low = low;
-                updated = true;
-            }
-
-            if (this.Close != close)
-            {
-                this.Close = close;
-                updated = true;
-            }
-
-            return updated;
-        }
-        public bool TryUpdate(double close)
-        {
-            bool updated = false;
-
-            if (this.High < close)
-            {
-                this.High = close;
-                updated = true;
-            }
-
-            if (this.Low > close)
-            {
-                this.Low = close;
-                updated = true;
-            }
-
-            if (this.Close != close)
-            {
-                this.Close = close;
-                updated = true;
-            }
-            return updated;
-        }
+        this.High = double.MinValue;
+        this.Low = double.MaxValue;
     }
 
-    public enum DailyOHLCSessionType { AllDay, SpecifiedSession, CustomRange, }
-    public enum DailyOHLCLabelPosition { Left, Center, Right }
+    public bool TryUpdate(double high, double low, double close)
+    {
+        bool updated = false;
 
-    #endregion Nested
+        if (this.High < high)
+        {
+            this.High = high;
+            updated = true;
+        }
+
+        if (this.Low > low)
+        {
+            this.Low = low;
+            updated = true;
+        }
+
+        if (this.Close != close)
+        {
+            this.Close = close;
+            updated = true;
+        }
+
+        return updated;
+    }
+    public bool TryUpdate(double close)
+    {
+        bool updated = false;
+
+        if (this.High < close)
+        {
+            this.High = close;
+            updated = true;
+        }
+
+        if (this.Low > close)
+        {
+            this.Low = close;
+            updated = true;
+        }
+
+        if (this.Close != close)
+        {
+            this.Close = close;
+            updated = true;
+        }
+        return updated;
+    }
+}
+
+public enum DailyOHLCSessionType { AllDay, SpecifiedSession, CustomRange, }
+public enum DailyOHLCLabelPosition { Left, Center, Right }
+
+public enum DailyOHLCPeriodType { Daily, Weekly, Monthly }
+
+#endregion Nested
