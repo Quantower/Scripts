@@ -1231,9 +1231,10 @@ public class IndicatorDailyOHLC : Indicator
 
             if (holder.TryGetValue(CUSTOM_OPEN_SESSION_NAME_SI, out item))
             {
-                var newValue = Core.Instance.TimeUtils.ConvertFromSelectedTimeZoneToUTC(item.GetValue<DateTime>());
+                var dateTime = /*DateTime.SpecifyKind(*/item.GetValue<DateTime>()/*, DateTimeKind.Local)*/;
+                var newValue = Core.Instance.TimeUtils.ConvertFromSelectedTimeZoneToUTC(dateTime);
 
-                if (this.CustomRangeStartTime != newValue)
+                if (Core.Instance.TimeUtils.ConvertFromSelectedTimeZoneToUTC(this.CustomRangeStartTime) != newValue)
                 {
                     this.CustomRangeStartTime = newValue;
                     needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
@@ -1242,9 +1243,10 @@ public class IndicatorDailyOHLC : Indicator
 
             if (holder.TryGetValue(CUSTOM_CLOSE_SESSION_NAME_SI, out item))
             {
-                var newValue = Core.Instance.TimeUtils.ConvertFromSelectedTimeZoneToUTC(item.GetValue<DateTime>());
+                var dateTime = item.GetValue<DateTime>();
+                var newValue = Core.Instance.TimeUtils.ConvertFromSelectedTimeZoneToUTC(dateTime);
 
-                if (this.CustomRangeEndTime != newValue)
+                if (Core.Instance.TimeUtils.ConvertFromSelectedTimeZoneToUTC(this.CustomRangeEndTime) != newValue)
                 {
                     this.CustomRangeEndTime = newValue;
                     needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
@@ -1264,9 +1266,10 @@ public class IndicatorDailyOHLC : Indicator
                 this.UseExtendLines = useExtendLines;
             if (holder.TryGetValue("Start extend time", out item))
             {
-                var newValue = Core.Instance.TimeUtils.ConvertFromSelectedTimeZoneToUTC(item.GetValue<DateTime>());
+                var dateTime = item.GetValue<DateTime>();
+                var newValue = Core.Instance.TimeUtils.ConvertFromSelectedTimeZoneToUTC(dateTime);
 
-                if (this.ExtendRangeStartTime != newValue)
+                if (Core.Instance.TimeUtils.ConvertFromSelectedTimeZoneToUTC(this.ExtendRangeStartTime) != newValue)
                 {
                     this.ExtendRangeStartTime = newValue;
                     needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
@@ -1275,9 +1278,10 @@ public class IndicatorDailyOHLC : Indicator
 
             if (holder.TryGetValue("End extend time", out item))
             {
-                var newValue = Core.Instance.TimeUtils.ConvertFromSelectedTimeZoneToUTC(item.GetValue<DateTime>());
+                var dateTime = item.GetValue<DateTime>();
+                var newValue = Core.Instance.TimeUtils.ConvertFromSelectedTimeZoneToUTC(dateTime);
 
-                if (this.ExtendRangeEndTime != newValue)
+                if (Core.Instance.TimeUtils.ConvertFromSelectedTimeZoneToUTC(this.ExtendRangeEndTime) != newValue)
                 {
                     this.ExtendRangeEndTime = newValue;
                     needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
