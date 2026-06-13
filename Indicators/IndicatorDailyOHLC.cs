@@ -77,7 +77,7 @@ public class IndicatorDailyOHLC : Indicator
 
             return Core.Instance.TimeUtils.ConvertFromUTCToSelectedTimeZone(this.customRangeStartTime);
         }
-        set => this.customRangeStartTime = value;
+        set => this.customRangeStartTime = Core.Instance.TimeUtils.ConvertFromSelectedTimeZoneToUTC(value);
     }
     private DateTime customRangeStartTime;
 
@@ -758,7 +758,8 @@ public class IndicatorDailyOHLC : Indicator
                 Text = loc._("Start time"),
                 Format = DatePickerFormat.LongTime,
                 ValueChangingBehavior = SettingItemValueChangingBehavior.WithConfirmation,
-                Relation = customRangeDailyRelation
+                Relation = customRangeDailyRelation,
+                Value = Core.TimeUtils.ConvertFromSelectedTimeZoneToUTC(this.CustomRangeStartTime)
             });
 
             settings.Add(new SettingItemDateTime(CUSTOM_CLOSE_SESSION_NAME_SI, this.CustomRangeEndTime, 20)
@@ -767,7 +768,8 @@ public class IndicatorDailyOHLC : Indicator
                 Text = loc._("End time"),
                 Format = DatePickerFormat.LongTime,
                 ValueChangingBehavior = SettingItemValueChangingBehavior.WithConfirmation,
-                Relation = customRangeDailyRelation
+                Relation = customRangeDailyRelation,
+                Value = Core.TimeUtils.ConvertFromSelectedTimeZoneToUTC(this.CustomRangeEndTime)
             });
 
             settings.Add(new SettingItemInteger(PERIODS_COUNT_NAME_SI, this.DaysCount, 20)
@@ -794,7 +796,8 @@ public class IndicatorDailyOHLC : Indicator
                 Text = loc._("Start extend time"),
                 Format = DatePickerFormat.LongTime,
                 ValueChangingBehavior = SettingItemValueChangingBehavior.WithConfirmation,
-                Relation = new SettingItemRelationVisibility("Show extend lines", true)
+                Relation = new SettingItemRelationVisibility("Show extend lines", true),
+                Value = Core.TimeUtils.ConvertFromSelectedTimeZoneToUTC(this.ExtendRangeStartTime)
             });
             settings.Add(new SettingItemDateTime("End extend time", this.ExtendRangeEndTime, 50)
             {
@@ -802,7 +805,8 @@ public class IndicatorDailyOHLC : Indicator
                 Text = loc._("End extend time"),
                 Format = DatePickerFormat.LongTime,
                 ValueChangingBehavior = SettingItemValueChangingBehavior.WithConfirmation,
-                Relation = new SettingItemRelationVisibility("Show extend lines", true)
+                Relation = new SettingItemRelationVisibility("Show extend lines", true),
+                Value = Core.TimeUtils.ConvertFromSelectedTimeZoneToUTC(this.ExtendRangeEndTime)
             });
             settings.Add(new SettingItemBoolean("ShowLabel", this.ShowLabel, 60)
             {
@@ -1231,7 +1235,7 @@ public class IndicatorDailyOHLC : Indicator
 
             if (holder.TryGetValue(CUSTOM_OPEN_SESSION_NAME_SI, out item))
             {
-                var dateTime = /*DateTime.SpecifyKind(*/item.GetValue<DateTime>()/*, DateTimeKind.Local)*/;
+                var dateTime = item.GetValue<DateTime>();
                 var newValue = Core.Instance.TimeUtils.ConvertFromSelectedTimeZoneToUTC(dateTime);
 
                 if (Core.Instance.TimeUtils.ConvertFromSelectedTimeZoneToUTC(this.CustomRangeStartTime) != newValue)
