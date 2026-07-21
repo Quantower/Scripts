@@ -367,7 +367,9 @@ namespace IndicatorSwing
             if (!this.toCross)
             {
                 pivot.EndIndex = workingLimit;
-                pivot.Ended = true;
+
+                pivot.Ended = !this.toEnd;
+
                 return;
             }
 

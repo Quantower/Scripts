@@ -21,6 +21,9 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
     private const string SHOW_LABELS_SI = "Show labels";
     private const string EXTEND_TO_DAY_END_SI = "Extend to day end";
     private const string SHOW_PRICE_FOR_LABEL_SI = "Show price for label";
+    private const string SHOW_DELTA_SI = "Show delta";
+    private const string DELTA_MEASURE_SI = "Delta measure";
+    private const string DELTA_LABEL_COLOR_SI = "Delta label color";
 
     public DateTime StartTime
     {
@@ -52,6 +55,11 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
     public bool ShowLabels = true;
     public bool ExtendToDayEnd = false;
     public bool ShowPriceForLabel = true;
+    public bool ShowDelta = true;
+    public OpeningRangeDeltaMeasure DeltaMeasure = OpeningRangeDeltaMeasure.Price;
+    public Color DeltaLabelColor = Color.FromArgb(239, 83, 80);
+
+    private SolidBrush deltaLabelBrush;
 
     public bool ShowFill = true;
 
@@ -357,6 +365,34 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
                 Relation = new SettingItemRelationVisibility(SHOW_LABELS_SI, true)
             });
 
+            settings.Add(new SettingItemBoolean(SHOW_DELTA_SI, this.ShowDelta, 31)
+            {
+                Text = loc._(SHOW_DELTA_SI),
+                SeparatorGroup = defaultSeparator,
+                Relation = new SettingItemRelationVisibility(SHOW_LABELS_SI, true)
+            });
+
+            var deltaPrice = new SelectItem("Price", OpeningRangeDeltaMeasure.Price);
+            var deltaTicks = new SelectItem("Ticks", OpeningRangeDeltaMeasure.Ticks);
+
+            settings.Add(new SettingItemSelectorLocalized(
+                DELTA_MEASURE_SI,
+                new SelectItem(DELTA_MEASURE_SI, this.DeltaMeasure),
+                new List<SelectItem> { deltaPrice, deltaTicks },
+                32)
+            {
+                Text = loc._(DELTA_MEASURE_SI),
+                SeparatorGroup = defaultSeparator,
+                Relation = new SettingItemRelationVisibility(SHOW_DELTA_SI, true)
+            });
+
+            settings.Add(new SettingItemColor(DELTA_LABEL_COLOR_SI, this.DeltaLabelColor, 33)
+            {
+                Text = loc._(DELTA_LABEL_COLOR_SI),
+                SeparatorGroup = defaultSeparator,
+                Relation = new SettingItemRelationVisibility(SHOW_DELTA_SI, true)
+            });
+
             settings.Add(new SettingItemFont("LabelFont", this.LabelFont, 31)
             {
                 Text = loc._("Label font"),
@@ -438,6 +474,15 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
 
             if (holder.TryGetValue(SHOW_PRICE_FOR_LABEL_SI, out item) && item.Value is bool showPriceForLabel)
                 this.ShowPriceForLabel = showPriceForLabel;
+
+            if (holder.TryGetValue(SHOW_DELTA_SI, out item) && item.Value is bool showDelta)
+                this.ShowDelta = showDelta;
+
+            if (holder.TryGetValue(DELTA_MEASURE_SI, out item))
+                this.DeltaMeasure = item.GetValue<OpeningRangeDeltaMeasure>();
+
+            if (holder.TryGetValue(DELTA_LABEL_COLOR_SI, out item) && item.Value is Color deltaLabelColor)
+                this.DeltaLabelColor = deltaLabelColor;
 
             if (holder.TryGetValue(EXTEND_TO_DAY_END_SI, out item) && item.Value is bool extendToDayEnd)
             {
@@ -595,15 +640,18 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
                     LabelPosition.Upper,
                     this.centerNearSF);
 
+            }
+
+
+            if (this.ShowLabels && this.ShowDelta)
+            {
                 this.DrawBillet(
                     gr,
                     rightBarX[SERIES_HIGH],
                     highPriceY,
                     this.LinesSeries[SERIES_HIGH].Width,
-                    this.ShowPriceForLabel
-                    ? $"\u0394: {this.openingRange.DeltaPrice.FormattedValue}"
-                    : "\u0394",
-                    this.highLabelBrush,
+                    this.GetDeltaLabelText(),
+                    this.deltaLabelBrush,
                     this.labelTextBrush,
                     this.LabelFont,
                     LabelPosition.Bottom,
@@ -888,6 +936,9 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
 
         if (this.middleLabelBrush == null || !this.middleLabelBrush.Color.Equals(this.LinesSeries[SERIES_MIDDLE].Color))
             this.middleLabelBrush = new SolidBrush(this.LinesSeries[SERIES_MIDDLE].Color);
+
+        if (this.deltaLabelBrush == null || !this.deltaLabelBrush.Color.Equals(this.DeltaLabelColor))
+            this.deltaLabelBrush = new SolidBrush(this.DeltaLabelColor);
     }
 
     private void ProcessRealTimeSubscription(bool needSubscribe)
@@ -1035,6 +1086,24 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
         }
 
         return pen;
+    }
+
+    private string GetDeltaLabelText()
+    {
+        double delta = this.openingRange.DeltaPrice.Value;
+
+        if (this.DeltaMeasure == OpeningRangeDeltaMeasure.Ticks)
+        {
+            double tickSize = this.Symbol?.TickSize ?? 0.0;
+
+            if (tickSize <= 0.0)
+                return "\u0394: 0 ticks";
+
+            double ticks = delta / tickSize;
+            return $"\u0394: {ticks:0.##} ticks";
+        }
+
+        return $"\u0394: {this.openingRange.DeltaPrice.FormattedValue}";
     }
     #endregion Misc
 
@@ -1262,4 +1331,9 @@ public enum OpeningRangeDataSource
 {
     LastAvailable,
     CurrentDayOnly
+}
+public enum OpeningRangeDeltaMeasure
+{
+    Price,
+    Ticks
 }

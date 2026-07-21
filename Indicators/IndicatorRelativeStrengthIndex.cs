@@ -25,10 +25,11 @@ public sealed class IndicatorRelativeStrengthIndex : Indicator, IWatchlistIndica
     public PriceType SourcePrice = PriceType.Close;
     // Default will be performed on Simple mode
     [InputParameter("Mode for the RSI line", 2, variants: new object[] {
-         "Simple", RSIMode.Simple,
-         "Exponential", RSIMode.Exponential}
+     "Simple", RSIMode.Simple,
+     "Exponential", RSIMode.Exponential,
+     "Wilder", RSIMode.Wilder}
     )]
-    public RSIMode SourceRSI = RSIMode.Exponential;
+    public RSIMode SourceRSI = RSIMode.Wilder;
 
     [InputParameter("Type of Moving Average", 3, variants: new object[] {
         "Simple", MaMode.SMA,
@@ -119,28 +120,30 @@ public sealed class IndicatorRelativeStrengthIndex : Indicator, IWatchlistIndica
             this.prevV = this.sumV;
             this.prevP = this.sumP;
         }
+
         if (this.Count <= this.Period || this.Period == 0)
             return;
 
         if (this.SourceRSI == RSIMode.Simple)
+        {
             this.CalcSimple();
-        else
+        }
+        else if (this.SourceRSI == RSIMode.Wilder)
         {
             if (this.CalculationType == IndicatorCalculationType.ByPeriod && this.Count > CALCULATION_PERIOD + this.Period)
-            {
-                // (+ Period). Тому що, для самого крайнього лівого бара треба розрахувати попереднє значення. 
-                // Воно рахується по формулі SMA, для якого і потрібен цей період.
+                this.CalcWilderByPeriod();
+            else
+                this.CalcWilder();
+        }
+        else // RSIMode.Exponential
+        {
+            if (this.CalculationType == IndicatorCalculationType.ByPeriod && this.Count > CALCULATION_PERIOD + this.Period)
                 this.CalcExponByPeriod();
-            }
             else
                 this.CalcExpon();
         }
 
-        // The calculated value must be set as close price against the custom HistoricalData (a respective price type argument), 
-        // because the SMA indicator was initialized with the source price - PriceType.Close. 
         this.histCustom.SetValue(0d, 0d, 0d, this.GetValue());
-
-        // Being able to obtain data against HistCustom, MA finaly can smooth it
         this.SetValue(this.ma.GetValue(), 1);
     }
 
@@ -172,36 +175,26 @@ public sealed class IndicatorRelativeStrengthIndex : Indicator, IWatchlistIndica
         }
 
         if (setValue)
-        {
-            double value = (this.sumP != 0D) ? 100D * (1.0 - 1.0 / (1.0 + this.sumV / this.sumP)) : 100D;
-            this.SetValue(value);
-        }
+            this.SetValue(this.CalculateRsi());
     }
     // Exponential RSI method
     private void CalcExpon()
     {
         if (this.Count == this.Period + 1)
         {
-            this.CalcSimple();
+            this.CalcSimple(setValue: false);
             this.prevV = this.sumV = this.sumV / this.Period;
             this.prevP = this.sumP = this.sumP / this.Period;
         }
         else
         {
             double diff = this.GetPrice(this.SourcePrice) - this.GetPrice(this.SourcePrice, 1);
-            if (diff > 0D)
-            {
-                this.sumV = (this.prevV * (this.Period - 1) + diff) / this.Period;
-                this.sumP = this.prevP * (this.Period - 1) / this.Period;
-            }
-            else
-            {
-                this.sumV = this.prevV * (this.Period - 1) / this.Period;
-                this.sumP = (this.prevP * (this.Period - 1) - diff) / this.Period;
-            }
+            double alpha = 2.0 / (this.Period + 1.0);
+
+            this.CalculateSums(diff, alpha);
         }
-        double rsi = (this.sumP != 0D) ? 100D - 100D / (1.0 + this.sumV / this.sumP) : 0D;
-        this.SetValue(rsi);
+
+        this.SetValue(this.CalculateRsi());
     }
     private void CalcExponByPeriod(int offset = 0)
     {
@@ -214,22 +207,80 @@ public sealed class IndicatorRelativeStrengthIndex : Indicator, IWatchlistIndica
         this.prevV = this.sumV = this.sumV / this.Period;
         this.prevP = this.sumP = this.sumP / this.Period;
 
+        double alpha = 2.0 / (this.Period + 1.0);
+
         for (int i = startOffset - 1; i >= offset; i--)
         {
             double diff = this.GetPrice(this.SourcePrice, i) - this.GetPrice(this.SourcePrice, i + 1);
-            if (diff > 0D)
-            {
-                this.sumV = (this.prevV * (this.Period - 1) + diff) / this.Period;
-                this.sumP = this.prevP * (this.Period - 1) / this.Period;
-            }
-            else
-            {
-                this.sumV = this.prevV * (this.Period - 1) / this.Period;
-                this.sumP = (this.prevP * (this.Period - 1) - diff) / this.Period;
-            }
+
+            this.CalculateSums(diff, alpha);
+
+            this.prevV = this.sumV;
+            this.prevP = this.sumP;
         }
 
-        double rsi = (this.sumP != 0D) ? 100D - 100D / (1.0 + this.sumV / this.sumP) : 0D;
-        this.SetValue(rsi);
+        this.SetValue(this.CalculateRsi());
+    }
+
+    private void CalcWilder()
+    {
+        if (this.Count == this.Period + 1)
+        {
+            this.CalcSimple(setValue: false);
+            this.prevV = this.sumV = this.sumV / this.Period;
+            this.prevP = this.sumP = this.sumP / this.Period;
+        }
+        else
+        {
+            double diff = this.GetPrice(this.SourcePrice) - this.GetPrice(this.SourcePrice, 1);
+            double alpha = 1.0 / this.Period;
+
+            this.CalculateSums(diff, alpha);
+        }
+
+        this.SetValue(this.CalculateRsi());
+    }
+    private void CalcWilderByPeriod(int offset = 0)
+    {
+        int startOffset = offset + CALCULATION_PERIOD;
+
+        if (this.Count <= startOffset + this.Period)
+            return;
+
+        this.CalcSimple(startOffset, setValue: false);
+        this.prevV = this.sumV = this.sumV / this.Period;
+        this.prevP = this.sumP = this.sumP / this.Period;
+
+        double alpha = 1.0 / this.Period;
+
+        for (int i = startOffset - 1; i >= offset; i--)
+        {
+            double diff = this.GetPrice(this.SourcePrice, i) - this.GetPrice(this.SourcePrice, i + 1);
+
+            this.CalculateSums(diff, alpha);
+
+            this.prevV = this.sumV;
+            this.prevP = this.sumP;
+        }
+
+        this.SetValue(this.CalculateRsi());
+    }
+
+
+    private void CalculateSums(double diff, double alpha)
+    {
+        double gain = diff > 0D ? diff : 0D;
+        double loss = diff < 0D ? -diff : 0D;
+
+        this.sumV = this.prevV + alpha * (gain - this.prevV);
+        this.sumP = this.prevP + alpha * (loss - this.prevP);
+    }
+
+    private double CalculateRsi()
+    {
+        if (this.sumP == 0D)
+            return this.sumV == 0D ? 50D : 100D;
+
+        return 100D - 100D / (1.0 + this.sumV / this.sumP);
     }
 }

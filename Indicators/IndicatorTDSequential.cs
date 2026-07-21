@@ -128,6 +128,9 @@ public class IndicatorTDSequential : Indicator
 
     private Pen lineUpPen;
     private Pen lineDownPen;
+
+    public bool EnableAlerts = true;
+    public bool PlayAlertSound = true;
     public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorTDSequential.cs";
 
     #endregion Parameters
@@ -186,6 +189,8 @@ public class IndicatorTDSequential : Indicator
         if (args.Reason != UpdateReason.NewBar && args.Reason != UpdateReason.HistoricalBar)
             return;
 
+        bool canSendAlert = this.EnableAlerts && args.Reason != UpdateReason.HistoricalBar;
+
         var prevClose = this.Close(ONE);
         var prevFiveClose = this.Close(FIVE);
 
@@ -198,6 +203,18 @@ public class IndicatorTDSequential : Indicator
         if (this.IsCorrectSetupValue(this.upValue))
             this.SetValue(this.upValue, SERIES_SETUP_UP, ONE);
 
+        if (this.Calculation == CalculationMode.OnlySetup9 && this.upValue == SETUP_MAX && canSendAlert)
+        {
+            Core.Alert(new Alert()
+            {
+                Name = this.Name,
+                Text = "TD Sequential: Sell Setup 9",
+                PlaySound = this.PlayAlertSound,
+                SymbolName = this.Symbol?.Name,
+                ConnectionName = this.Symbol?.Connection?.Name
+            });
+        }
+
         // Setup Down
         if (prevClose < prevFiveClose)
             this.downValue += ONE;
@@ -206,6 +223,18 @@ public class IndicatorTDSequential : Indicator
 
         if (this.IsCorrectSetupValue(this.downValue))
             this.SetValue(this.downValue, SERIES_SETUP_DOWN, ONE);
+
+        if (this.Calculation == CalculationMode.OnlySetup9 && this.downValue == SETUP_MAX && canSendAlert)
+        {
+            Core.Alert(new Alert()
+            {
+                Name = this.Name,
+                Text = "TD Sequential: Buy Setup 9",
+                PlaySound = this.PlayAlertSound,
+                SymbolName = this.Symbol?.Name,
+                ConnectionName = this.Symbol?.Connection?.Name
+            });
+        }
 
         // Countdown 
         if (this.Calculation == CalculationMode.SetupPlusCountdown13)
@@ -232,7 +261,17 @@ public class IndicatorTDSequential : Indicator
                     this.buyCountdown++;
                     if (this.IsCorrectCountdownValue(this.buyCountdown))
                         this.SetValue(this.buyCountdown, SERIES_CD_BUY, ONE);
-
+                    if (this.buyCountdown == COUNTDOWN_MAX && canSendAlert)
+                    {
+                        Core.Alert(new Alert()
+                        {
+                            Name = this.Name,
+                            Text = "TD Sequential: Buy Countdown 13",
+                            PlaySound = this.PlayAlertSound,
+                            SymbolName = this.Symbol?.Name,
+                            ConnectionName = this.Symbol?.Connection?.Name
+                        });
+                    }
                     if (this.buyCountdown >= COUNTDOWN_MAX)
                         this.buyCountdownActive = false;
                 }
@@ -246,7 +285,17 @@ public class IndicatorTDSequential : Indicator
                     this.sellCountdown++;
                     if (this.IsCorrectCountdownValue(this.sellCountdown))
                         this.SetValue(this.sellCountdown, SERIES_CD_SELL, ONE);
-
+                    if (this.sellCountdown == COUNTDOWN_MAX && canSendAlert)
+                    {
+                        Core.Alert(new Alert()
+                        {
+                            Name = this.Name,
+                            Text = "TD Sequential: Sell Countdown 13",
+                            PlaySound = this.PlayAlertSound,
+                            SymbolName = this.Symbol?.Name,
+                            ConnectionName = this.Symbol?.Connection?.Name
+                        });
+                    }
                     if (this.sellCountdown >= COUNTDOWN_MAX)
                         this.sellCountdownActive = false;
                 }
@@ -358,6 +407,21 @@ public class IndicatorTDSequential : Indicator
                 UseEnabilityToggler = true,
             });
 
+            var alertsGroup = new SettingItemSeparatorGroup("Alerts", 4);
+
+            settings.Add(new SettingItemBoolean("Enable alerts", this.EnableAlerts)
+            {
+                Text = "Enable alerts",
+                SeparatorGroup = alertsGroup,
+            });
+
+            settings.Add(new SettingItemBoolean("Play alert sound", this.PlayAlertSound)
+            {
+                Text = "Play alert sound",
+                SeparatorGroup = alertsGroup,
+                Relation = new SettingItemRelationVisibility("Enable alerts", true),
+            });
+
             return settings;
         }
         set
@@ -404,6 +468,13 @@ public class IndicatorTDSequential : Indicator
                 this.lineDownPen.Width = downLine.Width;
                 this.lineDownPen.DashStyle = (System.Drawing.Drawing2D.DashStyle)downLine.LineStyle;
             }
+
+            if (value.TryGetValue("Enable alerts", out bool enableAlerts))
+                this.EnableAlerts = enableAlerts;
+
+            if (value.TryGetValue("Play alert sound", out bool playAlertSound))
+                this.PlayAlertSound = playAlertSound;
+
             if (this.Calculation != prevCalc)
                 this.OnSettingsUpdated();
         }

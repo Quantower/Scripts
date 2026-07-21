@@ -7,6 +7,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using TradingPlatform.BusinessLayer;
+using TradingPlatform.BusinessLayer.Chart;
+using TradingPlatform.BusinessLayer.Utils;
 
 namespace TrendIndicators;
 
@@ -17,37 +19,39 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
     private const string BASE_PERIOD_INPUT_PARAMETER = "Base period";
     private const string RANGE_INPUT_PARAMETER = "Range";
     private const string CALCULATION_METHOD_INPUT_PARAMETER = "Calculation method";
+    private const string EXTEND_TO_PERIOD_END_INPUT_PARAMETER = "Extend to period end";
+    private const string DISPLAY_SEPARATOR_INPUT_PARAMETER = "Display separator";
+
+    private const string LABEL_PP = "PP";
+    private const string LABEL_R1 = "R1";
+    private const string LABEL_R2 = "R2";
+    private const string LABEL_R3 = "R3";
+    private const string LABEL_R4 = "R4";
+    private const string LABEL_R5 = "R5";
+    private const string LABEL_R6 = "R6";
+
+    private const string LABEL_S1 = "S1";
+    private const string LABEL_S2 = "S2";
+    private const string LABEL_S3 = "S3";
+    private const string LABEL_S4 = "S4";
+    private const string LABEL_S5 = "S5";
+    private const string LABEL_S6 = "S6";
+
+    private const string LABEL_MID_PP_R1 = "PP_R1_MID";
+    private const string LABEL_MID_R1_R2 = "R1_R2_MID";
+    private const string LABEL_MID_R2_R3 = "R2_R3_MID";
+    private const string LABEL_MID_R3_R4 = "R3_R4_MID";
+    private const string LABEL_MID_R4_R5 = "R4_R5_MID";
+    private const string LABEL_MID_R5_R6 = "R5_R6_MID";
+
+    private const string LABEL_MID_PP_S1 = "PP_S1_MID";
+    private const string LABEL_MID_S1_S2 = "S1_S2_MID";
+    private const string LABEL_MID_S2_S3 = "S2_S3_MID";
+    private const string LABEL_MID_S3_S4 = "S3_S4_MID";
+    private const string LABEL_MID_S4_S5 = "S4_S5_MID";
+    private const string LABEL_MID_S5_S6 = "S5_S6_MID";
 
     private const int MIN_HISTORY_COUNT = 3;
-
-    private const int PP_LINE_INDEX = 0;
-
-    private const int R1_LINE_INDEX = 1;
-    private const int R2_LINE_INDEX = 2;
-    private const int R3_LINE_INDEX = 3;
-    private const int R4_LINE_INDEX = 4;
-    private const int R5_LINE_INDEX = 5;
-    private const int R6_LINE_INDEX = 6;
-
-    private const int S1_LINE_INDEX = 7;
-    private const int S2_LINE_INDEX = 8;
-    private const int S3_LINE_INDEX = 9;
-    private const int S4_LINE_INDEX = 10;
-    private const int S5_LINE_INDEX = 11;
-    private const int S6_LINE_INDEX = 12;
-
-    private const int MID_PP_R1 = 13;
-    private const int MID_R1_R2 = 14;
-    private const int MID_R2_R3 = 15;
-    private const int MID_R3_R4 = 16;
-    private const int MID_R4_R5 = 17;
-    private const int MID_R5_R6 = 18;
-    private const int MID_PP_S1 = 19;
-    private const int MID_S1_S2 = 20;
-    private const int MID_S2_S3 = 21;
-    private const int MID_S3_S4 = 22;
-    private const int MID_S4_S5 = 23;
-    private const int MID_S5_S6 = 24;
 
     public bool ShowLabels = true;
     private readonly Font labelFont = new Font("Verdana", 10, GraphicsUnit.Pixel);
@@ -55,44 +59,87 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
     private const int LabelPadX = 6;
     private const int LabelPadY = 2;
     public bool ShowPriceInLabels = true;
-    public bool DrawLastPeriodOnly = true; 
+    public bool DrawLastPeriodOnly = true;
+    public bool ExtendToPeriodEnd = false;  
+    public bool DisplaySeparator = false;
 
     public bool OnlyCurrentPeriod = false;
-    public string CustomSessionName = string.Empty;
+
+    private const string CHART_SESSION_CONTAINER_SELECT_ITEM = "Chart session";
+    private const string SESSION_TEMPLATE_NAME_SI = "sessionsTemplate";
+    private const string CUSTOM_OPEN_SESSION_NAME_SI = "Start time";
+    private const string CUSTOM_CLOSE_SESSION_NAME_SI = "End time";
+
+    private string specifiedSessionContainerId = CHART_SESSION_CONTAINER_SELECT_ITEM;
+
+    private ISessionsContainer customSessionContainer;
+    private ISessionsContainer fullDaySessionContainer;
+    private ISessionsContainer selectedSessionContainer;
+    private ISessionsContainer chartSessionContainer;
+
+    private ISessionsContainer SessionContainer
+    {
+        get
+        {
+            switch (this.DailySessionType)
+            {
+                case DailySessionType.SpecifiedSession:
+                    {
+                        if (this.specifiedSessionContainerId == CHART_SESSION_CONTAINER_SELECT_ITEM)
+                            return this.CurrentChart?.CurrentSessionContainer ?? this.fullDaySessionContainer;
+
+                        return this.selectedSessionContainer ?? this.fullDaySessionContainer;
+                    }
+
+                case DailySessionType.CustomRange:
+                    return this.customSessionContainer ?? this.fullDaySessionContainer;
+
+                case DailySessionType.AllDay:
+                default:
+                    return this.fullDaySessionContainer;
+            }
+        }
+    }
     public DateTime CustomRangeStartTime
     {
         get
         {
             if (this.customRangeStartTime == default)
             {
-                var session = this.CreateDefaultSession();
-                this.customRangeStartTime = Core.Instance.TimeUtils.DateTimeUtcNow.Date.AddTicks(session.OpenTime.Ticks);
+                var session = this.GetFullDayTimeInterval(this.GetTimeZone());
+                this.customRangeStartTime = session.From;
             }
-            return this.customRangeStartTime;
+
+            return DateTime.SpecifyKind(this.customRangeStartTime, DateTimeKind.Local);
         }
         set => this.customRangeStartTime = value;
     }
     private DateTime customRangeStartTime;
+
     public DateTime CustomRangeEndTime
     {
         get
         {
             if (this.customRangeEndTime == default)
-                this.customRangeEndTime = this.CustomRangeStartTime;
+            {
+                var session = this.GetFullDayTimeInterval(this.GetTimeZone());
+                this.customRangeEndTime = session.To;
+            }
 
-            return this.customRangeEndTime;
+            return DateTime.SpecifyKind(this.customRangeEndTime, DateTimeKind.Local);
         }
         set => this.customRangeEndTime = value;
     }
     private DateTime customRangeEndTime;
+
     public BasePeriod BasePeriod = BasePeriod.Day;
     public int PeriodValue = 1;
     public CalculationMethod IndicatorCalculationMethod = CalculationMethod.Classic;
     public DailySessionType DailySessionType = DailySessionType.AllDay;
     private readonly Color MidColor = Color.FromArgb(128, 128, 128, 128);
     private Task loadingTask;
-    private ISession currentSession;
-    private ISessionsContainer chartSessionContainer;
+
+
     private CancellationTokenSource cancellationSource;
     private HistoricalData history;
     private string formattedPeriod;
@@ -143,38 +190,12 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
     #endregion Parameters
 
     public IndicatorPivotPoint()
+            : base()
     {
         this.Name = "Pivot Point";
-
-        this.AddLineSeries("PP", Color.Gray, 1, LineStyle.Solid);   // 0
-        this.AddLineSeries("R1", Color.Red, 1, LineStyle.Solid);    // 1
-        this.AddLineSeries("R2", Color.Red, 1, LineStyle.Solid);    // 2
-        this.AddLineSeries("R3", Color.Red, 1, LineStyle.Solid);    // 3
-        this.AddLineSeries("R4", Color.Red, 1, LineStyle.Solid);    // 4
-        this.AddLineSeries("R5", Color.Red, 1, LineStyle.Solid);    // 5
-        this.AddLineSeries("R6", Color.Red, 1, LineStyle.Solid);    // 6
-
-        this.AddLineSeries("S1", Color.DodgerBlue, 1, LineStyle.Solid); // 7
-        this.AddLineSeries("S2", Color.DodgerBlue, 1, LineStyle.Solid); // 8
-        this.AddLineSeries("S3", Color.DodgerBlue, 1, LineStyle.Solid); // 9
-        this.AddLineSeries("S4", Color.DodgerBlue, 1, LineStyle.Solid); // 10
-        this.AddLineSeries("S5", Color.DodgerBlue, 1, LineStyle.Solid); // 11
-        this.AddLineSeries("S6", Color.DodgerBlue, 1, LineStyle.Solid); // 12
-
         this.SeparateWindow = false;
-        this.AddLineSeries("R1-PP", MidColor, 1, LineStyle.Solid);  // 13
-        this.AddLineSeries("R2-R1", MidColor, 1, LineStyle.Solid);  // 14
-        this.AddLineSeries("R3-R2", MidColor, 1, LineStyle.Solid);  // 15
-        this.AddLineSeries("R4-R3", MidColor, 1, LineStyle.Solid);  // 16
-        this.AddLineSeries("R5-R4", MidColor, 1, LineStyle.Solid);  // 17
-        this.AddLineSeries("R6-R5", MidColor, 1, LineStyle.Solid);  // 18
+        this.InitializeLabels();
 
-        this.AddLineSeries("S1-PP", MidColor, 1, LineStyle.Solid);  // 19
-        this.AddLineSeries("S2-S1", MidColor, 1, LineStyle.Solid);  // 20
-        this.AddLineSeries("S3-S2", MidColor, 1, LineStyle.Solid);  // 21
-        this.AddLineSeries("S4-S3", MidColor, 1, LineStyle.Solid);  // 22
-        this.AddLineSeries("S5-S4", MidColor, 1, LineStyle.Solid);  // 23
-        this.AddLineSeries("S6-S5", MidColor, 1, LineStyle.Solid);  // 24
         //this.font = new Font("Tahoma", 8, FontStyle.Bold);
         //this.centerCenterSF = new StringFormat() { LineAlignment = StringAlignment.Center, Alignment = StringAlignment.Center };
         //this.messageBrush = new SolidBrush(Color.DodgerBlue);
@@ -184,55 +205,90 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
     protected override void OnInit()
     {
         base.OnInit();
+
+        this.ResetLabels();
         this.AbortPreviousTask();
         this.pivotPeriods = new List<PivotPointCalculationResponce>();
+
+        this.chartSessionContainer = this.CurrentChart?.CurrentSessionContainer;
+
+        if (this.CurrentChart != null)
+            this.CurrentChart.SettingsChanged += this.CurrentChartOnSettingsChanged;
+
         var token = this.cancellationSource.Token;
 
         if (this.Symbol == null)
             return;
-        if (this.DailySessionType == DailySessionType.AllDay)
-        {
-            // default session
-            this.currentSession = this.CreateDefaultSession();
-        }
-        else if (this.DailySessionType == DailySessionType.SpecifiedSession)
-        {
-            if (!string.IsNullOrEmpty(this.CustomSessionName))
+
+        var timeZone = this.GetTimeZone();
+
+        this.fullDaySessionContainer = new CustomSessionsContainer(
+            "FullDaySession",
+            timeZone,
+            new[]
             {
-                // selected chart session
-                var sessions = this.GetAvailableCustomChartSessions().Concat(this.GetAvailableSymbolSessions()).ToList();
-                if (sessions.Count > 0)
-                    this.currentSession = sessions.FirstOrDefault(s => s.Name.Equals(this.CustomSessionName) && s.Type == SessionType.Main);
-            }
+            this.CreateCustomSession(TimeSpan.Zero, new TimeSpan(23, 59, 59), timeZone.TimeZoneInfo)
+            });
+
+        switch (this.DailySessionType)
+        {
+            case DailySessionType.CustomRange:
+                {
+                    this.customSessionContainer = new CustomSessionsContainer(
+                        "CustomSession",
+                        timeZone,
+                        new[]
+                        {
+                        this.CreateCustomSession(
+                            this.CustomRangeStartTime.TimeOfDay,
+                            this.CustomRangeEndTime.TimeOfDay,
+                            timeZone.TimeZoneInfo)
+                        });
+                    break;
+                }
+
+            case DailySessionType.SpecifiedSession:
+                {
+                    if (!string.IsNullOrEmpty(this.specifiedSessionContainerId) &&
+                        this.specifiedSessionContainerId != CHART_SESSION_CONTAINER_SELECT_ITEM)
+                    {
+                        this.selectedSessionContainer = Core.Instance.CustomSessions[this.specifiedSessionContainerId];
+                    }
+                    break;
+                }
+
+            case DailySessionType.AllDay:
+            default:
+                break;
         }
-        else if (this.DailySessionType == DailySessionType.CustomRange)
-            this.currentSession = new Session("Custom session", this.CustomRangeStartTime.TimeOfDay, this.CustomRangeEndTime.TimeOfDay);
 
         var inputPeriod = new Period(this.BasePeriod, this.PeriodValue);
         this.formattedPeriod = this.GetFormattedPeriod(this.BasePeriod, this.PeriodValue);
 
         this.State = IndicatorState.Ready;
 
-
         if (this.HistoricalData.Aggregation is HistoryAggregationTick)
         {
             this.State = IndicatorState.OneTickNotAllowed;
             return;
         }
+
         HistoryType currHistoryType = HistoryType.Last;
+
         if (this.HistoricalData.Aggregation is HistoryAggregationTime historyAggregationTime)
         {
             currHistoryType = historyAggregationTime.HistoryType;
-            if (inputPeriod.Ticks < ((HistoryAggregationTime)this.HistoricalData.Aggregation).Period.Duration.Ticks)
+            if (inputPeriod.Ticks < historyAggregationTime.Period.Duration.Ticks)
             {
                 this.State = IndicatorState.IncorrectPeriod;
                 return;
             }
         }
+
         if (this.HistoricalData.Aggregation is HistoryAggregationTickBars historyAggregationTickBars)
         {
             currHistoryType = historyAggregationTickBars.HistoryType;
-            if (inputPeriod.Ticks < ((HistoryAggregationTickBars)this.HistoricalData.Aggregation).TicksCount)
+            if (inputPeriod.Ticks < historyAggregationTickBars.TicksCount)
             {
                 this.State = IndicatorState.IncorrectPeriod;
                 return;
@@ -249,34 +305,33 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
 
             var coefficient = 0;
             var prevHistoryCount = -1;
-
-            //Core.Loggers.Log($"-------------------------------------");
-
             var needReload = true;
+
             while (needReload)
             {
                 needReload = false;
 
                 if (token.IsCancellationRequested)
                     return;
-                // 
+
                 coefficient += 1;
                 var minimumRangeInTicks = inputPeriod.Ticks * MIN_HISTORY_COUNT * coefficient;
+
                 if (Core.TimeUtils.DateTimeUtcNow.Ticks - fromTime.Ticks < minimumRangeInTicks)
                     fromTime = Core.TimeUtils.DateTimeUtcNow - new TimeSpan(minimumRangeInTicks);
 
-                //Core.Loggers.Log($"Pivot point. Period:({inputPeriod}); From:({fromTime}); {this.Symbol} - START");
+                var aggregation = new HistoryAggregationTime(inputPeriod, currHistoryType);
+
+                if (this.DailySessionType != DailySessionType.AllDay)
+                    aggregation.SessionsContainer = this.SessionContainer;
 
                 this.history = this.Symbol.GetHistory(new HistoryRequestParameters()
                 {
                     Symbol = this.Symbol,
                     FromTime = fromTime,
                     CancellationToken = token,
-                    Aggregation = new HistoryAggregationTime(inputPeriod, currHistoryType),
+                    Aggregation = aggregation,
                 });
-
-                //Core.Loggers.Log($"Pivot point. Period:({inputPeriod}); From:({this.history.FromTime}); LoadedCount:{this.history.Count}; try:{coefficient}; {this.Symbol}");
-
                 if (token.IsCancellationRequested || prevHistoryCount == this.history.Count)
                 {
                     this.State = IndicatorState.NoData;
@@ -304,9 +359,6 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
     protected override void OnUpdate(UpdateArgs args)
     {
         base.OnUpdate(args);
-
-        if (args.Reason == UpdateReason.NewBar && this.State == IndicatorState.Calculation)
-            this.DrawIndicatorLines(this.pivotPeriods[this.pivotPeriods.Count-1], 0, 0);
     }
     protected override void OnClear()
     {
@@ -314,6 +366,14 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
 
         this.AbortPreviousTask();
         this.pivotPeriods?.Clear();
+        this.ResetLabels();
+
+        this.customSessionContainer = null;
+        this.fullDaySessionContainer = null;
+        this.selectedSessionContainer = null;
+
+        if (this.CurrentChart != null)
+            this.CurrentChart.SettingsChanged -= this.CurrentChartOnSettingsChanged;
     }
     public override IList<SettingItem> Settings
     {
@@ -371,27 +431,34 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
             //
             var customRangeSimRelation = new SettingItemRelationVisibility("Session type", customRange);
             var customRangeMultRelation = new SettingItemMultipleRelation(dailyPeriodTypeRelation, customRangeSimRelation);
-            settings.Add(new SettingItemString("Custom session name", this.CustomSessionName, 20)
+            var defaultItem = new SelectItem(CHART_SESSION_CONTAINER_SELECT_ITEM);
+            var items = new List<SelectItem> { defaultItem };
+            items.AddRange(Core.Instance.CustomSessions.Select(s => new SelectItem(s.Name, s.Id)));
+
+            var selectedItem = items.FirstOrDefault(i => Equals(i.Value, this.specifiedSessionContainerId)) ?? items.First();
+
+            settings.Add(new SettingItemSelectorLocalized(SESSION_TEMPLATE_NAME_SI, selectedItem, items, 20)
             {
                 SeparatorGroup = defaultSeparator,
-                Text = loc._("Custom session name"),
+                Text = loc._("Sessions template"),
                 Relation = new SettingItemRelationVisibility("Session type", specifiedSession)
             });
-            settings.Add(new SettingItemDateTime("Start time", this.customRangeStartTime, 20)
+            settings.Add(new SettingItemDateTime(CUSTOM_OPEN_SESSION_NAME_SI, this.CustomRangeStartTime, 20)
             {
                 SeparatorGroup = defaultSeparator,
                 Text = loc._("Start time"),
-                Format = DatePickerFormat.LongTime,
+                Format = DatePickerFormat.Time,
                 ValueChangingBehavior = SettingItemValueChangingBehavior.WithConfirmation,
-                Relation = customRangeMultRelation
+                Relation = new SettingItemRelationVisibility("Session type", customRange)
             });
-            settings.Add(new SettingItemDateTime("End time", this.customRangeEndTime, 20)
+
+            settings.Add(new SettingItemDateTime(CUSTOM_CLOSE_SESSION_NAME_SI, this.CustomRangeEndTime, 20)
             {
                 SeparatorGroup = defaultSeparator,
                 Text = loc._("End time"),
-                Format = DatePickerFormat.LongTime,
+                Format = DatePickerFormat.Time,
                 ValueChangingBehavior = SettingItemValueChangingBehavior.WithConfirmation,
-                Relation = customRangeMultRelation
+                Relation = new SettingItemRelationVisibility("Session type", customRange)
             });
             settings.Add(new SettingItemInteger(RANGE_INPUT_PARAMETER, this.PeriodValue, 10)
             {
@@ -426,7 +493,17 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
                 SeparatorGroup = defaultSeparator,
                 Text = "Draw last period only"
             });
+            settings.Add(new SettingItemBoolean(EXTEND_TO_PERIOD_END_INPUT_PARAMETER, this.ExtendToPeriodEnd, 97)
+            {
+                SeparatorGroup = defaultSeparator,
+                Text = "Extend lines to period end"
+            });
 
+            settings.Add(new SettingItemBoolean(DISPLAY_SEPARATOR_INPUT_PARAMETER, this.DisplaySeparator, 98)
+            {
+                SeparatorGroup = defaultSeparator,
+                Text = "Display separator"
+            });
             return settings;
         }
         set
@@ -478,17 +555,42 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
                 this.DailySessionType = item.GetValue<DailySessionType>();
                 needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
             }
-            if (holder.TryGetValue("Custom session name", out item) && item.Value is string customSessionName)
-                this.CustomSessionName = customSessionName;
-            if (holder.TryGetValue("Start time", out item) && item.Value is DateTime dtStartTime)
+            if (holder.TryGetValue(SESSION_TEMPLATE_NAME_SI, out item))
             {
-                this.CustomRangeStartTime = dtStartTime;
-                needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
+                var newContainerId = item.GetValue<string>();
+
+                if (newContainerId != this.specifiedSessionContainerId)
+                {
+                    this.specifiedSessionContainerId = newContainerId;
+
+                    if (newContainerId == CHART_SESSION_CONTAINER_SELECT_ITEM)
+                        this.selectedSessionContainer = null;
+                    else
+                        this.selectedSessionContainer = Core.Instance.CustomSessions[this.specifiedSessionContainerId];
+
+                    needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
+                }
             }
-            if (holder.TryGetValue("End time", out item) && item.Value is DateTime dtEndTime)
+            if (holder.TryGetValue(CUSTOM_OPEN_SESSION_NAME_SI, out item))
             {
-                this.CustomRangeEndTime = dtEndTime;
-                needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
+                var newValue = Core.Instance.TimeUtils.ConvertFromUTCToSelectedTimeZone(item.GetValue<DateTime>());
+
+                if (this.CustomRangeStartTime != newValue)
+                {
+                    this.CustomRangeStartTime = newValue;
+                    needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
+                }
+            }
+
+            if (holder.TryGetValue(CUSTOM_CLOSE_SESSION_NAME_SI, out item))
+            {
+                var newValue = Core.Instance.TimeUtils.ConvertFromUTCToSelectedTimeZone(item.GetValue<DateTime>());
+
+                if (this.CustomRangeEndTime != newValue)
+                {
+                    this.CustomRangeEndTime = newValue;
+                    needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
+                }
             }
             if (holder.TryGetValue("Display price", out item) && item.Value is bool showPrice)
                 this.ShowPriceInLabels = showPrice;
@@ -496,7 +598,23 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
                 this.ShowLabels = showLabels;
             if (holder.TryGetValue("Draw last period only", out item) && item.Value is bool drawLastOnly)
                 this.DrawLastPeriodOnly = drawLastOnly;
+            if (holder.TryGetValue(EXTEND_TO_PERIOD_END_INPUT_PARAMETER, out item) && item.Value is bool extend)
+            {
+                if (this.ExtendToPeriodEnd != extend)
+                {
+                    this.ExtendToPeriodEnd = extend;
+                    needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
+                }
+            }
 
+            if (holder.TryGetValue(DISPLAY_SEPARATOR_INPUT_PARAMETER, out item) && item.Value is bool sep)
+            {
+                if (this.DisplaySeparator != sep)
+                {
+                    this.DisplaySeparator = sep;
+                    needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
+                }
+            }
             if (needRefresh)
                 this.Refresh();
 
@@ -508,7 +626,7 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
     {
         base.OnPaintChart(args);
 
-        if (!this.ShowLabels || this.CurrentChart == null || this.pivotPeriods == null || this.pivotPeriods.Count == 0)
+        if (this.CurrentChart == null || this.pivotPeriods == null || this.pivotPeriods.Count == 0)
             return;
 
         var wnd = this.CurrentChart.Windows?[args.WindowIndex];
@@ -516,7 +634,7 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
             return;
 
         var g = args.Graphics;
-        var savedClip = g.Clip;
+        var savedClip = g.ClipBounds;
 
         try
         {
@@ -525,47 +643,48 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
             var conv = wnd.CoordinatesConverter;
 
             IEnumerable<PivotPointCalculationResponce> periodsToDraw =
-                this.DrawLastPeriodOnly
+                this.OnlyCurrentPeriod
                     ? new[] { this.pivotPeriods[this.pivotPeriods.Count-1] }
                     : (this.pivotPeriods ?? Enumerable.Empty<PivotPointCalculationResponce>());
 
             foreach (var p in periodsToDraw)
             {
-                DateTime anchorTime = DateTime.MinValue;
+                DateTime firstBarTime = DateTime.MinValue;
+                DateTime lastBarRightTime = DateTime.MinValue;
 
                 int fromIndex = (int)this.HistoricalData.GetIndexByTime(p.From.Ticks);
                 int toIndex = (int)this.HistoricalData.GetIndexByTime(p.To.Ticks);
-
                 if (fromIndex == -1) fromIndex = this.Count - 1;
                 if (toIndex   == -1) toIndex   = 0;
 
                 for (int y = fromIndex; y >= toIndex; y--)
                 {
-                    var t = this.HistoricalData[y].TimeLeft;
-                    if (t < p.From || t > p.To)
+                    var barLeft = DateTime.SpecifyKind(new DateTime(this.HistoricalData[y].TicksLeft), DateTimeKind.Utc);
+                    var barRight = DateTime.SpecifyKind(new DateTime(this.HistoricalData[y].TicksRight), DateTimeKind.Utc);
+
+                    if (barRight <= p.From || barLeft >= p.To)
                         continue;
 
-                    if (!this.currentSession.ContainsDate(t))
-                        continue;
+                    if (this.DailySessionType != DailySessionType.AllDay)
+                    {
+                        if (this.SessionContainer == null || !this.SessionContainer.ContainsDate(barLeft))
+                            continue;
+                    }
 
-                    if (t > anchorTime)
-                        anchorTime = t;
+                    if (firstBarTime == DateTime.MinValue || barLeft < firstBarTime)
+                        firstBarTime = barLeft;
+
+                    if (barRight > lastBarRightTime)
+                        lastBarRightTime = barRight;
                 }
 
-                if (anchorTime == DateTime.MinValue)
+                if (firstBarTime == DateTime.MinValue || lastBarRightTime == DateTime.MinValue)
                     continue;
 
-                float endX = (float)conv.GetChartX(anchorTime);
-
-                void Draw(string name, double value, Color color)
-                {
-                    if (double.IsNaN(value) || value == 0.0)
-                        return;
-
-                    float y = (float)conv.GetChartY(value);
-                    string label = this.ShowPriceInLabels ? $"{name} {this.Symbol.FormatPrice(value)}" : name;
-                    this.DrawLevelLabel(g, args.Rectangle, y, label, color, endX);
-                }
+                float startX = (float)conv.GetChartX(firstBarTime);
+                DateTime endTimeForLine = (this.ExtendToPeriodEnd && DateTime.Now < p.To) ? p.To : lastBarRightTime;
+                float lineEndX = (float)conv.GetChartX(endTimeForLine);
+                float endX = (float)conv.GetChartX(lastBarRightTime);
 
                 bool hasR2 = !double.IsNaN(p.R2) && p.R2 != 0.0;
                 bool hasR3 = !double.IsNaN(p.R3) && p.R3 != 0.0;
@@ -579,44 +698,136 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
                 bool hasS5 = !double.IsNaN(p.S5) && p.S5 != 0.0;
                 bool hasS6 = !double.IsNaN(p.S6) && p.S6 != 0.0;
 
-               
-                Draw("PP", p.PP, Color.Gray);
-                Draw("R1", p.R1, Color.Red);
-                Draw("S1", p.S1, Color.DodgerBlue);
+                DrawHLine(g, p.PP, Color.Gray, startX, lineEndX, conv, args.Rectangle);
+                DrawHLine(g, p.R1, Color.Red, startX, lineEndX, conv, args.Rectangle);
+                DrawHLine(g, p.S1, Color.DodgerBlue, startX, lineEndX, conv, args.Rectangle);
+                DrawHLine(g, Mid(p.PP, p.S1), this.MidColor, startX, lineEndX, conv, args.Rectangle);
+                DrawHLine(g, Mid(p.PP, p.R1), this.MidColor, startX, lineEndX, conv, args.Rectangle);
 
                 if (p.Method != CalculationMethod.DeMark)
                 {
-                    if (hasR2) Draw("R2", p.R2, Color.Red);
-                    if (hasR3) Draw("R3", p.R3, Color.Red);
-                    if (hasS2) Draw("S2", p.S2, Color.DodgerBlue);
-                    if (hasS3) Draw("S3", p.S3, Color.DodgerBlue);
+                    if (hasR2) DrawHLine(g, p.R2, Color.Red, startX, lineEndX, conv, args.Rectangle);
+                    if (hasR3) DrawHLine(g, p.R3, Color.Red, startX, lineEndX, conv, args.Rectangle);
+                    if (hasS2) DrawHLine(g,p.S2, Color.DodgerBlue, startX, lineEndX, conv, args.Rectangle);
+                    if (hasS3) DrawHLine(g, p.S3, Color.DodgerBlue, startX, lineEndX, conv, args.Rectangle);
+
+                    if (hasS2) DrawHLine(g, Mid(p.S1, p.S2), this.MidColor, startX, lineEndX, conv, args.Rectangle);
+                    if (hasS3) DrawHLine(g, Mid(p.S2, p.S3), this.MidColor, startX, lineEndX, conv, args.Rectangle);
+
+                    if (hasR2) DrawHLine(g, Mid(p.R1, p.R2), this.MidColor, startX, lineEndX, conv, args.Rectangle);
+                    if (hasR3) DrawHLine(g, Mid(p.R2, p.R3), this.MidColor, startX, lineEndX, conv, args.Rectangle);
+
                 }
 
                 if (p.Method == CalculationMethod.Camarilla)
                 {
-                    if (hasR4) Draw("R4", p.R4, Color.Red);
-                    if (hasR5) Draw("R5", p.R5, Color.Red);
-                    if (hasR6) Draw("R6", p.R6, Color.Red);
+                    if (hasR4) DrawHLine(g, p.R4, Color.Red, startX, lineEndX, conv, args.Rectangle);
+                    if (hasR5) DrawHLine(g, p.R5, Color.Red, startX, lineEndX, conv, args.Rectangle);
+                    if (hasR6) DrawHLine(g, p.R6, Color.Red, startX, lineEndX, conv, args.Rectangle);
 
-                    if (hasS4) Draw("S4", p.S4, Color.DodgerBlue);
-                    if (hasS5) Draw("S5", p.S5, Color.DodgerBlue);
-                    if (hasS6) Draw("S6", p.S6, Color.DodgerBlue);
+                    if (hasS4) DrawHLine(g, p.S4, Color.DodgerBlue, startX, lineEndX, conv, args.Rectangle);
+                    if (hasS5) DrawHLine(g, p.S5, Color.DodgerBlue, startX, lineEndX, conv, args.Rectangle);
+                    if (hasS6) DrawHLine(g, p.S6, Color.DodgerBlue, startX, lineEndX, conv, args.Rectangle);
+
+                    if (hasS4) DrawHLine(g, Mid(p.S3, p.S4), this.MidColor, startX, lineEndX, conv, args.Rectangle);
+                    if (hasS5) DrawHLine(g, Mid(p.S4, p.S5), this.MidColor, startX, lineEndX, conv, args.Rectangle);
+                    if (hasS6) DrawHLine(g, Mid(p.S5, p.S6), this.MidColor, startX, lineEndX, conv, args.Rectangle);
+
+                    if (hasR4) DrawHLine(g, Mid(p.R3, p.R4), this.MidColor, startX, lineEndX, conv, args.Rectangle);
+                    if (hasR5) DrawHLine(g, Mid(p.R4, p.R5), this.MidColor, startX, lineEndX, conv, args.Rectangle);
+                    if (hasR6) DrawHLine(g, Mid(p.R5, p.R6), this.MidColor, startX, lineEndX, conv, args.Rectangle);
                 }
+                if (this.DisplaySeparator)
+                {
+                    var ordered = periodsToDraw.OrderBy(x => x.From).ToList();
+                    for (int i = 1; i < ordered.Count; i++)
+                    {
+                        var prev = ordered[i - 1];
+                        var next = ordered[i];
 
-                    if (!double.IsNaN(p.R1) && p.R1 != 0.0) Draw("PP–R1", Mid(p.PP, p.R1), this.MidColor);
-                    if (hasR2) Draw("R1–R2", Mid(p.R1, p.R2), this.MidColor);
-                    if (hasR3) Draw("R2–R3", Mid(p.R2, p.R3), this.MidColor);
-                    if (hasR4) Draw("R3–R4", Mid(p.R3, p.R4), this.MidColor);
-                    if (hasR5) Draw("R4–R5", Mid(p.R4, p.R5), this.MidColor);
-                    if (hasR6) Draw("R5–R6", Mid(p.R5, p.R6), this.MidColor);
+                        float xBoundary = (float)conv.GetChartX(next.From);
 
-                    if (!double.IsNaN(p.S1) && p.S1 != 0.0) Draw("PP–S1", Mid(p.PP, p.S1), this.MidColor);
-                    if (hasS2) Draw("S1–S2", Mid(p.S1, p.S2), this.MidColor);
-                    if (hasS3) Draw("S2–S3", Mid(p.S2, p.S3), this.MidColor);
-                    if (hasS4) Draw("S3–S4", Mid(p.S3, p.S4), this.MidColor);
-                    if (hasS5) Draw("S4–S5", Mid(p.S4, p.S5), this.MidColor);
-                    if (hasS6) Draw("S5–S6", Mid(p.S5, p.S6), this.MidColor);
-                
+                        DrawSeparatorLine(g, prev.PP, next.PP, Color.Gray, xBoundary, conv, args.Rectangle);
+                        DrawSeparatorLine(g, prev.R1, next.R1, Color.Red, xBoundary, conv, args.Rectangle);
+                        DrawSeparatorLine(g, prev.S1, next.S1, Color.DodgerBlue, xBoundary, conv, args.Rectangle);
+                        DrawSeparatorLine(g, Mid(prev.PP, prev.S1), Mid(next.PP, next.S1), this.MidColor, xBoundary, conv, args.Rectangle);
+                        DrawSeparatorLine(g, Mid(prev.PP, prev.R1), Mid(next.PP, next.R1), this.MidColor, xBoundary, conv, args.Rectangle);
+
+                        if (prev.Method != CalculationMethod.DeMark && next.Method != CalculationMethod.DeMark)
+                        {
+                            if (hasR2) DrawSeparatorLine(g, prev.R2, next.R2, Color.Red, xBoundary, conv, args.Rectangle);
+                            if (hasR3) DrawSeparatorLine(g, prev.R3, next.R3, Color.Red, xBoundary, conv, args.Rectangle);
+
+                            if (hasS2) DrawSeparatorLine(g, prev.S2, next.S2, Color.DodgerBlue, xBoundary, conv, args.Rectangle);
+                            if (hasS3) DrawSeparatorLine(g, prev.S3, next.S3, Color.DodgerBlue, xBoundary, conv, args.Rectangle);
+
+                            if (hasS2) DrawSeparatorLine(g, Mid(prev.S1, prev.S2), Mid(next.S1, next.S2), this.MidColor, xBoundary, conv, args.Rectangle);
+                            if (hasS3) DrawSeparatorLine(g, Mid(prev.S2, prev.S3), Mid(next.S2, next.S3), this.MidColor, xBoundary, conv, args.Rectangle);
+
+                            if (hasR2) DrawSeparatorLine(g, Mid(prev.R1, prev.R2), Mid(next.R1, next.R2), this.MidColor, xBoundary, conv, args.Rectangle);
+                            if (hasR3) DrawSeparatorLine(g, Mid(prev.R2, prev.R3), Mid(next.R2, next.R3), this.MidColor, xBoundary, conv, args.Rectangle);
+                        }
+
+                        if (prev.Method == CalculationMethod.Camarilla && next.Method == CalculationMethod.Camarilla)
+                        {
+                            if (hasR4) DrawSeparatorLine(g, prev.R4, next.R4, Color.Red, xBoundary, conv, args.Rectangle);
+                            if (hasR5) DrawSeparatorLine(g, prev.R5, next.R5, Color.Red, xBoundary, conv, args.Rectangle);
+                            if (hasR6) DrawSeparatorLine(g, prev.R6, next.R6, Color.Red, xBoundary, conv, args.Rectangle);
+
+                            if (hasS4) DrawSeparatorLine(g, prev.S4, next.S4, Color.DodgerBlue, xBoundary, conv, args.Rectangle);
+                            if (hasS5) DrawSeparatorLine(g, prev.S5, next.S5, Color.DodgerBlue, xBoundary, conv, args.Rectangle);
+                            if (hasS6) DrawSeparatorLine(g, prev.S6, next.S6, Color.DodgerBlue, xBoundary, conv, args.Rectangle);
+
+                            if (hasS4) DrawSeparatorLine(g, Mid(prev.S3, prev.S4), Mid(next.S3, next.S4), this.MidColor, xBoundary, conv, args.Rectangle);
+                            if (hasS5) DrawSeparatorLine(g, Mid(prev.S4, prev.S5), Mid(next.S4, next.S5), this.MidColor, xBoundary, conv, args.Rectangle);
+                            if (hasS6) DrawSeparatorLine(g, Mid(prev.S5, prev.S6), Mid(next.S5, next.S6), this.MidColor, xBoundary, conv, args.Rectangle);
+
+                            if (hasR4) DrawSeparatorLine(g, Mid(prev.R3, prev.R4), Mid(next.R3, next.R4), this.MidColor, xBoundary, conv, args.Rectangle);
+                            if (hasR5) DrawSeparatorLine(g, Mid(prev.R4, prev.R5), Mid(next.R4, next.R5), this.MidColor, xBoundary, conv, args.Rectangle);
+                            if (hasR6) DrawSeparatorLine(g, Mid(prev.R5, prev.R6), Mid(next.R5, next.R6), this.MidColor, xBoundary, conv, args.Rectangle);
+                        }
+                    }
+                }
+                if (this.ShowLabels && !(this.DrawLastPeriodOnly && p != periodsToDraw.Last()))
+                {
+                    Draw(g, args.Rectangle, "PP", p.PP, Color.Gray, endX, conv);
+                    Draw(g, args.Rectangle, "R1", p.R1, Color.Red, endX, conv);
+                    Draw(g, args.Rectangle, "S1", p.S1, Color.DodgerBlue, endX, conv);
+
+                    if (p.Method != CalculationMethod.DeMark)
+                    {
+                        if (hasR2) Draw(g, args.Rectangle, "R2", p.R2, Color.Red, endX, conv);
+                        if (hasR3) Draw(g, args.Rectangle, "R3", p.R3, Color.Red, endX, conv);
+                        if (hasS2) Draw(g, args.Rectangle, "S2", p.S2, Color.DodgerBlue, endX, conv);
+                        if (hasS2) Draw(g, args.Rectangle, "S3", p.S3, Color.DodgerBlue, endX, conv);
+                        if (hasS2) Draw(g, args.Rectangle, "S1–S2", Mid(p.S1, p.S2), this.MidColor, endX, conv);
+                        if (hasS3) Draw(g, args.Rectangle, "S2–S3", Mid(p.S2, p.S3), this.MidColor, endX, conv);
+                        if (hasR2) Draw(g, args.Rectangle, "R1–R2", Mid(p.R1, p.R2), this.MidColor, endX, conv);
+                        if (hasR3) Draw(g, args.Rectangle, "R2–R3", Mid(p.R2, p.R3), this.MidColor, endX, conv);
+                    }
+
+                    if (p.Method == CalculationMethod.Camarilla)
+                    {
+                        if (hasR4) Draw(g, args.Rectangle, "R4", p.R4, Color.Red, endX, conv);
+                        if (hasR5) Draw(g, args.Rectangle, "R5", p.R5, Color.Red, endX, conv);
+                        if (hasR6) Draw(g, args.Rectangle, "R6", p.R6, Color.Red, endX, conv);
+
+                        if (hasR4) Draw(g, args.Rectangle, "R3–R4", Mid(p.R3, p.R4), this.MidColor, endX, conv);
+                        if (hasR5) Draw(g, args.Rectangle, "R4–R5", Mid(p.R4, p.R5), this.MidColor, endX, conv);
+                        if (hasR6) Draw(g, args.Rectangle, "R5–R6", Mid(p.R5, p.R6), this.MidColor, endX, conv);
+
+                        if (hasS4) Draw(g, args.Rectangle, "S4", p.S4, Color.DodgerBlue, endX, conv);
+                        if (hasS5) Draw(g, args.Rectangle, "S5", p.S5, Color.DodgerBlue, endX, conv);
+                        if (hasS6) Draw(g, args.Rectangle, "S6", p.S6, Color.DodgerBlue, endX, conv);
+
+                        if (hasS4) Draw(g, args.Rectangle, "S3–S4", Mid(p.S3, p.S4), this.MidColor, endX, conv);
+                        if (hasS5) Draw(g, args.Rectangle, "S4–S5", Mid(p.S4, p.S5), this.MidColor, endX, conv);
+                        if (hasS6) Draw(g, args.Rectangle, "S5–S6", Mid(p.S5, p.S6), this.MidColor, endX, conv);
+                    }
+
+                    if (!double.IsNaN(p.R1) && p.R1 != 0.0) Draw(g, args.Rectangle, "PP–R1", Mid(p.PP, p.R1), this.MidColor, endX, conv);
+                    if (!double.IsNaN(p.S1) && p.S1 != 0.0) Draw(g, args.Rectangle, "PP–S1", Mid(p.PP, p.S1), this.MidColor, endX, conv);
+                }
             }
         }
         catch (Exception ex)
@@ -625,7 +836,7 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
         }
         finally
         {
-            g.SetClip(savedClip, System.Drawing.Drawing2D.CombineMode.Replace);
+            g.SetClip(savedClip);
         }
         //if (this.State == IndicatorState.Ready)
         //    return;
@@ -672,7 +883,8 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
         pivotPoints.Reverse();
         this.pivotPeriods.Clear();
         this.pivotPeriods.AddRange(pivotPoints);
-        this.DrawIndicator(pivotPoints.ToArray());
+
+        this.UpdateLabelsFromLastPivot();
     }
     private PivotPointCalculationResponce CalculatePivotPoint(HistoricalData hd, int hdOffset)
     {
@@ -689,8 +901,6 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
         var low = currentItem[PriceType.Low];
         double pp, r1, r2, r3, r4, r5, r6, s1, s2, s3, s4, s5, s6;
         pp = r1 = r2 = r3 = r4 = r5 = r6 = s1 = s2 = s3 = s4 = s5 = s6 = 0;
-        if (this.CurrentChart.CurrentSessionContainer == null || this.CurrentChart.CurrentSessionContainer.Contains(currentItem))
-        {
             switch (this.IndicatorCalculationMethod)
             {
                 case CalculationMethod.Classic:
@@ -775,13 +985,58 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
                     }
                     break;
             }
-        }
-        else
-            r1 += 0;
-        var timeZone = this.CurrentChart?.CurrentTimeZone ?? Core.Instance.TimeUtils.SelectedTimeZone;
+        var timeZone = this.GetTimeZone();
         var historyItem = (HistoryItemBar)hd[hdOffset, SeekOriginHistory.End];
-        DateTime startTime = Core.Instance.TimeUtils.ConvertFromTimeZoneToUTC(new DateTime(historyItem.TicksLeft, DateTimeKind.Unspecified), timeZone);
-        DateTime endTime = Core.Instance.TimeUtils.ConvertFromTimeZoneToUTC(new DateTime(historyItem.TicksRight, DateTimeKind.Unspecified), timeZone);
+
+        var leftUtc = DateTime.SpecifyKind(new DateTime(historyItem.TicksLeft), DateTimeKind.Utc);
+        var leftLocal = TimeZoneInfo.ConvertTimeFromUtc(leftUtc, timeZone.TimeZoneInfo);
+
+        DateTime startLocal;
+        DateTime endLocal;
+
+        switch (this.BasePeriod)
+        {
+            case BasePeriod.Hour:
+                {
+                    int alignedHour = leftLocal.Hour - (leftLocal.Hour % this.PeriodValue);
+                    startLocal = new DateTime(leftLocal.Year, leftLocal.Month, leftLocal.Day, alignedHour, 0, 0, DateTimeKind.Unspecified);
+                    endLocal = startLocal.AddHours(this.PeriodValue);
+                    break;
+                }
+
+            case BasePeriod.Day:
+                {
+                    startLocal = new DateTime(leftLocal.Year, leftLocal.Month, leftLocal.Day, 0, 0, 0, DateTimeKind.Unspecified);
+                    endLocal = startLocal.AddDays(this.PeriodValue);
+                    break;
+                }
+
+            case BasePeriod.Week:
+                {
+                    var baseDate = new DateTime(leftLocal.Year, leftLocal.Month, leftLocal.Day, 0, 0, 0, DateTimeKind.Unspecified);
+                    int delta = (int)baseDate.DayOfWeek;
+                    startLocal = baseDate.AddDays(-delta);
+                    endLocal = startLocal.AddDays(7 * this.PeriodValue);
+                    break;
+                }
+
+            case BasePeriod.Month:
+                {
+                    startLocal = new DateTime(leftLocal.Year, leftLocal.Month, 1, 0, 0, 0, DateTimeKind.Unspecified);
+                    endLocal = startLocal.AddMonths(this.PeriodValue);
+                    break;
+                }
+
+            default:
+                {
+                    startLocal = new DateTime(leftLocal.Year, leftLocal.Month, leftLocal.Day, 0, 0, 0, DateTimeKind.Unspecified);
+                    endLocal = startLocal.AddDays(1);
+                    break;
+                }
+        }
+
+        DateTime startTime = Core.Instance.TimeUtils.ConvertFromTimeZoneToUTC(startLocal, timeZone);
+        DateTime endTime = Core.Instance.TimeUtils.ConvertFromTimeZoneToUTC(endLocal, timeZone);
 
         return new PivotPointCalculationResponce(startTime, endTime)
         {
@@ -817,112 +1072,54 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
         else
             this.pivotPeriods.Insert(0, last);
 
-        this.DrawIndicator(this.pivotPeriods[0]);
+        this.UpdateLabelsFromLastPivot();
+
     }
 
     #endregion Calculation 
 
     #region Drawing
-    private void DrawIndicator(params PivotPointCalculationResponce[] pivotPointValues)
+    private void DrawHLine(Graphics g, double value, Color color, float x1, float x2, IChartWindowCoordinatesConverter conv, Rectangle rect, float width = 1f)
     {
-        // 
-        if (this.HistoricalData == null)
+        if (double.IsNaN(value) || value == 0.0)
             return;
 
-        // new collection
-        for (int i = 0; i < pivotPointValues.Count(); i++)
-        {
-            var ppItem = pivotPointValues[i];
-
-            var fromIndex = (int)this.HistoricalData.GetIndexByTime(ppItem.From.Ticks);
-            var toIndex = (int)this.HistoricalData.GetIndexByTime(ppItem.To.ToLocalTime().Ticks);
-
-            if (fromIndex == -1)
-                fromIndex = this.Count - 1;
-            if (toIndex == -1)
-                toIndex = 0;
-
-            this.DrawIndicatorLines(ppItem, fromIndex, toIndex);
-        }
-
-    }
-    private void DrawIndicatorLines(PivotPointCalculationResponce ppItem, int fromIndex, int toIndex)
-    {
-        if (ppItem == null)
+        float y = (float)conv.GetChartY(value);
+        if (float.IsNaN(y) || y <= rect.Top || y >= rect.Bottom)
             return;
-        double pp = ppItem.PP;
-        double r1 = ppItem.R1, r2 = ppItem.R2, r3 = ppItem.R3,
-               r4 = ppItem.R4, r5 = ppItem.R5, r6 = ppItem.R6;
-        double s1 = ppItem.S1, s2 = ppItem.S2, s3 = ppItem.S3,
-               s4 = ppItem.S4, s5 = ppItem.S5, s6 = ppItem.S6;
-        for (int y = fromIndex; y >= toIndex; y--)
-        {
-            var currentBarTime = this.HistoricalData[y].TimeLeft;
-            var inSession = this.CurrentChart.CurrentSessionContainer.ContainsDate(currentBarTime);
-            if (!inSession)
-                continue;
-            this.SetValue(pp, PP_LINE_INDEX, y);
-            this.SetValue(r1, R1_LINE_INDEX, y);
-            this.SetValue(s1, S1_LINE_INDEX, y);
 
-            if (ppItem.Method != CalculationMethod.DeMark)
-            {
-                this.SetValue(r2, R2_LINE_INDEX, y);
-                this.SetValue(r3, R3_LINE_INDEX, y);
-                this.SetValue(s2, S2_LINE_INDEX, y);
-                this.SetValue(s3, S3_LINE_INDEX, y);
-            }
+        // clamp X to visible rect (optional, но удобно)
+        x1 = Math.Max(rect.Left, Math.Min(rect.Right, x1));
+        x2 = Math.Max(rect.Left, Math.Min(rect.Right, x2));
 
-            if (ppItem.Method == CalculationMethod.Camarilla)
-            {
-                this.SetValue(r4, R4_LINE_INDEX, y);
-                this.SetValue(r5, R5_LINE_INDEX, y);
-                this.SetValue(r6, R6_LINE_INDEX, y);
-
-                this.SetValue(s4, S4_LINE_INDEX, y);
-                this.SetValue(s5, S5_LINE_INDEX, y);
-                this.SetValue(s6, S6_LINE_INDEX, y);
-            }
-            bool hasR2 = !double.IsNaN(r2) && r2 != 0.0;
-            bool hasR3 = !double.IsNaN(r3) && r3 != 0.0;
-            bool hasR4 = !double.IsNaN(r4) && r4 != 0.0;
-            bool hasR5 = !double.IsNaN(r5) && r5 != 0.0;
-            bool hasR6 = !double.IsNaN(r6) && r6 != 0.0;
-
-            bool hasS2 = !double.IsNaN(s2) && s2 != 0.0;
-            bool hasS3 = !double.IsNaN(s3) && s3 != 0.0;
-            bool hasS4 = !double.IsNaN(s4) && s4 != 0.0;
-            bool hasS5 = !double.IsNaN(s5) && s5 != 0.0;
-            bool hasS6 = !double.IsNaN(s6) && s6 != 0.0;
-
-            if (!double.IsNaN(r1) && r1 != 0.0)
-                this.SetValue(Mid(pp, r1), MID_PP_R1, y);
-            if (hasR2)
-                this.SetValue(Mid(r1, r2), MID_R1_R2, y);
-            if (hasR3)
-                this.SetValue(Mid(r2, r3), MID_R2_R3, y);
-            if (hasR4)
-                this.SetValue(Mid(r3, r4), MID_R3_R4, y);
-            if (hasR5)
-                this.SetValue(Mid(r4, r5), MID_R4_R5, y);
-            if (hasR6)
-                this.SetValue(Mid(r5, r6), MID_R5_R6, y);
-
-            if (!double.IsNaN(s1) && s1 != 0.0)
-                this.SetValue(Mid(pp, s1), MID_PP_S1, y);
-            if (hasS2)
-                this.SetValue(Mid(s1, s2), MID_S1_S2, y);
-            if (hasS3)
-                this.SetValue(Mid(s2, s3), MID_S2_S3, y);
-            if (hasS4)
-                this.SetValue(Mid(s3, s4), MID_S3_S4, y);
-            if (hasS5)
-                this.SetValue(Mid(s4, s5), MID_S4_S5, y);
-            if (hasS6)
-                this.SetValue(Mid(s5, s6), MID_S5_S6, y);
-        }
+        using var pen = new Pen(color, width);
+        g.DrawLine(pen, x1, y, x2, y);
     }
 
+    private void DrawSeparatorLine(Graphics g, double prevValue, double nextValue, Color color, float x, IChartWindowCoordinatesConverter conv, Rectangle rect, float width = 1f)
+    {
+        if (double.IsNaN(prevValue) || prevValue == 0.0) return;
+        if (double.IsNaN(nextValue) || nextValue == 0.0) return;
+
+        float y1 = (float)conv.GetChartY(prevValue);
+        float y2 = (float)conv.GetChartY(nextValue);
+
+        if (float.IsNaN(y1) || float.IsNaN(y2)) return;
+
+        x = Math.Max(rect.Left, Math.Min(rect.Right, x));
+
+        using var pen = new Pen(color, width);
+        g.DrawLine(pen, x, y1, x, y2);
+    }
+    void Draw(Graphics g, Rectangle rect, string name, double value, Color color, float endX, IChartWindowCoordinatesConverter conv)
+    {
+        if (double.IsNaN(value) || value == 0.0)
+            return;
+
+        float y = (float)conv.GetChartY(value);
+        string label = this.ShowPriceInLabels ? $"{name} {this.Symbol.FormatPrice(value)}" : name;
+        this.DrawLevelLabel(g, rect, y, label, color, endX);
+    }
     private void DrawLevelLabel(Graphics g, Rectangle chartRect, float y, string text, Color backColor, float anchorX)
     {
         if (float.IsNaN(y) || y <= chartRect.Top || y >= chartRect.Bottom)
@@ -980,20 +1177,196 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
 
         return $"{range} {period}";
     }
-    private Session CreateDefaultSession()
-    {
-        // 00:00
-        var startTime = new DateTime(Core.Instance.TimeUtils.DateTimeUtcNow.Date.Ticks, DateTimeKind.Unspecified);
-        // 23:59:59
-        var endTime = new DateTime(Core.Instance.TimeUtils.DateTimeUtcNow.Date.AddHours(23).AddMinutes(59).AddSeconds(59).Ticks, DateTimeKind.Unspecified);
 
-        var timeZone = this.CurrentChart?.CurrentTimeZone ?? Core.Instance.TimeUtils.SelectedTimeZone;
-        return new Session("Default",
-            Core.Instance.TimeUtils.ConvertFromTimeZoneToUTC(startTime, timeZone).TimeOfDay,
-            Core.Instance.TimeUtils.ConvertFromTimeZoneToUTC(endTime, timeZone).TimeOfDay);
+    private void InitializeLabels()
+    {
+        this.AddLabel(LABEL_PP, ComparingType.Double, "PP");
+
+        this.AddLabel(LABEL_R1, ComparingType.Double, "R1");
+        this.AddLabel(LABEL_R2, ComparingType.Double, "R2");
+        this.AddLabel(LABEL_R3, ComparingType.Double, "R3");
+        this.AddLabel(LABEL_R4, ComparingType.Double, "R4");
+        this.AddLabel(LABEL_R5, ComparingType.Double, "R5");
+        this.AddLabel(LABEL_R6, ComparingType.Double, "R6");
+
+        this.AddLabel(LABEL_S1, ComparingType.Double, "S1");
+        this.AddLabel(LABEL_S2, ComparingType.Double, "S2");
+        this.AddLabel(LABEL_S3, ComparingType.Double, "S3");
+        this.AddLabel(LABEL_S4, ComparingType.Double, "S4");
+        this.AddLabel(LABEL_S5, ComparingType.Double, "S5");
+        this.AddLabel(LABEL_S6, ComparingType.Double, "S6");
+
+        this.AddLabel(LABEL_MID_PP_R1, ComparingType.Double, "PP–R1");
+        this.AddLabel(LABEL_MID_R1_R2, ComparingType.Double, "R1–R2");
+        this.AddLabel(LABEL_MID_R2_R3, ComparingType.Double, "R2–R3");
+        this.AddLabel(LABEL_MID_R3_R4, ComparingType.Double, "R3–R4");
+        this.AddLabel(LABEL_MID_R4_R5, ComparingType.Double, "R4–R5");
+        this.AddLabel(LABEL_MID_R5_R6, ComparingType.Double, "R5–R6");
+
+        this.AddLabel(LABEL_MID_PP_S1, ComparingType.Double, "PP–S1");
+        this.AddLabel(LABEL_MID_S1_S2, ComparingType.Double, "S1–S2");
+        this.AddLabel(LABEL_MID_S2_S3, ComparingType.Double, "S2–S3");
+        this.AddLabel(LABEL_MID_S3_S4, ComparingType.Double, "S3–S4");
+        this.AddLabel(LABEL_MID_S4_S5, ComparingType.Double, "S4–S5");
+        this.AddLabel(LABEL_MID_S5_S6, ComparingType.Double, "S5–S6");
     }
-    private IList<ISession> GetAvailableCustomChartSessions() => this.chartSessionContainer?.ActiveSessions?.ToList() ?? new List<ISession>();
-    private IList<ISession> GetAvailableSymbolSessions() => this.Symbol?.CurrentSessionsInfo?.ActiveSessions?.ToList() ?? new List<ISession>();
+
+    private void UpdateLabelsFromLastPivot()
+    {
+        if (this.pivotPeriods == null || this.pivotPeriods.Count == 0)
+        {
+            this.ResetLabels();
+            return;
+        }
+
+        var lastPivot = this.pivotPeriods
+            .OrderBy(p => p.To)
+            .LastOrDefault();
+
+        if (lastPivot == null)
+        {
+            this.ResetLabels();
+            return;
+        }
+
+        this.SetLabelValue(LABEL_PP, NormalizeLabelValue(lastPivot.PP));
+
+        this.SetLabelValue(LABEL_R1, NormalizeLabelValue(lastPivot.R1));
+        this.SetLabelValue(LABEL_R2, NormalizeLabelValue(lastPivot.R2));
+        this.SetLabelValue(LABEL_R3, NormalizeLabelValue(lastPivot.R3));
+        this.SetLabelValue(LABEL_R4, NormalizeLabelValue(lastPivot.R4));
+        this.SetLabelValue(LABEL_R5, NormalizeLabelValue(lastPivot.R5));
+        this.SetLabelValue(LABEL_R6, NormalizeLabelValue(lastPivot.R6));
+
+        this.SetLabelValue(LABEL_S1, NormalizeLabelValue(lastPivot.S1));
+        this.SetLabelValue(LABEL_S2, NormalizeLabelValue(lastPivot.S2));
+        this.SetLabelValue(LABEL_S3, NormalizeLabelValue(lastPivot.S3));
+        this.SetLabelValue(LABEL_S4, NormalizeLabelValue(lastPivot.S4));
+        this.SetLabelValue(LABEL_S5, NormalizeLabelValue(lastPivot.S5));
+        this.SetLabelValue(LABEL_S6, NormalizeLabelValue(lastPivot.S6));
+
+        this.SetLabelValue(LABEL_MID_PP_R1, NormalizeLabelValue(MidIfPossible(lastPivot.PP, lastPivot.R1)));
+        this.SetLabelValue(LABEL_MID_R1_R2, NormalizeLabelValue(MidIfPossible(lastPivot.R1, lastPivot.R2)));
+        this.SetLabelValue(LABEL_MID_R2_R3, NormalizeLabelValue(MidIfPossible(lastPivot.R2, lastPivot.R3)));
+        this.SetLabelValue(LABEL_MID_R3_R4, NormalizeLabelValue(MidIfPossible(lastPivot.R3, lastPivot.R4)));
+        this.SetLabelValue(LABEL_MID_R4_R5, NormalizeLabelValue(MidIfPossible(lastPivot.R4, lastPivot.R5)));
+        this.SetLabelValue(LABEL_MID_R5_R6, NormalizeLabelValue(MidIfPossible(lastPivot.R5, lastPivot.R6)));
+
+        this.SetLabelValue(LABEL_MID_PP_S1, NormalizeLabelValue(MidIfPossible(lastPivot.PP, lastPivot.S1)));
+        this.SetLabelValue(LABEL_MID_S1_S2, NormalizeLabelValue(MidIfPossible(lastPivot.S1, lastPivot.S2)));
+        this.SetLabelValue(LABEL_MID_S2_S3, NormalizeLabelValue(MidIfPossible(lastPivot.S2, lastPivot.S3)));
+        this.SetLabelValue(LABEL_MID_S3_S4, NormalizeLabelValue(MidIfPossible(lastPivot.S3, lastPivot.S4)));
+        this.SetLabelValue(LABEL_MID_S4_S5, NormalizeLabelValue(MidIfPossible(lastPivot.S4, lastPivot.S5)));
+        this.SetLabelValue(LABEL_MID_S5_S6, NormalizeLabelValue(MidIfPossible(lastPivot.S5, lastPivot.S6)));
+    }
+
+    private void ResetLabels()
+    {
+        this.SetLabelValue(LABEL_PP, double.NaN);
+
+        this.SetLabelValue(LABEL_R1, double.NaN);
+        this.SetLabelValue(LABEL_R2, double.NaN);
+        this.SetLabelValue(LABEL_R3, double.NaN);
+        this.SetLabelValue(LABEL_R4, double.NaN);
+        this.SetLabelValue(LABEL_R5, double.NaN);
+        this.SetLabelValue(LABEL_R6, double.NaN);
+
+        this.SetLabelValue(LABEL_S1, double.NaN);
+        this.SetLabelValue(LABEL_S2, double.NaN);
+        this.SetLabelValue(LABEL_S3, double.NaN);
+        this.SetLabelValue(LABEL_S4, double.NaN);
+        this.SetLabelValue(LABEL_S5, double.NaN);
+        this.SetLabelValue(LABEL_S6, double.NaN);
+
+        this.SetLabelValue(LABEL_MID_PP_R1, double.NaN);
+        this.SetLabelValue(LABEL_MID_R1_R2, double.NaN);
+        this.SetLabelValue(LABEL_MID_R2_R3, double.NaN);
+        this.SetLabelValue(LABEL_MID_R3_R4, double.NaN);
+        this.SetLabelValue(LABEL_MID_R4_R5, double.NaN);
+        this.SetLabelValue(LABEL_MID_R5_R6, double.NaN);
+
+        this.SetLabelValue(LABEL_MID_PP_S1, double.NaN);
+        this.SetLabelValue(LABEL_MID_S1_S2, double.NaN);
+        this.SetLabelValue(LABEL_MID_S2_S3, double.NaN);
+        this.SetLabelValue(LABEL_MID_S3_S4, double.NaN);
+        this.SetLabelValue(LABEL_MID_S4_S5, double.NaN);
+        this.SetLabelValue(LABEL_MID_S5_S6, double.NaN);
+    }
+
+    private double NormalizeLabelValue(double value)
+    {
+        if (double.IsNaN(value) || double.IsInfinity(value) || value == 0.0)
+            return 0d;
+        
+        return this.RoundToTickSize(value);
+    }
+
+    private double MidIfPossible(double a, double b)
+    {
+        if (double.IsNaN(a) || double.IsNaN(b) || a == 0.0 || b == 0.0)
+            return 0d;
+
+        return (a + b) * 0.5;
+    }
+
+    private double RoundToTickSize(double value)
+    {
+        if (double.IsNaN(value) || double.IsInfinity(value))
+            return value;
+
+        if (this.Symbol == null || this.Symbol.TickSize <= 0)
+            return value;
+
+        double steps = Math.Round(value / this.Symbol.TickSize, MidpointRounding.AwayFromZero);
+        return steps * this.Symbol.TickSize;
+    }
+
+    private void CurrentChartOnSettingsChanged(object sender, ChartEventArgs e)
+    {
+        if (this.DailySessionType == DailySessionType.SpecifiedSession &&
+            this.specifiedSessionContainerId == CHART_SESSION_CONTAINER_SELECT_ITEM)
+        {
+            if (this.CurrentChart?.CurrentSessionContainer == null || this.chartSessionContainer == null)
+                return;
+
+            if (!this.chartSessionContainer.Equals(this.CurrentChart.CurrentSessionContainer))
+            {
+                this.chartSessionContainer = this.CurrentChart.CurrentSessionContainer;
+                this.Refresh();
+            }
+        }
+    }
+
+    private TradingPlatform.BusinessLayer.TimeZone GetTimeZone()
+    {
+        return this.CurrentChart?.CurrentTimeZone ?? Core.Instance.TimeUtils.SelectedTimeZone;
+    }
+
+    private Interval<DateTime> GetFullDayTimeInterval(TradingPlatform.BusinessLayer.TimeZone timeZone)
+    {
+        var openTime = new DateTime(DateTime.UtcNow.Date.Ticks, DateTimeKind.Unspecified);
+        var closeTime = new DateTime(DateTime.UtcNow.Date.AddDays(-1).Ticks, DateTimeKind.Unspecified);
+
+        return new Interval<DateTime>(
+            Core.Instance.TimeUtils.ConvertFromTimeZoneToUTC(openTime, timeZone),
+            Core.Instance.TimeUtils.ConvertFromTimeZoneToUTC(closeTime, timeZone));
+    }
+
+    private CustomSession CreateCustomSession(TimeSpan open, TimeSpan close, TimeZoneInfo info)
+    {
+        var session = new CustomSession
+        {
+            OpenOffset = open,
+            CloseOffset = close,
+            IsActive = true,
+            Name = "Main",
+            Days = Enum.GetValues(typeof(DayOfWeek)).Cast<DayOfWeek>().ToArray(),
+            Type = SessionType.Main
+        };
+
+        session.RecalculateOpenCloseTime(info);
+        return session;
+    }
     #endregion Misc
 }
 

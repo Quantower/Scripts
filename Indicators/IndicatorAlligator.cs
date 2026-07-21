@@ -11,10 +11,10 @@ public sealed class IndicatorAlligator : Indicator
     [InputParameter("Type of Jaw Moving Average", 0, variants: new object[]{
         "Simple", MaMode.SMA,
         "Exponential", MaMode.EMA,
-        "Modified", MaMode.SMMA,
+        "Smoothed Simple", MaMode.SMMA,
            "Linear Weighted", MaMode.LWMA}
     )]
-    public MaMode JawMAType = MaMode.SMA;
+    public MaMode JawMAType = MaMode.SMMA;
 
     [InputParameter("Source price for Jaw Moving Average", 1, variants: new object[] {
          "Close", PriceType.Close,
@@ -31,16 +31,16 @@ public sealed class IndicatorAlligator : Indicator
     [InputParameter("Period of Jaw Moving Average", 2, 1, 999)]
     public int JawMAPeiod = 13;
 
-    [InputParameter("Shift of Jaw Moving Average", 3, 1, 999)]
+    [InputParameter("Shift of Jaw Moving Average", 3, -999, 999, 1, 0)]
     public int JawMAShift = 8;
 
     [InputParameter("Type of Teeth Moving Average", 4, variants: new object[]{
         "Simple", MaMode.SMA,
         "Exponential", MaMode.EMA,
-        "Modified", MaMode.SMMA,
+        "Smoothed Simple", MaMode.SMMA,
            "Linear Weighted", MaMode.LWMA}
      )]
-    public MaMode TeethMAType = MaMode.SMA;
+    public MaMode TeethMAType = MaMode.SMMA;
 
     [InputParameter("Source price for Teeth Moving Average", 5, variants: new object[]{
          "Close", PriceType.Close,
@@ -56,16 +56,16 @@ public sealed class IndicatorAlligator : Indicator
     [InputParameter("Period of Teeth MovingAverage", 6, 1, 999)]
     public int TeethMAPeiod = 8;
 
-    [InputParameter("Shift of Teeth Moving Average", 7, 1, 999)]
+    [InputParameter("Shift of Teeth Moving Average", 7, -999, 999, 1, 0)]
     public int TeethMAShift = 5;
 
     [InputParameter("Type of Lips Moving Average", 8, variants: new object[]{
         "Simple", MaMode.SMA,
         "Exponential", MaMode.EMA,
-        "Modified", MaMode.SMMA,
-           "Linear Weighted", MaMode.LWMA}
+        "Smoothed Simple", MaMode.SMMA,
+        "Linear Weighted", MaMode.LWMA}
      )]
-    public MaMode LipsMAType = MaMode.SMA;
+    public MaMode LipsMAType = MaMode.SMMA;
     //
     [InputParameter("Calculation type", 9, variants: new object[]
     {
@@ -88,7 +88,7 @@ public sealed class IndicatorAlligator : Indicator
     [InputParameter("Period of Lips Moving Average", 11, 1, 9999)]
     public int LipsMAPeiod = 5;
 
-    [InputParameter("Shift of Lips Moving Average", 12)]
+    [InputParameter("Shift of Lips Moving Average", 12, -999, 999, 1, 0)]
     public int LipsMAShift = 3;
 
     // Serves for an identification of related indicators with different parameters.
@@ -122,10 +122,9 @@ public sealed class IndicatorAlligator : Indicator
     /// </summary>
     protected override void OnInit()
     {
-#warning Реалізувати "LineTimeShift".
-        //LineTimeShift[0] = JawMAShift;
-        //LineTimeShift[1] = TeethMAShift;
-        //LineTimeShift[2] = LipsMAShift;
+        this.LinesSeries[0].TimeShift = this.JawMAShift;
+        this.LinesSeries[1].TimeShift = this.TeethMAShift;
+        this.LinesSeries[2].TimeShift = this.LipsMAShift;
         this.jawMa = Core.Indicators.BuiltIn.MA(this.JawMAPeiod, this.JawSourcePrice, this.JawMAType, this.CalculationType);
         this.AddIndicator(this.jawMa);
         this.teethMa = Core.Indicators.BuiltIn.MA(this.TeethMAPeiod, this.TeethSourcePrice, this.TeethMAType, this.CalculationType);

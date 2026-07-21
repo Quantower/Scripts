@@ -132,7 +132,6 @@ public class IndicatorDailyOHLC : Indicator
     public NativeAlignment LabelAlignment { get; set; }
     public int labelFormat { get; set; }
     public int labelPosition { get; set; }
-    public int LabelHorizontalMode { get; set; } = 0;
     public int LastLabelsCount { get; set; } = 1;
     public int OpenLabelOffsetPx { get; set; } = 0;
     public int HighLabelOffsetPx { get; set; } = 0;
@@ -505,24 +504,6 @@ public class IndicatorDailyOHLC : Indicator
 
             this.extendSession = new Session("Extend session", extendStart, extendEnd);
         }
-
-        this.OpenLabelHorizontalMode   = this.LabelHorizontalMode;
-        this.HighLabelHorizontalMode   = this.LabelHorizontalMode;
-        this.LowLabelHorizontalMode    = this.LabelHorizontalMode;
-        this.CloseLabelHorizontalMode  = this.LabelHorizontalMode;
-        this.MiddleLabelHorizontalMode = this.LabelHorizontalMode;
-
-        this.OpenLabelPosition   = this.labelPosition;
-        this.HighLabelPosition   = this.labelPosition;
-        this.LowLabelPosition    = this.labelPosition;
-        this.CloseLabelPosition  = this.labelPosition;
-        this.MiddleLabelPosition = this.labelPosition;
-
-        this.OpenLastLabelsCount   = this.LastLabelsCount;
-        this.HighLastLabelsCount   = this.LastLabelsCount;
-        this.LowLastLabelsCount    = this.LastLabelsCount;
-        this.CloseLastLabelsCount  = this.LastLabelsCount;
-        this.MiddleLastLabelsCount = this.LastLabelsCount;
     }
 
     protected override void OnUpdate(UpdateArgs args)

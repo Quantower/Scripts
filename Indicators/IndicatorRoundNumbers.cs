@@ -15,7 +15,8 @@ public class IndicatorRoundNumbers : Indicator
 
     [InputParameter(ROUND_NUMBERS_SI, 10, 1, int.MaxValue, 1, 0)]
     public int Step = 50;
-
+    [InputParameter("Offset (ticks)", 15, int.MinValue, int.MaxValue, 1, 0)]
+    public int OffsetTicks = 0;
     [InputParameter(NUMBER_OF_LINES_SI, 20, 1, int.MaxValue, 1, 0)]
     public int NumberOfLines = 20;
 
@@ -58,7 +59,11 @@ public class IndicatorRoundNumbers : Indicator
     {
         var gr = args.Graphics;
 
-        float deltaPriceY = (float)(this.Step * this.CurrentChart.TickSize * this.CurrentChart.MainWindow.YScaleFactor);
+        double tickSize = this.CurrentChart.TickSize;
+        double levelStep = this.Step * tickSize;
+        double offsetPrice = this.OffsetTicks * tickSize;
+
+        float deltaPriceY = (float)(levelStep * this.CurrentChart.MainWindow.YScaleFactor);
         if (deltaPriceY <= 0)
             return;
 
@@ -67,10 +72,16 @@ public class IndicatorRoundNumbers : Indicator
         int right = this.CurrentChart.MainWindow.ClientRectangle.Right;
 
         double middlePrice = this.Close();
-        double correctedMiddleLevel = (int)(middlePrice / (this.Step * this.CurrentChart.TickSize)) * (this.Step * this.CurrentChart.TickSize);
 
-        float startLevel = (float)(this.CurrentChart.MainWindow.CoordinatesConverter.GetChartY(correctedMiddleLevel) - System.Math.Ceiling(this.NumberOfLines / 2d) * deltaPriceY);
+        double correctedMiddleLevel =
+            Math.Floor((middlePrice - offsetPrice) / levelStep) * levelStep + offsetPrice;
 
+        correctedMiddleLevel = Math.Round(correctedMiddleLevel / tickSize) * tickSize;
+
+        float startLevel = (float)(
+            this.CurrentChart.MainWindow.CoordinatesConverter.GetChartY(correctedMiddleLevel)
+            - Math.Ceiling(this.NumberOfLines / 2d) * deltaPriceY
+        );
         for (int i = 0; i < this.NumberOfLines; i++)
         {
             if (startLevel >= top && startLevel <= bottom)

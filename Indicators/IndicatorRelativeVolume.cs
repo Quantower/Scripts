@@ -14,7 +14,7 @@ namespace Relative_Volume
         private HistoricalData dailyHistoricalData;
         [InputParameter("Period", 0, 1, 1000)]
         public int period = 10;
-        
+
         private enum RvolMode { Cumulative, Regular }
         [InputParameter("RVOL Mode", 1, variants: new object[] {
             "Cumulative", RvolMode.Cumulative,
@@ -53,6 +53,7 @@ namespace Relative_Volume
 
         private bool TryCalculateRelativeVolume(DateTime referenceTime, out double result)
         {
+            var history = this.dailyHistoricalData;
             if (this.dailyHistoricalData == null)
             {
                 result = 0;
@@ -66,65 +67,77 @@ namespace Relative_Volume
             DateTime baseTime = referenceTime;
             DateTime startTime = baseTime.Date;
 
-            for (int i = 0; i < this.period; i++)
+            int currIndex = (int)history.GetIndexByTime(referenceTime.Ticks);
+            if (currIndex < 0 || history[currIndex] is not HistoryItemBar currentBar)
             {
-                double volume = 0;
-                DateTime targetTime = baseTime;
-
-                int index = (int)this.dailyHistoricalData.GetIndexByTime(targetTime.Ticks);
-                if (index >= 0 && this.dailyHistoricalData[index] is HistoryItemBar bar)
+                result = 0;
+                return false;
+            }
+            if (this.rvolMode == RvolMode.Regular)
+            {
+                currentVolume = currentBar.Volume;
+            }
+            else
+            {
+                for (int i = currIndex; i >= 0; i--)
                 {
-                    volume = bar.Volume;
-                    averageVolume += volume;
-                    validDays++;
+                    var prevBar = (HistoryItemBar)history[i];
 
-                    if (i == 0 && this.rvolMode == RvolMode.Regular)
-                        currentVolume = bar.Volume;
+                    if (prevBar.TimeLeft < startTime)
+                        break;
+
+                    currentVolume += prevBar.Volume;
                 }
-
-                if (this.rvolMode == RvolMode.Cumulative)
+            }
+            DateTime prevDayTime = referenceTime;
+            DateTime prevStartTime = startTime;
+            for (int i = 1; i <= this.period; i++)
+            {
+                prevDayTime = prevDayTime.AddDays(-1);
+                prevStartTime = prevStartTime.AddDays(-1);
+                int index = (int)history.GetIndexByTime(prevDayTime.Ticks);
+                if (index < 0)
+                    continue;
+                var prevBar = (HistoryItemBar)history[index];
+                if (this.rvolMode == RvolMode.Regular)
                 {
-                    DateTime slider = targetTime;
-                    double cumulative = 0;
-
-                    Period step = this.GetStepPeriod();
-
-                    while (startTime <= slider)
+                    averageVolume += prevBar.Volume;
+                    validDays++;
+                }
+                else
+                {
+                    double cumVolume = 0;
+                    for (int j = index; j >= 0; j--)
                     {
-                        int idx = (int)this.dailyHistoricalData.GetIndexByTime(slider.Ticks);
-                        if (idx >= 0 && this.dailyHistoricalData[idx] is HistoryItemBar b)
-                            cumulative += b.Volume;
+                        prevBar = (HistoryItemBar)history[j];
 
-                        slider -= step.Duration;
+                        if (prevBar.TimeLeft < prevStartTime)
+                            break;
+
+                        cumVolume += prevBar.Volume;
                     }
 
-                    if (i == 0)
-                        currentVolume = cumulative;
-
-                    averageVolume += cumulative;
+                    averageVolume += cumVolume;
                     validDays++;
                 }
 
-                startTime = startTime.AddDays(-1);
-                baseTime = baseTime.AddDays(-1);
             }
-
-            if (validDays == 0 || averageVolume == 0)
+            if (validDays == 0 || averageVolume <= 0)
             {
                 result = 0;
                 return false;
             }
 
             result = currentVolume / (averageVolume / validDays);
+
+            if (double.IsNaN(result) || double.IsInfinity(result))
+            {
+                result = 0;
+                return false;
+            }
+
             return true;
-        }
-        private Period GetStepPeriod()
-        {
-            if (this.HistoricalData == null)
-                return Period.MIN1;
-            if (this.HistoricalData.Aggregation is HistoryAggregationTime historyAggregationTime)
-                return historyAggregationTime.Period;
-            return Period.MIN1;
+
         }
 
 
@@ -154,7 +167,7 @@ namespace Relative_Volume
                 if (needReload)
                     this.dailyHistoricalData = this.Symbol.GetHistory(this.HistoricalData.Aggregation, DateTime.Today.AddDays(-this.period * 2));
 
-                for (int j = 0; j < this.Count; j++)
+                for (int j = 0; j < this.HistoricalData.Count; j++)
                 {
                     if (token.IsCancellationRequested)
                     {
@@ -163,7 +176,7 @@ namespace Relative_Volume
                     }
 
                     DateTime time = this.Time(j);
-                    if (this.TryCalculateRelativeVolume(time, out double relVolume) && j < this.Count)
+                    if (this.TryCalculateRelativeVolume(time, out double relVolume))
                         this.SetValue(relVolume, 0, j);
                 }
                 this.IsLoading = false;

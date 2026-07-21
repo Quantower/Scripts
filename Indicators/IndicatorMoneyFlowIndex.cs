@@ -56,6 +56,23 @@ public sealed class IndicatorMoneyFlowIndex : Indicator, IWatchlistIndicator
         {
             this.fnmf.Insert(0, 0);
             this.fpmf.Insert(0, 0);
+
+            if (this.fnmf.Count > this.Period + 2)
+                this.fnmf.RemoveAt(this.fnmf.Count - 1);
+
+            if (this.fpmf.Count > this.Period + 2)
+                this.fpmf.RemoveAt(this.fpmf.Count - 1);
+        }
+        else
+        {
+            if (this.fnmf.Count == 0)
+                this.fnmf.Insert(0, 0d);
+
+            if (this.fpmf.Count == 0)
+                this.fpmf.Insert(0, 0d);
+
+            this.fnmf[0] = 0d;
+            this.fpmf[0] = 0d;
         }
         // Skip the bar at the beginning of the story.
         if (this.Count == 1)

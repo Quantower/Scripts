@@ -54,7 +54,7 @@ public class IndicatorPowerBars : Indicator
             return;
 
         var g = args.Graphics;
-        var savedClip = g.Clip;
+        var savedClip = g.ClipBounds;
 
         try
         {
@@ -72,9 +72,22 @@ public class IndicatorPowerBars : Indicator
             leftIndex  = Math.Max(0, leftIndex - 1);
             rightIndex = Math.Min(this.Count - 1, rightIndex + 1);
 
-            int bodyWidth = Math.Max(1, this.CurrentChart.BarsWidth - 2);
+            int bodyWidth = this.CurrentChart.BarsWidth;
+            int barLeftOffset = 0;
+            if (bodyWidth > 5)
+            {
+                if (bodyWidth % 2 == 1)
+                {
+                    barLeftOffset = 1;
+                    bodyWidth -= 2;
+                }
+                else
+                {
+                    bodyWidth -= 1;
+                }
+            }
 
-            using var fillBrush = new SolidBrush(this.tresholdColor);
+            var fillBrush = new SolidBrush(this.tresholdColor);
 
             for (int i = leftIndex; i <= rightIndex; i++)
             {
@@ -92,17 +105,16 @@ public class IndicatorPowerBars : Indicator
 
                 var bar = (HistoryItemBar)this.HistoricalData[i, SeekOriginHistory.Begin];
 
-                float centerX = (float)wnd.CoordinatesConverter.GetChartX(bar.TimeLeft) + this.CurrentChart.BarsWidth / 2f;
-                float x = centerX - bodyWidth / 2f;
+                int x = (int)wnd.CoordinatesConverter.GetChartX(bar.TimeLeft);
 
-                float yOpen = (float)wnd.CoordinatesConverter.GetChartY(bar.Open);
-                float yClose = (float)wnd.CoordinatesConverter.GetChartY(bar.Close);
+                int yOpen = (int)wnd.CoordinatesConverter.GetChartY(bar.Open);
+                int yClose = (int)wnd.CoordinatesConverter.GetChartY(bar.Close);
 
                 float top = Math.Min(yOpen, yClose);
                 float height = Math.Abs(yOpen - yClose);
                 if (height < 1f) height = 1f; 
 
-                g.FillRectangle(fillBrush, x, top, bodyWidth, height);
+                g.FillRectangle(fillBrush, x+barLeftOffset, top, bodyWidth, height);
             }
         }
         catch (Exception ex)
@@ -111,7 +123,7 @@ public class IndicatorPowerBars : Indicator
         }
         finally
         {
-            g.SetClip(savedClip, System.Drawing.Drawing2D.CombineMode.Replace);
+            g.SetClip(savedClip);
         }
     }
 

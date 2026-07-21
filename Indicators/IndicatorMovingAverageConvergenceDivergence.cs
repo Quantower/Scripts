@@ -15,11 +15,29 @@ public sealed class IndicatorMovingAverageConvergenceDivergence : Indicator, IWa
     [InputParameter("Period of fast EMA", 0, 1, 999, 1, 0)]
     public int FastPeriod = 12;
 
-    [InputParameter("Period of slow EMA", 1, 1, 999, 1, 0)]
+    [InputParameter("Period of slow MA", 1, 1, 999, 1, 0)]
     public int SlowPeriod = 26;
 
-    [InputParameter("Period of signal SMA", 2, 1, 999, 1, 0)]
+    [InputParameter("Period of signal MA", 2, 1, 999, 1, 0)]
     public int SignalPeriod = 9;
+
+    [InputParameter("MACD line MA type", 3, variants: new object[]
+{
+    "Simple Moving Average", MaMode.SMA,
+    "Exponential Moving Average", MaMode.EMA,
+    "Smoothed Moving Average", MaMode.SMMA,
+    "Linearly Weighted Moving Average", MaMode.LWMA,
+})]
+    public MaMode MacdMaType = MaMode.EMA;
+
+    [InputParameter("Signal line MA type", 6, variants: new object[]
+    {
+    "Simple Moving Average", MaMode.SMA,
+    "Exponential Moving Average", MaMode.EMA,
+    "Smoothed Moving Average", MaMode.SMMA,
+    "Linearly Weighted Moving Average", MaMode.LWMA,
+    })]
+    public MaMode SignalMaType = MaMode.SMA;
 
     //
     [InputParameter("Price type", 4, variants: new object[]
@@ -36,7 +54,14 @@ public sealed class IndicatorMovingAverageConvergenceDivergence : Indicator, IWa
         "By period", IndicatorCalculationType.ByPeriod,
     })]
     public IndicatorCalculationType CalculationType = Indicator.DEFAULT_CALCULATION_TYPE;
-  
+    [InputParameter("Show Clouds", 30)]
+    public bool showClouds = false;
+
+    [InputParameter("MACD line above cloud style", 30)]
+    public Color firstAboveCloudColor = Color.FromArgb(85, Color.Green);
+
+    [InputParameter("Signal line above cloud style", 40)]
+    public Color secondAboveCloudColor = Color.FromArgb(85, Color.Red);
     public int MinHistoryDepths => this.MaxEMAPeriod + this.SignalPeriod;
     public override string ShortName => $"MACD ({this.FastPeriod}: {this.SlowPeriod}: {this.SignalPeriod})";
     public override string HelpLink => "https://help.quantower.com/analytics-panels/chart/technical-indicators/oscillators/moving-average-convergence-divergence";
@@ -44,15 +69,18 @@ public sealed class IndicatorMovingAverageConvergenceDivergence : Indicator, IWa
 
     private int MaxEMAPeriod => Math.Max(this.FastPeriod, this.SlowPeriod);
 
-    private Indicator fastEMA;
-    private Indicator slowEMA;
-    private Indicator sma;
+    private Indicator fastMA;
+    private Indicator slowMA;
+    private Indicator signalMA;
     private HistoricalDataCustom customHD;
 
     private Color level1_Color;
     private Color level2_Color;
     private Color level3_Color;
     private Color level4_Color;
+
+    private CloudType currCloudType = CloudType.None;
+    private CloudType prevCloudType = CloudType.None;
 
     /// <summary>
     /// Indicator's constructor. Contains general information: name, description, LineSeries etc. 
@@ -83,19 +111,20 @@ public sealed class IndicatorMovingAverageConvergenceDivergence : Indicator, IWa
     protected override void OnInit()
     {
         // Get two EMA and one SMA indicators from built-in indicator collection. 
-        this.fastEMA = Core.Indicators.BuiltIn.EMA(this.FastPeriod, this.PriceType, this.CalculationType);
-        this.slowEMA = Core.Indicators.BuiltIn.EMA(this.SlowPeriod, this.PriceType, this.CalculationType);
-        this.sma = Core.Indicators.BuiltIn.SMA(this.SignalPeriod, PriceType.Close);
+        this.fastMA = Core.Indicators.BuiltIn.MA(this.FastPeriod, this.PriceType, this.MacdMaType, this.CalculationType);
+        this.slowMA = Core.Indicators.BuiltIn.MA(this.SlowPeriod, this.PriceType, this.MacdMaType, this.CalculationType);
+        this.signalMA = Core.Indicators.BuiltIn.MA(this.SignalPeriod, PriceType.Close, this.SignalMaType, this.CalculationType);
+
 
         // Create a custom HistoricalData and synchronize it with this(MACD) indicator.
         this.customHD = new HistoricalDataCustom(this);
 
         // Attach SMA indicator to custom HistoricalData. The SMA will calculate on the data, which will store in custom HD. 
-        this.customHD.AddIndicator(this.sma);
+        this.customHD.AddIndicator(this.signalMA);
 
         // Add auxiliary EMA indicators to the current one. 
-        this.AddIndicator(this.fastEMA);
-        this.AddIndicator(this.slowEMA);
+        this.AddIndicator(this.fastMA);
+        this.AddIndicator(this.slowMA);
 
     }
 
@@ -113,7 +142,7 @@ public sealed class IndicatorMovingAverageConvergenceDivergence : Indicator, IWa
             return;
 
         // Calculate a difference bettwen two EMA indicators and set value to 'MACD' line buffer.
-        double differ = this.fastEMA.GetValue() - this.slowEMA.GetValue();
+        double differ = this.fastMA.GetValue() - this.slowMA.GetValue();
         this.SetValue(differ, 1);
 
         // The calculated value must be set as close price against the custom HistoricalData,
@@ -124,7 +153,7 @@ public sealed class IndicatorMovingAverageConvergenceDivergence : Indicator, IWa
             return;
 
         // Get value from SMA indicator, which is calculated based on custom HistoricalData.
-        double signal = this.sma.GetValue();
+        double signal = this.signalMA.GetValue();
         if (double.IsNaN(signal))
             return;
 
@@ -139,6 +168,27 @@ public sealed class IndicatorMovingAverageConvergenceDivergence : Indicator, IWa
             this.LinesSeries[0].SetMarker(0, osMAValue > this.LinesSeries[0].GetValue(1) ? this.level1_Color : this.level2_Color);
         else
             this.LinesSeries[0].SetMarker(0, osMAValue < this.LinesSeries[0].GetValue(1) ? this.level3_Color : this.level4_Color);
+        if (!this.showClouds)
+            return;
+
+        if (differ > signal)
+            this.currCloudType = CloudType.FirstAbove;
+        else
+            this.currCloudType = CloudType.SecondAbove;
+
+        if (this.currCloudType == this.prevCloudType)
+            return;
+        Color cloudColor = this.currCloudType == CloudType.FirstAbove ? this.firstAboveCloudColor : this.secondAboveCloudColor;
+        if (this.prevCloudType == CloudType.None)
+        {
+            this.BeginCloud(1, 2, cloudColor);
+        }
+        else
+        {
+            this.EndCloud(1, 2, Color.Empty);
+            this.BeginCloud(1, 2, cloudColor);
+        }
+        this.prevCloudType = this.currCloudType;
     }
 
     public override IList<SettingItem> Settings
@@ -150,12 +200,12 @@ public sealed class IndicatorMovingAverageConvergenceDivergence : Indicator, IWa
             if (settings.GetItemByName("Line_0") is SettingItemGroup lineGroup)
             {
                 var items = lineGroup.Value as IList<SettingItem>;
-                var separatorGeoup = items?.FirstOrDefault()?.SeparatorGroup;
+                var separatorGroup = items?.FirstOrDefault()?.SeparatorGroup;
 
-                lineGroup.AddItem(new SettingItemColor("Color 1", this.level1_Color, 1) { ColorText = loc._("Color"), SeparatorGroup = separatorGeoup });
-                lineGroup.AddItem(new SettingItemColor("Color 2", this.level2_Color, 1) { ColorText = loc._("Color"), SeparatorGroup = separatorGeoup });
-                lineGroup.AddItem(new SettingItemColor("Color 3", this.level3_Color, 1) { ColorText = loc._("Color"), SeparatorGroup = separatorGeoup });
-                lineGroup.AddItem(new SettingItemColor("Color 4", this.level4_Color, 1) { ColorText = loc._("Color"), SeparatorGroup = separatorGeoup });
+                lineGroup.AddItem(new SettingItemColor("Color 1", this.level1_Color, 1) { ColorText = loc._("Color"), SeparatorGroup = separatorGroup });
+                lineGroup.AddItem(new SettingItemColor("Color 2", this.level2_Color, 1) { ColorText = loc._("Color"), SeparatorGroup = separatorGroup });
+                lineGroup.AddItem(new SettingItemColor("Color 3", this.level3_Color, 1) { ColorText = loc._("Color"), SeparatorGroup = separatorGroup });
+                lineGroup.AddItem(new SettingItemColor("Color 4", this.level4_Color, 1) { ColorText = loc._("Color"), SeparatorGroup = separatorGroup });
             }
 
             return settings;
@@ -197,5 +247,11 @@ public sealed class IndicatorMovingAverageConvergenceDivergence : Indicator, IWa
                 this.OnSettingsUpdated();
         }
     }
+    }
+    internal enum CloudType
+    {
+        None = 0,
+        FirstAbove = 1,
+        SecondAbove = 2,
     }
 }

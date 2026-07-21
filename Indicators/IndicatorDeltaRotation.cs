@@ -263,6 +263,8 @@ public class IndicatorDeltaRotation : Indicator, IVolumeAnalysisIndicator
             var isAbsorptionBar = !isDoji && ((volumeAnalysis.Total.Delta < 0 && isGrownBar) || (volumeAnalysis.Total.Delta > 0 && !isGrownBar));
             var isUpDirection = isDoji
                 ? this.previousArea?.IsUpBarsDirection ?? false
+                : isAbsorptionBar
+                ? volumeAnalysis.Total.Delta > 0
                 : isGrownBar;
 
             //
