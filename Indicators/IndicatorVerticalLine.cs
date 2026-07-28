@@ -7,7 +7,7 @@ using System.Drawing.Drawing2D;
 using TradingPlatform.BusinessLayer;
 using TradingPlatform.BusinessLayer.Utils;
 
-namespace ChanneIsIndicators;
+namespace OtherIndicators;
 public class IndicatorVerticalLine : Indicator
 {
     private TimeLine[] lines = new TimeLine[5] { new TimeLine(Color.Green, "First Line", 1), new TimeLine(Color.Red, "Second Line", 2), new TimeLine(Color.GreenYellow, "Third Line", 3), new TimeLine(Color.Blue, "Fourth Line", 4), new TimeLine(Color.Cyan, "Fifth Line", 5) };

@@ -7,7 +7,7 @@ using System.Drawing.Drawing2D;
 using TradingPlatform.BusinessLayer;
 using TradingPlatform.BusinessLayer.Utils;
 
-namespace VolumeIndicators
+namespace OtherIndicators
 {
     public sealed class IndicatorTimeSessions : Indicator
     {
@@ -17,7 +17,7 @@ namespace VolumeIndicators
 
         private readonly Session[] sessions;
 
-        private bool drawUnbegunSessions = true;
+        private bool drawUnbegunSessions = false;
 
         public IndicatorTimeSessions()
             : base()
@@ -112,7 +112,7 @@ namespace VolumeIndicators
                         if ((this.drawUnbegunSessions && (startTime < screenRightTime || endTime > screenLeftTime)) ||
                             (!this.drawUnbegunSessions && startTime < screenRightTime && endTime > screenLeftTime))
                         {
-                            bool isInChartArea = startTime < screenRightTime && endTime > screenLeftTime;
+                            bool isInChartArea = startTime < screenRightTime || endTime > screenLeftTime;
                             var currentZoneStartTime = startTime;
                             var currentZoneEndTime = endTime;
 
@@ -122,8 +122,8 @@ namespace VolumeIndicators
                                 currentZoneEndTime = screenRightTime;
                             bool drawAnyway = this.drawUnbegunSessions && s.DrawMode == SessionDrawMode.Simple;
 
-                            bool startInSession = isInChartArea ? this.IsTimeInSession(currentZoneStartTime) : false;
-                            bool endInSession = isInChartArea ? this.IsTimeInSession(currentZoneEndTime) : false;
+                            bool startInSession = isInChartArea ? this.HistoricalData.Aggregation.SessionsContainer.ContainsDate(currentZoneStartTime) : false;
+                            bool endInSession = isInChartArea ? this.HistoricalData.Aggregation.SessionsContainer.ContainsDate(currentZoneEndTime) : false;
 
                             if (drawAnyway || startInSession || endInSession)
                             {
@@ -132,9 +132,10 @@ namespace VolumeIndicators
                                     if (!startInSession)
                                         currentZoneStartTime = this.HistoricalData[(int)this.HistoricalData.GetIndexByTime(currentZoneStartTime.Ticks, SeekOriginHistory.Begin)+1, SeekOriginHistory.Begin].TimeLeft;
                                     if (!endInSession)
-                                        currentZoneEndTime = this.HistoricalData[(int)this.HistoricalData.GetIndexByTime(currentZoneStartTime.Ticks, SeekOriginHistory.Begin)-1, SeekOriginHistory.Begin].TimeLeft;
+                                        currentZoneEndTime = this.HistoricalData[(int)this.HistoricalData.GetIndexByTime(currentZoneEndTime.Ticks, SeekOriginHistory.Begin)-1, SeekOriginHistory.Begin].TimeLeft;
                                 }
-
+                                if (!startInSession && !endInSession)
+                                    continue;
                                 leftCoordinate = (int)mainWindow.CoordinatesConverter.GetChartX(startTime);
                                 rightCoordinate = (int)mainWindow.CoordinatesConverter.GetChartX(endTime);
                                 if (!s.AllWeekAvailable)
