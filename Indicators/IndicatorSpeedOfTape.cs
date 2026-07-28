@@ -25,7 +25,7 @@ public class IndicatorSpeedOfTape : Indicator, IVolumeAnalysisIndicator
     private readonly StringFormat centerCenterSF;
     protected static string LoadingMessage => loc._("Loading volume analysis data...");
 
-    public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorTimeHistogram.cs";
+    public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorSpeedOfTape.cs";
 
     public override string ShortName => $"SoT";
     public IndicatorSpeedOfTape()
