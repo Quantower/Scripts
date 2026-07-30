@@ -786,10 +786,20 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
 
             var conv = wnd.CoordinatesConverter;
 
+            var orderedPeriods = (this.pivotPeriods ?? new List<PivotPointCalculationResponce>())
+                .OrderBy(period => period.From)
+                .ThenBy(period => period.To)
+                .ToList();
+
+            if (orderedPeriods.Count == 0)
+                return;
+
+            var latestPeriod = orderedPeriods[orderedPeriods.Count - 1];
+
             IEnumerable<PivotPointCalculationResponce> periodsToDraw =
                 this.OnlyCurrentPeriod
-                    ? new[] { this.pivotPeriods[this.pivotPeriods.Count-1] }
-                    : (this.pivotPeriods ?? Enumerable.Empty<PivotPointCalculationResponce>());
+                    ? new[] { latestPeriod }
+                    : orderedPeriods;
 
             foreach (var p in periodsToDraw)
             {
@@ -932,7 +942,8 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
                         }
                     }
                 }
-                if (this.ShowLabels && !(this.DrawLastPeriodOnly && p != periodsToDraw.Last()))
+                bool isLatestPeriod = p.From == latestPeriod.From && p.To == latestPeriod.To;
+                if (this.ShowLabels && (!this.DrawLastPeriodOnly || isLatestPeriod))
                 {
                     Draw(g, args.Rectangle, "PP", p.PP, this.PPLineOptions, endX, conv);
                     Draw(g, args.Rectangle, "R1", p.R1, this.RLineOptions, endX, conv);
