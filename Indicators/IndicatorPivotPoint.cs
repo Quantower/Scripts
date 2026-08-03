@@ -21,11 +21,33 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
     private const string CALCULATION_METHOD_INPUT_PARAMETER = "Calculation method";
     private const string EXTEND_TO_PERIOD_END_INPUT_PARAMETER = "Extend to period end";
     private const string DISPLAY_SEPARATOR_INPUT_PARAMETER = "Display separator";
+    private const string DISPLAY_LABELS_LAST_PERIOD_ONLY_INPUT_PARAMETER = "Display labels last period only";
 
     private const string PP_LINE_OPTIONS_SI = "PPLineOptions";
-    private const string R_LINE_OPTIONS_SI = "RLineOptions";
-    private const string S_LINE_OPTIONS_SI = "SLineOptions";
-    private const string MID_LINE_OPTIONS_SI = "MidLineOptions";
+    private const string R1_LINE_OPTIONS_SI = "R1LineOptions";
+    private const string R2_LINE_OPTIONS_SI = "R2LineOptions";
+    private const string R3_LINE_OPTIONS_SI = "R3LineOptions";
+    private const string R4_LINE_OPTIONS_SI = "R4LineOptions";
+    private const string R5_LINE_OPTIONS_SI = "R5LineOptions";
+    private const string R6_LINE_OPTIONS_SI = "R6LineOptions";
+    private const string S1_LINE_OPTIONS_SI = "S1LineOptions";
+    private const string S2_LINE_OPTIONS_SI = "S2LineOptions";
+    private const string S3_LINE_OPTIONS_SI = "S3LineOptions";
+    private const string S4_LINE_OPTIONS_SI = "S4LineOptions";
+    private const string S5_LINE_OPTIONS_SI = "S5LineOptions";
+    private const string S6_LINE_OPTIONS_SI = "S6LineOptions";
+    private const string MID_PP_R1_LINE_OPTIONS_SI = "PPR1MidLineOptions";
+    private const string MID_R1_R2_LINE_OPTIONS_SI = "R1R2MidLineOptions";
+    private const string MID_R2_R3_LINE_OPTIONS_SI = "R2R3MidLineOptions";
+    private const string MID_R3_R4_LINE_OPTIONS_SI = "R3R4MidLineOptions";
+    private const string MID_R4_R5_LINE_OPTIONS_SI = "R4R5MidLineOptions";
+    private const string MID_R5_R6_LINE_OPTIONS_SI = "R5R6MidLineOptions";
+    private const string MID_PP_S1_LINE_OPTIONS_SI = "PPS1MidLineOptions";
+    private const string MID_S1_S2_LINE_OPTIONS_SI = "S1S2MidLineOptions";
+    private const string MID_S2_S3_LINE_OPTIONS_SI = "S2S3MidLineOptions";
+    private const string MID_S3_S4_LINE_OPTIONS_SI = "S3S4MidLineOptions";
+    private const string MID_S4_S5_LINE_OPTIONS_SI = "S4S5MidLineOptions";
+    private const string MID_S5_S6_LINE_OPTIONS_SI = "S5S6MidLineOptions";
 
     private const string LABEL_PP = "PP";
     private const string LABEL_R1 = "R1";
@@ -63,6 +85,7 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
     private readonly StringFormat labelSF = new StringFormat { Alignment = StringAlignment.Near, LineAlignment = StringAlignment.Center };
     private const int LabelPadX = 6;
     private const int LabelPadY = 2;
+    private const int LabelGapX = 4;
     public bool ShowPriceInLabels = true;
     public bool DrawLastPeriodOnly = true;
     public bool ExtendToPeriodEnd = false;
@@ -144,50 +167,202 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
     public LineOptions PPLineOptions
     {
         get => this.ppLineOptions;
-        private set
-        {
-            this.ppLineOptions = value;
-            this.ppLinePen = ProcessPen(this.ppLinePen, value);
-        }
+        private set => AssignLineOptions(ref this.ppLineOptions, ref this.ppLinePen, value);
     }
     private LineOptions ppLineOptions;
     private Pen ppLinePen;
 
-    public LineOptions RLineOptions
+    public LineOptions R1LineOptions
     {
-        get => this.rLineOptions;
-        private set
-        {
-            this.rLineOptions = value;
-            this.rLinePen = ProcessPen(this.rLinePen, value);
-        }
+        get => this.r1LineOptions;
+        private set => AssignLineOptions(ref this.r1LineOptions, ref this.r1LinePen, value);
     }
-    private LineOptions rLineOptions;
-    private Pen rLinePen;
+    private LineOptions r1LineOptions;
+    private Pen r1LinePen;
 
-    public LineOptions SLineOptions
+    public LineOptions R2LineOptions
     {
-        get => this.sLineOptions;
-        private set
-        {
-            this.sLineOptions = value;
-            this.sLinePen = ProcessPen(this.sLinePen, value);
-        }
+        get => this.r2LineOptions;
+        private set => AssignLineOptions(ref this.r2LineOptions, ref this.r2LinePen, value);
     }
-    private LineOptions sLineOptions;
-    private Pen sLinePen;
+    private LineOptions r2LineOptions;
+    private Pen r2LinePen;
 
-    public LineOptions MidLineOptions
+    public LineOptions R3LineOptions
     {
-        get => this.midLineOptions;
-        private set
-        {
-            this.midLineOptions = value;
-            this.midLinePen = ProcessPen(this.midLinePen, value);
-        }
+        get => this.r3LineOptions;
+        private set => AssignLineOptions(ref this.r3LineOptions, ref this.r3LinePen, value);
     }
-    private LineOptions midLineOptions;
-    private Pen midLinePen;
+    private LineOptions r3LineOptions;
+    private Pen r3LinePen;
+
+    public LineOptions R4LineOptions
+    {
+        get => this.r4LineOptions;
+        private set => AssignLineOptions(ref this.r4LineOptions, ref this.r4LinePen, value);
+    }
+    private LineOptions r4LineOptions;
+    private Pen r4LinePen;
+
+    public LineOptions R5LineOptions
+    {
+        get => this.r5LineOptions;
+        private set => AssignLineOptions(ref this.r5LineOptions, ref this.r5LinePen, value);
+    }
+    private LineOptions r5LineOptions;
+    private Pen r5LinePen;
+
+    public LineOptions R6LineOptions
+    {
+        get => this.r6LineOptions;
+        private set => AssignLineOptions(ref this.r6LineOptions, ref this.r6LinePen, value);
+    }
+    private LineOptions r6LineOptions;
+    private Pen r6LinePen;
+
+    public LineOptions S1LineOptions
+    {
+        get => this.s1LineOptions;
+        private set => AssignLineOptions(ref this.s1LineOptions, ref this.s1LinePen, value);
+    }
+    private LineOptions s1LineOptions;
+    private Pen s1LinePen;
+
+    public LineOptions S2LineOptions
+    {
+        get => this.s2LineOptions;
+        private set => AssignLineOptions(ref this.s2LineOptions, ref this.s2LinePen, value);
+    }
+    private LineOptions s2LineOptions;
+    private Pen s2LinePen;
+
+    public LineOptions S3LineOptions
+    {
+        get => this.s3LineOptions;
+        private set => AssignLineOptions(ref this.s3LineOptions, ref this.s3LinePen, value);
+    }
+    private LineOptions s3LineOptions;
+    private Pen s3LinePen;
+
+    public LineOptions S4LineOptions
+    {
+        get => this.s4LineOptions;
+        private set => AssignLineOptions(ref this.s4LineOptions, ref this.s4LinePen, value);
+    }
+    private LineOptions s4LineOptions;
+    private Pen s4LinePen;
+
+    public LineOptions S5LineOptions
+    {
+        get => this.s5LineOptions;
+        private set => AssignLineOptions(ref this.s5LineOptions, ref this.s5LinePen, value);
+    }
+    private LineOptions s5LineOptions;
+    private Pen s5LinePen;
+
+    public LineOptions S6LineOptions
+    {
+        get => this.s6LineOptions;
+        private set => AssignLineOptions(ref this.s6LineOptions, ref this.s6LinePen, value);
+    }
+    private LineOptions s6LineOptions;
+    private Pen s6LinePen;
+
+    public LineOptions PPR1MidLineOptions
+    {
+        get => this.ppR1MidLineOptions;
+        private set => AssignLineOptions(ref this.ppR1MidLineOptions, ref this.ppR1MidLinePen, value);
+    }
+    private LineOptions ppR1MidLineOptions;
+    private Pen ppR1MidLinePen;
+
+    public LineOptions R1R2MidLineOptions
+    {
+        get => this.r1R2MidLineOptions;
+        private set => AssignLineOptions(ref this.r1R2MidLineOptions, ref this.r1R2MidLinePen, value);
+    }
+    private LineOptions r1R2MidLineOptions;
+    private Pen r1R2MidLinePen;
+
+    public LineOptions R2R3MidLineOptions
+    {
+        get => this.r2R3MidLineOptions;
+        private set => AssignLineOptions(ref this.r2R3MidLineOptions, ref this.r2R3MidLinePen, value);
+    }
+    private LineOptions r2R3MidLineOptions;
+    private Pen r2R3MidLinePen;
+
+    public LineOptions R3R4MidLineOptions
+    {
+        get => this.r3R4MidLineOptions;
+        private set => AssignLineOptions(ref this.r3R4MidLineOptions, ref this.r3R4MidLinePen, value);
+    }
+    private LineOptions r3R4MidLineOptions;
+    private Pen r3R4MidLinePen;
+
+    public LineOptions R4R5MidLineOptions
+    {
+        get => this.r4R5MidLineOptions;
+        private set => AssignLineOptions(ref this.r4R5MidLineOptions, ref this.r4R5MidLinePen, value);
+    }
+    private LineOptions r4R5MidLineOptions;
+    private Pen r4R5MidLinePen;
+
+    public LineOptions R5R6MidLineOptions
+    {
+        get => this.r5R6MidLineOptions;
+        private set => AssignLineOptions(ref this.r5R6MidLineOptions, ref this.r5R6MidLinePen, value);
+    }
+    private LineOptions r5R6MidLineOptions;
+    private Pen r5R6MidLinePen;
+
+    public LineOptions PPS1MidLineOptions
+    {
+        get => this.ppS1MidLineOptions;
+        private set => AssignLineOptions(ref this.ppS1MidLineOptions, ref this.ppS1MidLinePen, value);
+    }
+    private LineOptions ppS1MidLineOptions;
+    private Pen ppS1MidLinePen;
+
+    public LineOptions S1S2MidLineOptions
+    {
+        get => this.s1S2MidLineOptions;
+        private set => AssignLineOptions(ref this.s1S2MidLineOptions, ref this.s1S2MidLinePen, value);
+    }
+    private LineOptions s1S2MidLineOptions;
+    private Pen s1S2MidLinePen;
+
+    public LineOptions S2S3MidLineOptions
+    {
+        get => this.s2S3MidLineOptions;
+        private set => AssignLineOptions(ref this.s2S3MidLineOptions, ref this.s2S3MidLinePen, value);
+    }
+    private LineOptions s2S3MidLineOptions;
+    private Pen s2S3MidLinePen;
+
+    public LineOptions S3S4MidLineOptions
+    {
+        get => this.s3S4MidLineOptions;
+        private set => AssignLineOptions(ref this.s3S4MidLineOptions, ref this.s3S4MidLinePen, value);
+    }
+    private LineOptions s3S4MidLineOptions;
+    private Pen s3S4MidLinePen;
+
+    public LineOptions S4S5MidLineOptions
+    {
+        get => this.s4S5MidLineOptions;
+        private set => AssignLineOptions(ref this.s4S5MidLineOptions, ref this.s4S5MidLinePen, value);
+    }
+    private LineOptions s4S5MidLineOptions;
+    private Pen s4S5MidLinePen;
+
+    public LineOptions S5S6MidLineOptions
+    {
+        get => this.s5S6MidLineOptions;
+        private set => AssignLineOptions(ref this.s5S6MidLineOptions, ref this.s5S6MidLinePen, value);
+    }
+    private LineOptions s5S6MidLineOptions;
+    private Pen s5S6MidLinePen;
     private Task loadingTask;
 
 
@@ -246,43 +421,155 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
         this.Name = "Pivot Point";
         this.SeparateWindow = false;
 
-        this.PPLineOptions = new LineOptions
-        {
-            Enabled = true,
-            WithCheckBox = true,
-            Color = Color.Gray,
-            LineStyle = LineStyle.Solid,
-            Width = 1
-        };
+        this.PPLineOptions = CreateLineOptions(
+            enabled: true,
+            color: Color.Gray,
+            style: LineStyle.Solid,
+            width: 1);
 
-        this.RLineOptions = new LineOptions
-        {
-            Enabled = true,
-            WithCheckBox = true,
-            Color = Color.Red,
-            LineStyle = LineStyle.Solid,
-            Width = 1
-        };
+        this.R1LineOptions = CreateLineOptions(
+            enabled: true,
+            color: Color.Red,
+            style: LineStyle.Solid,
+            width: 1);
 
-        this.SLineOptions = new LineOptions
-        {
-            Enabled = true,
-            WithCheckBox = true,
-            Color = Color.DodgerBlue,
-            LineStyle = LineStyle.Solid,
-            Width = 1
-        };
+        this.R2LineOptions = CreateLineOptions(
+            enabled: true,
+            color: Color.Red,
+            style: LineStyle.Solid,
+            width: 1);
 
-        // All intermediate levels (PP-R1, R1-R2, PP-S1, S1-S2, etc.)
-        // are hidden by default.
-        this.MidLineOptions = new LineOptions
-        {
-            Enabled = false,
-            WithCheckBox = true,
-            Color = Color.FromArgb(128, 128, 128, 128),
-            LineStyle = LineStyle.Dash,
-            Width = 1
-        };
+        this.R3LineOptions = CreateLineOptions(
+            enabled: true,
+            color: Color.Red,
+            style: LineStyle.Solid,
+            width: 1);
+
+        this.R4LineOptions = CreateLineOptions(
+            enabled: true,
+            color: Color.Red,
+            style: LineStyle.Solid,
+            width: 1);
+
+        this.R5LineOptions = CreateLineOptions(
+            enabled: true,
+            color: Color.Red,
+            style: LineStyle.Solid,
+            width: 1);
+
+        this.R6LineOptions = CreateLineOptions(
+            enabled: true,
+            color: Color.Red,
+            style: LineStyle.Solid,
+            width: 1);
+
+        this.S1LineOptions = CreateLineOptions(
+            enabled: true,
+            color: Color.DodgerBlue,
+            style: LineStyle.Solid,
+            width: 1);
+
+        this.S2LineOptions = CreateLineOptions(
+            enabled: true,
+            color: Color.DodgerBlue,
+            style: LineStyle.Solid,
+            width: 1);
+
+        this.S3LineOptions = CreateLineOptions(
+            enabled: true,
+            color: Color.DodgerBlue,
+            style: LineStyle.Solid,
+            width: 1);
+
+        this.S4LineOptions = CreateLineOptions(
+            enabled: true,
+            color: Color.DodgerBlue,
+            style: LineStyle.Solid,
+            width: 1);
+
+        this.S5LineOptions = CreateLineOptions(
+            enabled: true,
+            color: Color.DodgerBlue,
+            style: LineStyle.Solid,
+            width: 1);
+
+        this.S6LineOptions = CreateLineOptions(
+            enabled: true,
+            color: Color.DodgerBlue,
+            style: LineStyle.Solid,
+            width: 1);
+
+        this.PPR1MidLineOptions = CreateLineOptions(
+            enabled: false,
+            color: Color.FromArgb(128, 128, 128, 128),
+            style: LineStyle.Dash,
+            width: 1);
+
+        this.R1R2MidLineOptions = CreateLineOptions(
+            enabled: false,
+            color: Color.FromArgb(128, 128, 128, 128),
+            style: LineStyle.Dash,
+            width: 1);
+
+        this.R2R3MidLineOptions = CreateLineOptions(
+            enabled: false,
+            color: Color.FromArgb(128, 128, 128, 128),
+            style: LineStyle.Dash,
+            width: 1);
+
+        this.R3R4MidLineOptions = CreateLineOptions(
+            enabled: false,
+            color: Color.FromArgb(128, 128, 128, 128),
+            style: LineStyle.Dash,
+            width: 1);
+
+        this.R4R5MidLineOptions = CreateLineOptions(
+            enabled: false,
+            color: Color.FromArgb(128, 128, 128, 128),
+            style: LineStyle.Dash,
+            width: 1);
+
+        this.R5R6MidLineOptions = CreateLineOptions(
+            enabled: false,
+            color: Color.FromArgb(128, 128, 128, 128),
+            style: LineStyle.Dash,
+            width: 1);
+
+        this.PPS1MidLineOptions = CreateLineOptions(
+            enabled: false,
+            color: Color.FromArgb(128, 128, 128, 128),
+            style: LineStyle.Dash,
+            width: 1);
+
+        this.S1S2MidLineOptions = CreateLineOptions(
+            enabled: false,
+            color: Color.FromArgb(128, 128, 128, 128),
+            style: LineStyle.Dash,
+            width: 1);
+
+        this.S2S3MidLineOptions = CreateLineOptions(
+            enabled: false,
+            color: Color.FromArgb(128, 128, 128, 128),
+            style: LineStyle.Dash,
+            width: 1);
+
+        this.S3S4MidLineOptions = CreateLineOptions(
+            enabled: false,
+            color: Color.FromArgb(128, 128, 128, 128),
+            style: LineStyle.Dash,
+            width: 1);
+
+        this.S4S5MidLineOptions = CreateLineOptions(
+            enabled: false,
+            color: Color.FromArgb(128, 128, 128, 128),
+            style: LineStyle.Dash,
+            width: 1);
+
+        this.S5S6MidLineOptions = CreateLineOptions(
+            enabled: false,
+            color: Color.FromArgb(128, 128, 128, 128),
+            style: LineStyle.Dash,
+            width: 1);
 
         this.InitializeLabels();
 
@@ -468,9 +755,30 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
     public override void Dispose()
     {
         this.ppLinePen?.Dispose();
-        this.rLinePen?.Dispose();
-        this.sLinePen?.Dispose();
-        this.midLinePen?.Dispose();
+        this.r1LinePen?.Dispose();
+        this.r2LinePen?.Dispose();
+        this.r3LinePen?.Dispose();
+        this.r4LinePen?.Dispose();
+        this.r5LinePen?.Dispose();
+        this.r6LinePen?.Dispose();
+        this.s1LinePen?.Dispose();
+        this.s2LinePen?.Dispose();
+        this.s3LinePen?.Dispose();
+        this.s4LinePen?.Dispose();
+        this.s5LinePen?.Dispose();
+        this.s6LinePen?.Dispose();
+        this.ppR1MidLinePen?.Dispose();
+        this.r1R2MidLinePen?.Dispose();
+        this.r2R3MidLinePen?.Dispose();
+        this.r3R4MidLinePen?.Dispose();
+        this.r4R5MidLinePen?.Dispose();
+        this.r5R6MidLinePen?.Dispose();
+        this.ppS1MidLinePen?.Dispose();
+        this.s1S2MidLinePen?.Dispose();
+        this.s2S3MidLinePen?.Dispose();
+        this.s3S4MidLinePen?.Dispose();
+        this.s4S5MidLinePen?.Dispose();
+        this.s5S6MidLinePen?.Dispose();
         this.labelFont?.Dispose();
         this.labelSF?.Dispose();
 
@@ -580,33 +888,184 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
                 Text = loc._(CALCULATION_METHOD_INPUT_PARAMETER),
                 SortIndex = 20
             });
-            var lineStyleSeparator = new SettingItemSeparatorGroup("Line styles", -999);
+            var pivotLineSeparator = new SettingItemSeparatorGroup("Pivot line", -999);
+            var resistanceLineSeparator = new SettingItemSeparatorGroup("Resistance lines", -998);
+            var supportLineSeparator = new SettingItemSeparatorGroup("Support lines", -997);
+            var midResistanceLineSeparator = new SettingItemSeparatorGroup("Intermediate resistance lines", -996);
+            var midSupportLineSeparator = new SettingItemSeparatorGroup("Intermediate support lines", -995);
 
             settings.Add(new SettingItemLineOptions(PP_LINE_OPTIONS_SI, this.PPLineOptions, 90)
             {
-                SeparatorGroup = lineStyleSeparator,
+                SeparatorGroup = pivotLineSeparator,
                 Text = "PP line",
                 ExcludedStyles = new[] { LineStyle.Points, LineStyle.Histogramm }
             });
 
-            settings.Add(new SettingItemLineOptions(R_LINE_OPTIONS_SI, this.RLineOptions, 91)
+            settings.Add(new SettingItemLineOptions(R1_LINE_OPTIONS_SI, this.R1LineOptions, 91)
             {
-                SeparatorGroup = lineStyleSeparator,
-                Text = "R lines",
+                SeparatorGroup = resistanceLineSeparator,
+                Text = "R1 line",
                 ExcludedStyles = new[] { LineStyle.Points, LineStyle.Histogramm }
             });
 
-            settings.Add(new SettingItemLineOptions(S_LINE_OPTIONS_SI, this.SLineOptions, 92)
+            settings.Add(new SettingItemLineOptions(R2_LINE_OPTIONS_SI, this.R2LineOptions, 92)
             {
-                SeparatorGroup = lineStyleSeparator,
-                Text = "S lines",
+                SeparatorGroup = resistanceLineSeparator,
+                Text = "R2 line",
                 ExcludedStyles = new[] { LineStyle.Points, LineStyle.Histogramm }
             });
 
-            settings.Add(new SettingItemLineOptions(MID_LINE_OPTIONS_SI, this.MidLineOptions, 93)
+            settings.Add(new SettingItemLineOptions(R3_LINE_OPTIONS_SI, this.R3LineOptions, 93)
             {
-                SeparatorGroup = lineStyleSeparator,
-                Text = "Lines between levels",
+                SeparatorGroup = resistanceLineSeparator,
+                Text = "R3 line",
+                ExcludedStyles = new[] { LineStyle.Points, LineStyle.Histogramm }
+            });
+
+            settings.Add(new SettingItemLineOptions(R4_LINE_OPTIONS_SI, this.R4LineOptions, 94)
+            {
+                SeparatorGroup = resistanceLineSeparator,
+                Text = "R4 line",
+                ExcludedStyles = new[] { LineStyle.Points, LineStyle.Histogramm }
+            });
+
+            settings.Add(new SettingItemLineOptions(R5_LINE_OPTIONS_SI, this.R5LineOptions, 95)
+            {
+                SeparatorGroup = resistanceLineSeparator,
+                Text = "R5 line",
+                ExcludedStyles = new[] { LineStyle.Points, LineStyle.Histogramm }
+            });
+
+            settings.Add(new SettingItemLineOptions(R6_LINE_OPTIONS_SI, this.R6LineOptions, 96)
+            {
+                SeparatorGroup = resistanceLineSeparator,
+                Text = "R6 line",
+                ExcludedStyles = new[] { LineStyle.Points, LineStyle.Histogramm }
+            });
+
+            settings.Add(new SettingItemLineOptions(S1_LINE_OPTIONS_SI, this.S1LineOptions, 97)
+            {
+                SeparatorGroup = supportLineSeparator,
+                Text = "S1 line",
+                ExcludedStyles = new[] { LineStyle.Points, LineStyle.Histogramm }
+            });
+
+            settings.Add(new SettingItemLineOptions(S2_LINE_OPTIONS_SI, this.S2LineOptions, 98)
+            {
+                SeparatorGroup = supportLineSeparator,
+                Text = "S2 line",
+                ExcludedStyles = new[] { LineStyle.Points, LineStyle.Histogramm }
+            });
+
+            settings.Add(new SettingItemLineOptions(S3_LINE_OPTIONS_SI, this.S3LineOptions, 99)
+            {
+                SeparatorGroup = supportLineSeparator,
+                Text = "S3 line",
+                ExcludedStyles = new[] { LineStyle.Points, LineStyle.Histogramm }
+            });
+
+            settings.Add(new SettingItemLineOptions(S4_LINE_OPTIONS_SI, this.S4LineOptions, 100)
+            {
+                SeparatorGroup = supportLineSeparator,
+                Text = "S4 line",
+                ExcludedStyles = new[] { LineStyle.Points, LineStyle.Histogramm }
+            });
+
+            settings.Add(new SettingItemLineOptions(S5_LINE_OPTIONS_SI, this.S5LineOptions, 101)
+            {
+                SeparatorGroup = supportLineSeparator,
+                Text = "S5 line",
+                ExcludedStyles = new[] { LineStyle.Points, LineStyle.Histogramm }
+            });
+
+            settings.Add(new SettingItemLineOptions(S6_LINE_OPTIONS_SI, this.S6LineOptions, 102)
+            {
+                SeparatorGroup = supportLineSeparator,
+                Text = "S6 line",
+                ExcludedStyles = new[] { LineStyle.Points, LineStyle.Histogramm }
+            });
+
+            settings.Add(new SettingItemLineOptions(MID_PP_R1_LINE_OPTIONS_SI, this.PPR1MidLineOptions, 103)
+            {
+                SeparatorGroup = midResistanceLineSeparator,
+                Text = "PP–R1 line",
+                ExcludedStyles = new[] { LineStyle.Points, LineStyle.Histogramm }
+            });
+
+            settings.Add(new SettingItemLineOptions(MID_R1_R2_LINE_OPTIONS_SI, this.R1R2MidLineOptions, 104)
+            {
+                SeparatorGroup = midResistanceLineSeparator,
+                Text = "R1–R2 line",
+                ExcludedStyles = new[] { LineStyle.Points, LineStyle.Histogramm }
+            });
+
+            settings.Add(new SettingItemLineOptions(MID_R2_R3_LINE_OPTIONS_SI, this.R2R3MidLineOptions, 105)
+            {
+                SeparatorGroup = midResistanceLineSeparator,
+                Text = "R2–R3 line",
+                ExcludedStyles = new[] { LineStyle.Points, LineStyle.Histogramm }
+            });
+
+            settings.Add(new SettingItemLineOptions(MID_R3_R4_LINE_OPTIONS_SI, this.R3R4MidLineOptions, 106)
+            {
+                SeparatorGroup = midResistanceLineSeparator,
+                Text = "R3–R4 line",
+                ExcludedStyles = new[] { LineStyle.Points, LineStyle.Histogramm }
+            });
+
+            settings.Add(new SettingItemLineOptions(MID_R4_R5_LINE_OPTIONS_SI, this.R4R5MidLineOptions, 107)
+            {
+                SeparatorGroup = midResistanceLineSeparator,
+                Text = "R4–R5 line",
+                ExcludedStyles = new[] { LineStyle.Points, LineStyle.Histogramm }
+            });
+
+            settings.Add(new SettingItemLineOptions(MID_R5_R6_LINE_OPTIONS_SI, this.R5R6MidLineOptions, 108)
+            {
+                SeparatorGroup = midResistanceLineSeparator,
+                Text = "R5–R6 line",
+                ExcludedStyles = new[] { LineStyle.Points, LineStyle.Histogramm }
+            });
+
+            settings.Add(new SettingItemLineOptions(MID_PP_S1_LINE_OPTIONS_SI, this.PPS1MidLineOptions, 109)
+            {
+                SeparatorGroup = midSupportLineSeparator,
+                Text = "PP–S1 line",
+                ExcludedStyles = new[] { LineStyle.Points, LineStyle.Histogramm }
+            });
+
+            settings.Add(new SettingItemLineOptions(MID_S1_S2_LINE_OPTIONS_SI, this.S1S2MidLineOptions, 110)
+            {
+                SeparatorGroup = midSupportLineSeparator,
+                Text = "S1–S2 line",
+                ExcludedStyles = new[] { LineStyle.Points, LineStyle.Histogramm }
+            });
+
+            settings.Add(new SettingItemLineOptions(MID_S2_S3_LINE_OPTIONS_SI, this.S2S3MidLineOptions, 111)
+            {
+                SeparatorGroup = midSupportLineSeparator,
+                Text = "S2–S3 line",
+                ExcludedStyles = new[] { LineStyle.Points, LineStyle.Histogramm }
+            });
+
+            settings.Add(new SettingItemLineOptions(MID_S3_S4_LINE_OPTIONS_SI, this.S3S4MidLineOptions, 112)
+            {
+                SeparatorGroup = midSupportLineSeparator,
+                Text = "S3–S4 line",
+                ExcludedStyles = new[] { LineStyle.Points, LineStyle.Histogramm }
+            });
+
+            settings.Add(new SettingItemLineOptions(MID_S4_S5_LINE_OPTIONS_SI, this.S4S5MidLineOptions, 113)
+            {
+                SeparatorGroup = midSupportLineSeparator,
+                Text = "S4–S5 line",
+                ExcludedStyles = new[] { LineStyle.Points, LineStyle.Histogramm }
+            });
+
+            settings.Add(new SettingItemLineOptions(MID_S5_S6_LINE_OPTIONS_SI, this.S5S6MidLineOptions, 114)
+            {
+                SeparatorGroup = midSupportLineSeparator,
+                Text = "S5–S6 line",
                 ExcludedStyles = new[] { LineStyle.Points, LineStyle.Histogramm }
             });
 
@@ -620,10 +1079,10 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
                 SeparatorGroup = defaultSeparator,
                 Text = "Display price"
             });
-            settings.Add(new SettingItemBoolean("Draw last period only", this.DrawLastPeriodOnly, 96)
+            settings.Add(new SettingItemBoolean(DISPLAY_LABELS_LAST_PERIOD_ONLY_INPUT_PARAMETER, this.DrawLastPeriodOnly, 96)
             {
                 SeparatorGroup = defaultSeparator,
-                Text = "Draw last period only"
+                Text = "Display labels last period only"
             });
             settings.Add(new SettingItemBoolean(EXTEND_TO_PERIOD_END_INPUT_PARAMETER, this.ExtendToPeriodEnd, 97)
             {
@@ -644,17 +1103,80 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
 
             var needRefresh = false;
 
-            if (holder.TryGetValue(PP_LINE_OPTIONS_SI, out var lineItem) && lineItem.Value is LineOptions ppOptions)
-                this.PPLineOptions = ppOptions;
+            if (holder.TryGetValue(PP_LINE_OPTIONS_SI, out var lineItem) && lineItem.Value is LineOptions pPLineOptionsValue)
+                this.PPLineOptions = pPLineOptionsValue;
 
-            if (holder.TryGetValue(R_LINE_OPTIONS_SI, out lineItem) && lineItem.Value is LineOptions rOptions)
-                this.RLineOptions = rOptions;
+            if (holder.TryGetValue(R1_LINE_OPTIONS_SI, out lineItem) && lineItem.Value is LineOptions r1LineOptionsValue)
+                this.R1LineOptions = r1LineOptionsValue;
 
-            if (holder.TryGetValue(S_LINE_OPTIONS_SI, out lineItem) && lineItem.Value is LineOptions sOptions)
-                this.SLineOptions = sOptions;
+            if (holder.TryGetValue(R2_LINE_OPTIONS_SI, out lineItem) && lineItem.Value is LineOptions r2LineOptionsValue)
+                this.R2LineOptions = r2LineOptionsValue;
 
-            if (holder.TryGetValue(MID_LINE_OPTIONS_SI, out lineItem) && lineItem.Value is LineOptions midOptions)
-                this.MidLineOptions = midOptions;
+            if (holder.TryGetValue(R3_LINE_OPTIONS_SI, out lineItem) && lineItem.Value is LineOptions r3LineOptionsValue)
+                this.R3LineOptions = r3LineOptionsValue;
+
+            if (holder.TryGetValue(R4_LINE_OPTIONS_SI, out lineItem) && lineItem.Value is LineOptions r4LineOptionsValue)
+                this.R4LineOptions = r4LineOptionsValue;
+
+            if (holder.TryGetValue(R5_LINE_OPTIONS_SI, out lineItem) && lineItem.Value is LineOptions r5LineOptionsValue)
+                this.R5LineOptions = r5LineOptionsValue;
+
+            if (holder.TryGetValue(R6_LINE_OPTIONS_SI, out lineItem) && lineItem.Value is LineOptions r6LineOptionsValue)
+                this.R6LineOptions = r6LineOptionsValue;
+
+            if (holder.TryGetValue(S1_LINE_OPTIONS_SI, out lineItem) && lineItem.Value is LineOptions s1LineOptionsValue)
+                this.S1LineOptions = s1LineOptionsValue;
+
+            if (holder.TryGetValue(S2_LINE_OPTIONS_SI, out lineItem) && lineItem.Value is LineOptions s2LineOptionsValue)
+                this.S2LineOptions = s2LineOptionsValue;
+
+            if (holder.TryGetValue(S3_LINE_OPTIONS_SI, out lineItem) && lineItem.Value is LineOptions s3LineOptionsValue)
+                this.S3LineOptions = s3LineOptionsValue;
+
+            if (holder.TryGetValue(S4_LINE_OPTIONS_SI, out lineItem) && lineItem.Value is LineOptions s4LineOptionsValue)
+                this.S4LineOptions = s4LineOptionsValue;
+
+            if (holder.TryGetValue(S5_LINE_OPTIONS_SI, out lineItem) && lineItem.Value is LineOptions s5LineOptionsValue)
+                this.S5LineOptions = s5LineOptionsValue;
+
+            if (holder.TryGetValue(S6_LINE_OPTIONS_SI, out lineItem) && lineItem.Value is LineOptions s6LineOptionsValue)
+                this.S6LineOptions = s6LineOptionsValue;
+
+            if (holder.TryGetValue(MID_PP_R1_LINE_OPTIONS_SI, out lineItem) && lineItem.Value is LineOptions pPR1MidLineOptionsValue)
+                this.PPR1MidLineOptions = pPR1MidLineOptionsValue;
+
+            if (holder.TryGetValue(MID_R1_R2_LINE_OPTIONS_SI, out lineItem) && lineItem.Value is LineOptions r1R2MidLineOptionsValue)
+                this.R1R2MidLineOptions = r1R2MidLineOptionsValue;
+
+            if (holder.TryGetValue(MID_R2_R3_LINE_OPTIONS_SI, out lineItem) && lineItem.Value is LineOptions r2R3MidLineOptionsValue)
+                this.R2R3MidLineOptions = r2R3MidLineOptionsValue;
+
+            if (holder.TryGetValue(MID_R3_R4_LINE_OPTIONS_SI, out lineItem) && lineItem.Value is LineOptions r3R4MidLineOptionsValue)
+                this.R3R4MidLineOptions = r3R4MidLineOptionsValue;
+
+            if (holder.TryGetValue(MID_R4_R5_LINE_OPTIONS_SI, out lineItem) && lineItem.Value is LineOptions r4R5MidLineOptionsValue)
+                this.R4R5MidLineOptions = r4R5MidLineOptionsValue;
+
+            if (holder.TryGetValue(MID_R5_R6_LINE_OPTIONS_SI, out lineItem) && lineItem.Value is LineOptions r5R6MidLineOptionsValue)
+                this.R5R6MidLineOptions = r5R6MidLineOptionsValue;
+
+            if (holder.TryGetValue(MID_PP_S1_LINE_OPTIONS_SI, out lineItem) && lineItem.Value is LineOptions pPS1MidLineOptionsValue)
+                this.PPS1MidLineOptions = pPS1MidLineOptionsValue;
+
+            if (holder.TryGetValue(MID_S1_S2_LINE_OPTIONS_SI, out lineItem) && lineItem.Value is LineOptions s1S2MidLineOptionsValue)
+                this.S1S2MidLineOptions = s1S2MidLineOptionsValue;
+
+            if (holder.TryGetValue(MID_S2_S3_LINE_OPTIONS_SI, out lineItem) && lineItem.Value is LineOptions s2S3MidLineOptionsValue)
+                this.S2S3MidLineOptions = s2S3MidLineOptionsValue;
+
+            if (holder.TryGetValue(MID_S3_S4_LINE_OPTIONS_SI, out lineItem) && lineItem.Value is LineOptions s3S4MidLineOptionsValue)
+                this.S3S4MidLineOptions = s3S4MidLineOptionsValue;
+
+            if (holder.TryGetValue(MID_S4_S5_LINE_OPTIONS_SI, out lineItem) && lineItem.Value is LineOptions s4S5MidLineOptionsValue)
+                this.S4S5MidLineOptions = s4S5MidLineOptionsValue;
+
+            if (holder.TryGetValue(MID_S5_S6_LINE_OPTIONS_SI, out lineItem) && lineItem.Value is LineOptions s5S6MidLineOptionsValue)
+                this.S5S6MidLineOptions = s5S6MidLineOptionsValue;
 
             if (holder.TryGetValue(CURRENT_PERIOD_INPUT_PARAMETER, out var item) && item.Value is bool onlyCurrent)
             {
@@ -740,8 +1262,8 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
                 this.ShowPriceInLabels = showPrice;
             if (holder.TryGetValue("Display labels", out item) && item.Value is bool showLabels)
                 this.ShowLabels = showLabels;
-            if (holder.TryGetValue("Draw last period only", out item) && item.Value is bool drawLastOnly)
-                this.DrawLastPeriodOnly = drawLastOnly;
+            if (holder.TryGetValue(DISPLAY_LABELS_LAST_PERIOD_ONLY_INPUT_PARAMETER, out item) && item.Value is bool displayLabelsLastPeriodOnly)
+                this.DrawLastPeriodOnly = displayLabelsLastPeriodOnly;
             if (holder.TryGetValue(EXTEND_TO_PERIOD_END_INPUT_PARAMETER, out item) && item.Value is bool extend)
             {
                 if (this.ExtendToPeriodEnd != extend)
@@ -785,8 +1307,7 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
             g.SetClip(args.Rectangle);
 
             var conv = wnd.CoordinatesConverter;
-
-            var orderedPeriods = (this.pivotPeriods ?? new List<PivotPointCalculationResponce>())
+            var orderedPeriods = this.pivotPeriods
                 .OrderBy(period => period.From)
                 .ThenBy(period => period.To)
                 .ToList();
@@ -796,10 +1317,9 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
 
             var latestPeriod = orderedPeriods[orderedPeriods.Count - 1];
 
-            IEnumerable<PivotPointCalculationResponce> periodsToDraw =
-                this.OnlyCurrentPeriod
-                    ? new[] { latestPeriod }
-                    : orderedPeriods;
+            var periodsToDraw = this.OnlyCurrentPeriod
+                ? new List<PivotPointCalculationResponce> { latestPeriod }
+                : orderedPeriods;
 
             foreach (var p in periodsToDraw)
             {
@@ -808,8 +1328,10 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
 
                 int fromIndex = (int)this.HistoricalData.GetIndexByTime(p.From.Ticks);
                 int toIndex = (int)this.HistoricalData.GetIndexByTime(p.To.Ticks);
-                if (fromIndex == -1) fromIndex = this.Count - 1;
-                if (toIndex   == -1) toIndex   = 0;
+                if (fromIndex == -1)
+                    fromIndex = this.Count - 1;
+                if (toIndex == -1)
+                    toIndex = 0;
 
                 for (int y = fromIndex; y >= toIndex; y--)
                 {
@@ -836,152 +1358,151 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
                     continue;
 
                 float startX = (float)conv.GetChartX(firstBarTime);
-                DateTime endTimeForLine = (this.ExtendToPeriodEnd && DateTime.Now < p.To) ? p.To : lastBarRightTime;
+                DateTime endTimeForLine = this.ExtendToPeriodEnd && Core.Instance.TimeUtils.DateTimeUtcNow < p.To
+                    ? p.To
+                    : lastBarRightTime;
                 float lineEndX = (float)conv.GetChartX(endTimeForLine);
-                float endX = (float)conv.GetChartX(lastBarRightTime);
+                float actualEndX = (float)conv.GetChartX(lastBarRightTime);
 
-                bool hasR2 = !double.IsNaN(p.R2) && p.R2 != 0.0;
-                bool hasR3 = !double.IsNaN(p.R3) && p.R3 != 0.0;
-                bool hasR4 = !double.IsNaN(p.R4) && p.R4 != 0.0;
-                bool hasR5 = !double.IsNaN(p.R5) && p.R5 != 0.0;
-                bool hasR6 = !double.IsNaN(p.R6) && p.R6 != 0.0;
+                bool hasR2 = IsValidLevel(p.R2);
+                bool hasR3 = IsValidLevel(p.R3);
+                bool hasR4 = IsValidLevel(p.R4);
+                bool hasR5 = IsValidLevel(p.R5);
+                bool hasR6 = IsValidLevel(p.R6);
 
-                bool hasS2 = !double.IsNaN(p.S2) && p.S2 != 0.0;
-                bool hasS3 = !double.IsNaN(p.S3) && p.S3 != 0.0;
-                bool hasS4 = !double.IsNaN(p.S4) && p.S4 != 0.0;
-                bool hasS5 = !double.IsNaN(p.S5) && p.S5 != 0.0;
-                bool hasS6 = !double.IsNaN(p.S6) && p.S6 != 0.0;
+                bool hasS2 = IsValidLevel(p.S2);
+                bool hasS3 = IsValidLevel(p.S3);
+                bool hasS4 = IsValidLevel(p.S4);
+                bool hasS5 = IsValidLevel(p.S5);
+                bool hasS6 = IsValidLevel(p.S6);
 
                 DrawHLine(g, p.PP, this.ppLinePen, startX, lineEndX, conv, args.Rectangle);
-                DrawHLine(g, p.R1, this.rLinePen, startX, lineEndX, conv, args.Rectangle);
-                DrawHLine(g, p.S1, this.sLinePen, startX, lineEndX, conv, args.Rectangle);
-                DrawHLine(g, Mid(p.PP, p.S1), this.midLinePen, startX, lineEndX, conv, args.Rectangle);
-                DrawHLine(g, Mid(p.PP, p.R1), this.midLinePen, startX, lineEndX, conv, args.Rectangle);
+                DrawHLine(g, p.R1, this.r1LinePen, startX, lineEndX, conv, args.Rectangle);
+                DrawHLine(g, p.S1, this.s1LinePen, startX, lineEndX, conv, args.Rectangle);
+                DrawHLine(g, Mid(p.PP, p.R1), this.ppR1MidLinePen, startX, lineEndX, conv, args.Rectangle);
+                DrawHLine(g, Mid(p.PP, p.S1), this.ppS1MidLinePen, startX, lineEndX, conv, args.Rectangle);
 
                 if (p.Method != CalculationMethod.DeMark)
                 {
-                    if (hasR2) DrawHLine(g, p.R2, this.rLinePen, startX, lineEndX, conv, args.Rectangle);
-                    if (hasR3) DrawHLine(g, p.R3, this.rLinePen, startX, lineEndX, conv, args.Rectangle);
-                    if (hasS2) DrawHLine(g, p.S2, this.sLinePen, startX, lineEndX, conv, args.Rectangle);
-                    if (hasS3) DrawHLine(g, p.S3, this.sLinePen, startX, lineEndX, conv, args.Rectangle);
+                    if (hasR2) DrawHLine(g, p.R2, this.r2LinePen, startX, lineEndX, conv, args.Rectangle);
+                    if (hasR3) DrawHLine(g, p.R3, this.r3LinePen, startX, lineEndX, conv, args.Rectangle);
+                    if (hasS2) DrawHLine(g, p.S2, this.s2LinePen, startX, lineEndX, conv, args.Rectangle);
+                    if (hasS3) DrawHLine(g, p.S3, this.s3LinePen, startX, lineEndX, conv, args.Rectangle);
 
-                    if (hasS2) DrawHLine(g, Mid(p.S1, p.S2), this.midLinePen, startX, lineEndX, conv, args.Rectangle);
-                    if (hasS3) DrawHLine(g, Mid(p.S2, p.S3), this.midLinePen, startX, lineEndX, conv, args.Rectangle);
-
-                    if (hasR2) DrawHLine(g, Mid(p.R1, p.R2), this.midLinePen, startX, lineEndX, conv, args.Rectangle);
-                    if (hasR3) DrawHLine(g, Mid(p.R2, p.R3), this.midLinePen, startX, lineEndX, conv, args.Rectangle);
-
+                    if (hasR2) DrawHLine(g, Mid(p.R1, p.R2), this.r1R2MidLinePen, startX, lineEndX, conv, args.Rectangle);
+                    if (hasR3) DrawHLine(g, Mid(p.R2, p.R3), this.r2R3MidLinePen, startX, lineEndX, conv, args.Rectangle);
+                    if (hasS2) DrawHLine(g, Mid(p.S1, p.S2), this.s1S2MidLinePen, startX, lineEndX, conv, args.Rectangle);
+                    if (hasS3) DrawHLine(g, Mid(p.S2, p.S3), this.s2S3MidLinePen, startX, lineEndX, conv, args.Rectangle);
                 }
 
                 if (p.Method == CalculationMethod.Camarilla)
                 {
-                    if (hasR4) DrawHLine(g, p.R4, this.rLinePen, startX, lineEndX, conv, args.Rectangle);
-                    if (hasR5) DrawHLine(g, p.R5, this.rLinePen, startX, lineEndX, conv, args.Rectangle);
-                    if (hasR6) DrawHLine(g, p.R6, this.rLinePen, startX, lineEndX, conv, args.Rectangle);
+                    if (hasR4) DrawHLine(g, p.R4, this.r4LinePen, startX, lineEndX, conv, args.Rectangle);
+                    if (hasR5) DrawHLine(g, p.R5, this.r5LinePen, startX, lineEndX, conv, args.Rectangle);
+                    if (hasR6) DrawHLine(g, p.R6, this.r6LinePen, startX, lineEndX, conv, args.Rectangle);
+                    if (hasS4) DrawHLine(g, p.S4, this.s4LinePen, startX, lineEndX, conv, args.Rectangle);
+                    if (hasS5) DrawHLine(g, p.S5, this.s5LinePen, startX, lineEndX, conv, args.Rectangle);
+                    if (hasS6) DrawHLine(g, p.S6, this.s6LinePen, startX, lineEndX, conv, args.Rectangle);
 
-                    if (hasS4) DrawHLine(g, p.S4, this.sLinePen, startX, lineEndX, conv, args.Rectangle);
-                    if (hasS5) DrawHLine(g, p.S5, this.sLinePen, startX, lineEndX, conv, args.Rectangle);
-                    if (hasS6) DrawHLine(g, p.S6, this.sLinePen, startX, lineEndX, conv, args.Rectangle);
-
-                    if (hasS4) DrawHLine(g, Mid(p.S3, p.S4), this.midLinePen, startX, lineEndX, conv, args.Rectangle);
-                    if (hasS5) DrawHLine(g, Mid(p.S4, p.S5), this.midLinePen, startX, lineEndX, conv, args.Rectangle);
-                    if (hasS6) DrawHLine(g, Mid(p.S5, p.S6), this.midLinePen, startX, lineEndX, conv, args.Rectangle);
-
-                    if (hasR4) DrawHLine(g, Mid(p.R3, p.R4), this.midLinePen, startX, lineEndX, conv, args.Rectangle);
-                    if (hasR5) DrawHLine(g, Mid(p.R4, p.R5), this.midLinePen, startX, lineEndX, conv, args.Rectangle);
-                    if (hasR6) DrawHLine(g, Mid(p.R5, p.R6), this.midLinePen, startX, lineEndX, conv, args.Rectangle);
+                    if (hasR4) DrawHLine(g, Mid(p.R3, p.R4), this.r3R4MidLinePen, startX, lineEndX, conv, args.Rectangle);
+                    if (hasR5) DrawHLine(g, Mid(p.R4, p.R5), this.r4R5MidLinePen, startX, lineEndX, conv, args.Rectangle);
+                    if (hasR6) DrawHLine(g, Mid(p.R5, p.R6), this.r5R6MidLinePen, startX, lineEndX, conv, args.Rectangle);
+                    if (hasS4) DrawHLine(g, Mid(p.S3, p.S4), this.s3S4MidLinePen, startX, lineEndX, conv, args.Rectangle);
+                    if (hasS5) DrawHLine(g, Mid(p.S4, p.S5), this.s4S5MidLinePen, startX, lineEndX, conv, args.Rectangle);
+                    if (hasS6) DrawHLine(g, Mid(p.S5, p.S6), this.s5S6MidLinePen, startX, lineEndX, conv, args.Rectangle);
                 }
-                if (this.DisplaySeparator)
-                {
-                    var ordered = periodsToDraw.OrderBy(x => x.From).ToList();
-                    for (int i = 1; i < ordered.Count; i++)
-                    {
-                        var prev = ordered[i - 1];
-                        var next = ordered[i];
 
-                        float xBoundary = (float)conv.GetChartX(next.From);
-
-                        DrawSeparatorLine(g, prev.PP, next.PP, this.ppLinePen, xBoundary, conv, args.Rectangle);
-                        DrawSeparatorLine(g, prev.R1, next.R1, this.rLinePen, xBoundary, conv, args.Rectangle);
-                        DrawSeparatorLine(g, prev.S1, next.S1, this.sLinePen, xBoundary, conv, args.Rectangle);
-                        DrawSeparatorLine(g, Mid(prev.PP, prev.S1), Mid(next.PP, next.S1), this.midLinePen, xBoundary, conv, args.Rectangle);
-                        DrawSeparatorLine(g, Mid(prev.PP, prev.R1), Mid(next.PP, next.R1), this.midLinePen, xBoundary, conv, args.Rectangle);
-
-                        if (prev.Method != CalculationMethod.DeMark && next.Method != CalculationMethod.DeMark)
-                        {
-                            if (hasR2) DrawSeparatorLine(g, prev.R2, next.R2, this.rLinePen, xBoundary, conv, args.Rectangle);
-                            if (hasR3) DrawSeparatorLine(g, prev.R3, next.R3, this.rLinePen, xBoundary, conv, args.Rectangle);
-
-                            if (hasS2) DrawSeparatorLine(g, prev.S2, next.S2, this.sLinePen, xBoundary, conv, args.Rectangle);
-                            if (hasS3) DrawSeparatorLine(g, prev.S3, next.S3, this.sLinePen, xBoundary, conv, args.Rectangle);
-
-                            if (hasS2) DrawSeparatorLine(g, Mid(prev.S1, prev.S2), Mid(next.S1, next.S2), this.midLinePen, xBoundary, conv, args.Rectangle);
-                            if (hasS3) DrawSeparatorLine(g, Mid(prev.S2, prev.S3), Mid(next.S2, next.S3), this.midLinePen, xBoundary, conv, args.Rectangle);
-
-                            if (hasR2) DrawSeparatorLine(g, Mid(prev.R1, prev.R2), Mid(next.R1, next.R2), this.midLinePen, xBoundary, conv, args.Rectangle);
-                            if (hasR3) DrawSeparatorLine(g, Mid(prev.R2, prev.R3), Mid(next.R2, next.R3), this.midLinePen, xBoundary, conv, args.Rectangle);
-                        }
-
-                        if (prev.Method == CalculationMethod.Camarilla && next.Method == CalculationMethod.Camarilla)
-                        {
-                            if (hasR4) DrawSeparatorLine(g, prev.R4, next.R4, this.rLinePen, xBoundary, conv, args.Rectangle);
-                            if (hasR5) DrawSeparatorLine(g, prev.R5, next.R5, this.rLinePen, xBoundary, conv, args.Rectangle);
-                            if (hasR6) DrawSeparatorLine(g, prev.R6, next.R6, this.rLinePen, xBoundary, conv, args.Rectangle);
-
-                            if (hasS4) DrawSeparatorLine(g, prev.S4, next.S4, this.sLinePen, xBoundary, conv, args.Rectangle);
-                            if (hasS5) DrawSeparatorLine(g, prev.S5, next.S5, this.sLinePen, xBoundary, conv, args.Rectangle);
-                            if (hasS6) DrawSeparatorLine(g, prev.S6, next.S6, this.sLinePen, xBoundary, conv, args.Rectangle);
-
-                            if (hasS4) DrawSeparatorLine(g, Mid(prev.S3, prev.S4), Mid(next.S3, next.S4), this.midLinePen, xBoundary, conv, args.Rectangle);
-                            if (hasS5) DrawSeparatorLine(g, Mid(prev.S4, prev.S5), Mid(next.S4, next.S5), this.midLinePen, xBoundary, conv, args.Rectangle);
-                            if (hasS6) DrawSeparatorLine(g, Mid(prev.S5, prev.S6), Mid(next.S5, next.S6), this.midLinePen, xBoundary, conv, args.Rectangle);
-
-                            if (hasR4) DrawSeparatorLine(g, Mid(prev.R3, prev.R4), Mid(next.R3, next.R4), this.midLinePen, xBoundary, conv, args.Rectangle);
-                            if (hasR5) DrawSeparatorLine(g, Mid(prev.R4, prev.R5), Mid(next.R4, next.R5), this.midLinePen, xBoundary, conv, args.Rectangle);
-                            if (hasR6) DrawSeparatorLine(g, Mid(prev.R5, prev.R6), Mid(next.R5, next.R6), this.midLinePen, xBoundary, conv, args.Rectangle);
-                        }
-                    }
-                }
                 bool isLatestPeriod = p.From == latestPeriod.From && p.To == latestPeriod.To;
-                if (this.ShowLabels && (!this.DrawLastPeriodOnly || isLatestPeriod))
+                bool shouldDrawLabels = this.ShowLabels && (!this.DrawLastPeriodOnly || isLatestPeriod);
+                if (!shouldDrawLabels)
+                    continue;
+
+                // Labels of the newest period are anchored to the actual end of the line
+                // and placed to its right. Historical labels remain on the left side.
+                float labelAnchorX = isLatestPeriod ? lineEndX : actualEndX;
+                bool placeLabelRight = isLatestPeriod;
+
+                Draw(g, args.Rectangle, "PP", p.PP, this.PPLineOptions, labelAnchorX, conv, placeLabelRight);
+                Draw(g, args.Rectangle, "R1", p.R1, this.R1LineOptions, labelAnchorX, conv, placeLabelRight);
+                Draw(g, args.Rectangle, "S1", p.S1, this.S1LineOptions, labelAnchorX, conv, placeLabelRight);
+                Draw(g, args.Rectangle, "PP–R1", Mid(p.PP, p.R1), this.PPR1MidLineOptions, labelAnchorX, conv, placeLabelRight);
+                Draw(g, args.Rectangle, "PP–S1", Mid(p.PP, p.S1), this.PPS1MidLineOptions, labelAnchorX, conv, placeLabelRight);
+
+                if (p.Method != CalculationMethod.DeMark)
                 {
-                    Draw(g, args.Rectangle, "PP", p.PP, this.PPLineOptions, endX, conv);
-                    Draw(g, args.Rectangle, "R1", p.R1, this.RLineOptions, endX, conv);
-                    Draw(g, args.Rectangle, "S1", p.S1, this.SLineOptions, endX, conv);
+                    if (hasR2) Draw(g, args.Rectangle, "R2", p.R2, this.R2LineOptions, labelAnchorX, conv, placeLabelRight);
+                    if (hasR3) Draw(g, args.Rectangle, "R3", p.R3, this.R3LineOptions, labelAnchorX, conv, placeLabelRight);
+                    if (hasS2) Draw(g, args.Rectangle, "S2", p.S2, this.S2LineOptions, labelAnchorX, conv, placeLabelRight);
+                    if (hasS3) Draw(g, args.Rectangle, "S3", p.S3, this.S3LineOptions, labelAnchorX, conv, placeLabelRight);
 
-                    if (p.Method != CalculationMethod.DeMark)
+                    if (hasR2) Draw(g, args.Rectangle, "R1–R2", Mid(p.R1, p.R2), this.R1R2MidLineOptions, labelAnchorX, conv, placeLabelRight);
+                    if (hasR3) Draw(g, args.Rectangle, "R2–R3", Mid(p.R2, p.R3), this.R2R3MidLineOptions, labelAnchorX, conv, placeLabelRight);
+                    if (hasS2) Draw(g, args.Rectangle, "S1–S2", Mid(p.S1, p.S2), this.S1S2MidLineOptions, labelAnchorX, conv, placeLabelRight);
+                    if (hasS3) Draw(g, args.Rectangle, "S2–S3", Mid(p.S2, p.S3), this.S2S3MidLineOptions, labelAnchorX, conv, placeLabelRight);
+                }
+
+                if (p.Method == CalculationMethod.Camarilla)
+                {
+                    if (hasR4) Draw(g, args.Rectangle, "R4", p.R4, this.R4LineOptions, labelAnchorX, conv, placeLabelRight);
+                    if (hasR5) Draw(g, args.Rectangle, "R5", p.R5, this.R5LineOptions, labelAnchorX, conv, placeLabelRight);
+                    if (hasR6) Draw(g, args.Rectangle, "R6", p.R6, this.R6LineOptions, labelAnchorX, conv, placeLabelRight);
+                    if (hasS4) Draw(g, args.Rectangle, "S4", p.S4, this.S4LineOptions, labelAnchorX, conv, placeLabelRight);
+                    if (hasS5) Draw(g, args.Rectangle, "S5", p.S5, this.S5LineOptions, labelAnchorX, conv, placeLabelRight);
+                    if (hasS6) Draw(g, args.Rectangle, "S6", p.S6, this.S6LineOptions, labelAnchorX, conv, placeLabelRight);
+
+                    if (hasR4) Draw(g, args.Rectangle, "R3–R4", Mid(p.R3, p.R4), this.R3R4MidLineOptions, labelAnchorX, conv, placeLabelRight);
+                    if (hasR5) Draw(g, args.Rectangle, "R4–R5", Mid(p.R4, p.R5), this.R4R5MidLineOptions, labelAnchorX, conv, placeLabelRight);
+                    if (hasR6) Draw(g, args.Rectangle, "R5–R6", Mid(p.R5, p.R6), this.R5R6MidLineOptions, labelAnchorX, conv, placeLabelRight);
+                    if (hasS4) Draw(g, args.Rectangle, "S3–S4", Mid(p.S3, p.S4), this.S3S4MidLineOptions, labelAnchorX, conv, placeLabelRight);
+                    if (hasS5) Draw(g, args.Rectangle, "S4–S5", Mid(p.S4, p.S5), this.S4S5MidLineOptions, labelAnchorX, conv, placeLabelRight);
+                    if (hasS6) Draw(g, args.Rectangle, "S5–S6", Mid(p.S5, p.S6), this.S5S6MidLineOptions, labelAnchorX, conv, placeLabelRight);
+                }
+            }
+
+            // Draw period-to-period connectors once, after horizontal lines.
+            if (this.DisplaySeparator && periodsToDraw.Count > 1)
+            {
+                for (int i = 1; i < periodsToDraw.Count; i++)
+                {
+                    var prev = periodsToDraw[i - 1];
+                    var next = periodsToDraw[i];
+                    float xBoundary = (float)conv.GetChartX(next.From);
+
+                    DrawSeparatorLine(g, prev.PP, next.PP, this.ppLinePen, xBoundary, conv, args.Rectangle);
+                    DrawSeparatorLine(g, prev.R1, next.R1, this.r1LinePen, xBoundary, conv, args.Rectangle);
+                    DrawSeparatorLine(g, prev.S1, next.S1, this.s1LinePen, xBoundary, conv, args.Rectangle);
+                    DrawSeparatorLine(g, Mid(prev.PP, prev.R1), Mid(next.PP, next.R1), this.ppR1MidLinePen, xBoundary, conv, args.Rectangle);
+                    DrawSeparatorLine(g, Mid(prev.PP, prev.S1), Mid(next.PP, next.S1), this.ppS1MidLinePen, xBoundary, conv, args.Rectangle);
+
+                    if (prev.Method != CalculationMethod.DeMark && next.Method != CalculationMethod.DeMark)
                     {
-                        if (hasR2) Draw(g, args.Rectangle, "R2", p.R2, this.RLineOptions, endX, conv);
-                        if (hasR3) Draw(g, args.Rectangle, "R3", p.R3, this.RLineOptions, endX, conv);
-                        if (hasS2) Draw(g, args.Rectangle, "S2", p.S2, this.SLineOptions, endX, conv);
-                        if (hasS2) Draw(g, args.Rectangle, "S3", p.S3, this.SLineOptions, endX, conv);
-                        if (hasS2) Draw(g, args.Rectangle, "S1–S2", Mid(p.S1, p.S2), this.MidLineOptions, endX, conv);
-                        if (hasS3) Draw(g, args.Rectangle, "S2–S3", Mid(p.S2, p.S3), this.MidLineOptions, endX, conv);
-                        if (hasR2) Draw(g, args.Rectangle, "R1–R2", Mid(p.R1, p.R2), this.MidLineOptions, endX, conv);
-                        if (hasR3) Draw(g, args.Rectangle, "R2–R3", Mid(p.R2, p.R3), this.MidLineOptions, endX, conv);
+                        DrawSeparatorLine(g, prev.R2, next.R2, this.r2LinePen, xBoundary, conv, args.Rectangle);
+                        DrawSeparatorLine(g, prev.R3, next.R3, this.r3LinePen, xBoundary, conv, args.Rectangle);
+                        DrawSeparatorLine(g, prev.S2, next.S2, this.s2LinePen, xBoundary, conv, args.Rectangle);
+                        DrawSeparatorLine(g, prev.S3, next.S3, this.s3LinePen, xBoundary, conv, args.Rectangle);
+
+                        DrawSeparatorLine(g, Mid(prev.R1, prev.R2), Mid(next.R1, next.R2), this.r1R2MidLinePen, xBoundary, conv, args.Rectangle);
+                        DrawSeparatorLine(g, Mid(prev.R2, prev.R3), Mid(next.R2, next.R3), this.r2R3MidLinePen, xBoundary, conv, args.Rectangle);
+                        DrawSeparatorLine(g, Mid(prev.S1, prev.S2), Mid(next.S1, next.S2), this.s1S2MidLinePen, xBoundary, conv, args.Rectangle);
+                        DrawSeparatorLine(g, Mid(prev.S2, prev.S3), Mid(next.S2, next.S3), this.s2S3MidLinePen, xBoundary, conv, args.Rectangle);
                     }
 
-                    if (p.Method == CalculationMethod.Camarilla)
+                    if (prev.Method == CalculationMethod.Camarilla && next.Method == CalculationMethod.Camarilla)
                     {
-                        if (hasR4) Draw(g, args.Rectangle, "R4", p.R4, this.RLineOptions, endX, conv);
-                        if (hasR5) Draw(g, args.Rectangle, "R5", p.R5, this.RLineOptions, endX, conv);
-                        if (hasR6) Draw(g, args.Rectangle, "R6", p.R6, this.RLineOptions, endX, conv);
+                        DrawSeparatorLine(g, prev.R4, next.R4, this.r4LinePen, xBoundary, conv, args.Rectangle);
+                        DrawSeparatorLine(g, prev.R5, next.R5, this.r5LinePen, xBoundary, conv, args.Rectangle);
+                        DrawSeparatorLine(g, prev.R6, next.R6, this.r6LinePen, xBoundary, conv, args.Rectangle);
+                        DrawSeparatorLine(g, prev.S4, next.S4, this.s4LinePen, xBoundary, conv, args.Rectangle);
+                        DrawSeparatorLine(g, prev.S5, next.S5, this.s5LinePen, xBoundary, conv, args.Rectangle);
+                        DrawSeparatorLine(g, prev.S6, next.S6, this.s6LinePen, xBoundary, conv, args.Rectangle);
 
-                        if (hasR4) Draw(g, args.Rectangle, "R3–R4", Mid(p.R3, p.R4), this.MidLineOptions, endX, conv);
-                        if (hasR5) Draw(g, args.Rectangle, "R4–R5", Mid(p.R4, p.R5), this.MidLineOptions, endX, conv);
-                        if (hasR6) Draw(g, args.Rectangle, "R5–R6", Mid(p.R5, p.R6), this.MidLineOptions, endX, conv);
-
-                        if (hasS4) Draw(g, args.Rectangle, "S4", p.S4, this.SLineOptions, endX, conv);
-                        if (hasS5) Draw(g, args.Rectangle, "S5", p.S5, this.SLineOptions, endX, conv);
-                        if (hasS6) Draw(g, args.Rectangle, "S6", p.S6, this.SLineOptions, endX, conv);
-
-                        if (hasS4) Draw(g, args.Rectangle, "S3–S4", Mid(p.S3, p.S4), this.MidLineOptions, endX, conv);
-                        if (hasS5) Draw(g, args.Rectangle, "S4–S5", Mid(p.S4, p.S5), this.MidLineOptions, endX, conv);
-                        if (hasS6) Draw(g, args.Rectangle, "S5–S6", Mid(p.S5, p.S6), this.MidLineOptions, endX, conv);
+                        DrawSeparatorLine(g, Mid(prev.R3, prev.R4), Mid(next.R3, next.R4), this.r3R4MidLinePen, xBoundary, conv, args.Rectangle);
+                        DrawSeparatorLine(g, Mid(prev.R4, prev.R5), Mid(next.R4, next.R5), this.r4R5MidLinePen, xBoundary, conv, args.Rectangle);
+                        DrawSeparatorLine(g, Mid(prev.R5, prev.R6), Mid(next.R5, next.R6), this.r5R6MidLinePen, xBoundary, conv, args.Rectangle);
+                        DrawSeparatorLine(g, Mid(prev.S3, prev.S4), Mid(next.S3, next.S4), this.s3S4MidLinePen, xBoundary, conv, args.Rectangle);
+                        DrawSeparatorLine(g, Mid(prev.S4, prev.S5), Mid(next.S4, next.S5), this.s4S5MidLinePen, xBoundary, conv, args.Rectangle);
+                        DrawSeparatorLine(g, Mid(prev.S5, prev.S6), Mid(next.S5, next.S6), this.s5S6MidLinePen, xBoundary, conv, args.Rectangle);
                     }
-
-                    if (!double.IsNaN(p.R1) && p.R1 != 0.0) Draw(g, args.Rectangle, "PP–R1", Mid(p.PP, p.R1), this.MidLineOptions, endX, conv);
-                    if (!double.IsNaN(p.S1) && p.S1 != 0.0) Draw(g, args.Rectangle, "PP–S1", Mid(p.PP, p.S1), this.MidLineOptions, endX, conv);
                 }
             }
         }
@@ -993,32 +1514,6 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
         {
             g.SetClip(savedClip);
         }
-        //if (this.State == IndicatorState.Ready)
-        //    return;
-
-        //var gr = Graphics.FromHdc(args.Hdc);
-        //gr.TextRenderingHint = System.Drawing.Text.TextRenderingHint.SingleBitPerPixelGridFit;
-        //gr.SetClip(args.Rectangle);
-        //switch (this.State)
-        //{
-        //    case IndicatorState.Loading:
-        //        this.DrawMessage(gr, $"Loading {this.Symbol.Name} ({this.formattedPeriod} aggregation).", args.Rectangle);
-        //        break;
-        //    case IndicatorState.NoData:
-        //        this.DrawMessage(gr, $"No data.", args.Rectangle);
-        //        break;
-        //    case IndicatorState.IncorrectPeriod:
-        //        this.DrawMessage(gr, $"Incorrect period.\n The 'Pivot point' period should be greater or equal than chart period.", args.Rectangle);
-        //        break;
-        //    case IndicatorState.OneTickNotAllowed:
-        //        this.DrawMessage(gr, $"Incorrect chart period.\n The 'Pivot point' does not support chart with '1 Tick' aggregation.", args.Rectangle);
-        //        break;
-        //    case IndicatorState.Calculation:
-        //        {
-        //            // draw lines
-        //        }
-        //        break;
-        //}
     }
     #endregion Overrides
 
@@ -1236,11 +1731,15 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
     #region Drawing
     private void DrawHLine(Graphics g, double value, Pen pen, float x1, float x2, IChartWindowCoordinatesConverter conv, Rectangle rect)
     {
-        if (pen == null || double.IsNaN(value) || value == 0.0)
+        if (pen == null || !IsValidLevel(value))
             return;
 
         float y = (float)conv.GetChartY(value);
-        if (float.IsNaN(y) || y <= rect.Top || y >= rect.Bottom)
+
+        // Do not draw a horizontal segment when it is completely outside
+        // the visible chart rectangle. A segment whose ends are outside on
+        // opposite sides is still drawn because it crosses the visible area.
+        if (IsLineSegmentOutsideRectangle(x1, y, x2, y, rect))
             return;
 
         x1 = Math.Max(rect.Left, Math.Min(rect.Right, x1));
@@ -1251,48 +1750,123 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
 
     private void DrawSeparatorLine(Graphics g, double prevValue, double nextValue, Pen pen, float x, IChartWindowCoordinatesConverter conv, Rectangle rect)
     {
-        if (pen == null)
+        if (pen == null || !IsValidLevel(prevValue) || !IsValidLevel(nextValue))
             return;
-
-        if (double.IsNaN(prevValue) || prevValue == 0.0) return;
-        if (double.IsNaN(nextValue) || nextValue == 0.0) return;
 
         float y1 = (float)conv.GetChartY(prevValue);
         float y2 = (float)conv.GetChartY(nextValue);
 
-        if (float.IsNaN(y1) || float.IsNaN(y2)) return;
+        // The same visibility test is applied to vertical period separators.
+        if (IsLineSegmentOutsideRectangle(x, y1, x, y2, rect))
+            return;
 
         x = Math.Max(rect.Left, Math.Min(rect.Right, x));
+        y1 = Math.Max(rect.Top, Math.Min(rect.Bottom, y1));
+        y2 = Math.Max(rect.Top, Math.Min(rect.Bottom, y2));
+
         g.DrawLine(pen, x, y1, x, y2);
     }
 
-    private void Draw(Graphics g, Rectangle rect, string name, double value, LineOptions lineOptions, float endX, IChartWindowCoordinatesConverter conv)
+    private static bool IsLineSegmentOutsideRectangle(
+        float x1,
+        float y1,
+        float x2,
+        float y2,
+        Rectangle rect)
     {
-        if (lineOptions == null || !lineOptions.Enabled || double.IsNaN(value) || value == 0.0)
+        if (float.IsNaN(x1) || float.IsInfinity(x1) ||
+            float.IsNaN(y1) || float.IsInfinity(y1) ||
+            float.IsNaN(x2) || float.IsInfinity(x2) ||
+            float.IsNaN(y2) || float.IsInfinity(y2))
+        {
+            return true;
+        }
+
+        float minX = Math.Min(x1, x2);
+        float maxX = Math.Max(x1, x2);
+        float minY = Math.Min(y1, y2);
+        float maxY = Math.Max(y1, y2);
+
+        return maxX < rect.Left ||
+               minX > rect.Right ||
+               maxY < rect.Top ||
+               minY > rect.Bottom;
+    }
+
+    private void Draw(
+        Graphics g,
+        Rectangle rect,
+        string name,
+        double value,
+        LineOptions lineOptions,
+        float anchorX,
+        IChartWindowCoordinatesConverter conv,
+        bool placeRight)
+    {
+        if (lineOptions == null || !lineOptions.Enabled || !IsValidLevel(value))
             return;
 
         float y = (float)conv.GetChartY(value);
         string label = this.ShowPriceInLabels ? $"{name} {this.Symbol.FormatPrice(value)}" : name;
-        this.DrawLevelLabel(g, rect, y, label, lineOptions.Color, endX);
+        this.DrawLevelLabel(g, rect, y, label, lineOptions.Color, anchorX, placeRight);
     }
-    private void DrawLevelLabel(Graphics g, Rectangle chartRect, float y, string text, Color backColor, float anchorX)
+
+    private void DrawLevelLabel(
+        Graphics g,
+        Rectangle chartRect,
+        float y,
+        string text,
+        Color backColor,
+        float anchorX,
+        bool placeRight)
     {
         if (float.IsNaN(y) || y <= chartRect.Top || y >= chartRect.Bottom)
             return;
 
         var size = g.MeasureString(text, this.labelFont);
+        float labelWidth = size.Width + LabelPadX * 2f;
+        float labelHeight = size.Height + LabelPadY * 2f;
+        float visibleAnchorX = Math.Max(chartRect.Left, Math.Min(chartRect.Right, anchorX));
 
-        var rect = new RectangleF(
-            anchorX - (size.Width + LabelPadX * 2f),           // X
-            y - size.Height / 2f - LabelPadY,                  // Y
-            size.Width + LabelPadX * 2f,                       // W
-            size.Height + LabelPadY * 2f                       // H
-        );
+        float x = placeRight
+            ? visibleAnchorX + LabelGapX
+            : visibleAnchorX - labelWidth - LabelGapX;
+
+        // Prefer the requested side. If there is no room at the chart edge,
+        // move the label to the other side so it remains fully visible.
+        if (placeRight && x + labelWidth > chartRect.Right)
+            x = visibleAnchorX - labelWidth - LabelGapX;
+        else if (!placeRight && x < chartRect.Left)
+            x = visibleAnchorX + LabelGapX;
+
+        x = Math.Max(chartRect.Left, Math.Min(chartRect.Right - labelWidth, x));
+        float top = y - size.Height / 2f - LabelPadY;
+        top = Math.Max(chartRect.Top, Math.Min(chartRect.Bottom - labelHeight, top));
+
+        var labelRect = new RectangleF(x, top, labelWidth, labelHeight);
 
         using (var brush = new SolidBrush(backColor))
-            g.FillRectangle(brush, rect);
+            g.FillRectangle(brush, labelRect);
 
-        g.DrawString(text, this.labelFont, Brushes.White, rect, this.labelSF);
+        g.DrawString(text, this.labelFont, Brushes.White, labelRect, this.labelSF);
+    }
+
+    private static bool IsValidLevel(double value) =>
+        !double.IsNaN(value) && !double.IsInfinity(value) && value != 0.0;
+
+    private static LineOptions CreateLineOptions(bool enabled, Color color, LineStyle style, int width) => new LineOptions
+    {
+        Enabled = enabled,
+        WithCheckBox = true,
+        Color = color,
+        LineStyle = style,
+        Width = width
+    };
+
+    private static void AssignLineOptions(ref LineOptions targetOptions, ref Pen targetPen, LineOptions value)
+    {
+        targetOptions = value;
+        targetPen = ProcessPen(targetPen, value);
     }
 
     private static Pen ProcessPen(Pen pen, LineOptions lineOptions)
