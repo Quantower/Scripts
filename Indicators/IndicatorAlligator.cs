@@ -25,14 +25,11 @@ public sealed class IndicatorAlligator : Indicator
          "Medium", PriceType.Median,
          "Weighted", PriceType.Weighted}
     )]
-    public PriceType JawSourcePrice = PriceType.Close;
+    public PriceType JawSourcePrice = PriceType.Median;
 
     // Displays Input Parameter as input field (or checkbox if value type is bolean).
     [InputParameter("Period of Jaw Moving Average", 2, 1, 999)]
-    public int JawMAPeiod = 13;
-
-    [InputParameter("Shift of Jaw Moving Average", 3, -999, 999, 1, 0)]
-    public int JawMAShift = 8;
+    public int JawMAPeriod = 13;
 
     [InputParameter("Type of Teeth Moving Average", 4, variants: new object[]{
         "Simple", MaMode.SMA,
@@ -51,13 +48,10 @@ public sealed class IndicatorAlligator : Indicator
          "Medium", PriceType.Median,
          "Weighted", PriceType.Weighted}
     )]
-    public PriceType TeethSourcePrice = PriceType.Close;
+    public PriceType TeethSourcePrice = PriceType.Median;
 
-    [InputParameter("Period of Teeth MovingAverage", 6, 1, 999)]
-    public int TeethMAPeiod = 8;
-
-    [InputParameter("Shift of Teeth Moving Average", 7, -999, 999, 1, 0)]
-    public int TeethMAShift = 5;
+    [InputParameter("Period of Teeth Moving Average", 6, 1, 9999)]
+    public int TeethMAPeriod = 8;
 
     [InputParameter("Type of Lips Moving Average", 8, variants: new object[]{
         "Simple", MaMode.SMA,
@@ -67,32 +61,30 @@ public sealed class IndicatorAlligator : Indicator
      )]
     public MaMode LipsMAType = MaMode.SMMA;
     //
-    [InputParameter("Calculation type", 9, variants: new object[]
-    {
-        "All available data", IndicatorCalculationType.AllAvailableData,
-        "By period", IndicatorCalculationType.ByPeriod,
-    })]
-    public IndicatorCalculationType CalculationType = Indicator.DEFAULT_CALCULATION_TYPE;
 
-    [InputParameter("Source price for Lips Moving Average", 10, variants: new object[]{
+    [InputParameter("Source price for Lips Moving Average", 9, variants: new object[]{
          "Close", PriceType.Close,
          "Open", PriceType.Open,
          "High", PriceType.High,
          "Low", PriceType.Low,
          "Typical", PriceType.Typical,
-         "Medium", PriceType.Median,
+         "Median", PriceType.Median,
          "Weighted", PriceType.Weighted}
     )]
-    public PriceType LipsSourcePrice = PriceType.Close;
+    public PriceType LipsSourcePrice = PriceType.Median;
 
-    [InputParameter("Period of Lips Moving Average", 11, 1, 9999)]
-    public int LipsMAPeiod = 5;
+    [InputParameter("Period of Lips Moving Average", 10, 1, 9999)]
+    public int LipsMAPeriod = 5;
 
-    [InputParameter("Shift of Lips Moving Average", 12, -999, 999, 1, 0)]
-    public int LipsMAShift = 3;
+    [InputParameter("Calculation type", 12, variants: new object[]
+{
+        "All available data", IndicatorCalculationType.AllAvailableData,
+        "By period", IndicatorCalculationType.ByPeriod,
+})]
+    public IndicatorCalculationType CalculationType = Indicator.DEFAULT_CALCULATION_TYPE;
 
     // Serves for an identification of related indicators with different parameters.
-    public override string ShortName => $"ALLIGATOR ({this.JawMAPeiod}:{this.TeethMAPeiod}:{this.LipsMAPeiod})";
+    public override string ShortName => $"Alligator ({this.JawMAPeriod}:{this.TeethMAPeriod}:{this.LipsMAPeriod})";
     public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorAlligator.cs";
 
     private Indicator jawMa;
@@ -110,9 +102,9 @@ public sealed class IndicatorAlligator : Indicator
         this.Description = "Three moving averages with different colors, periods and calculation methods";
 
         // Defines line on demand with particular parameters.
-        this.AddLineSeries("JAW Line", Color.Green, 1, LineStyle.Solid);
+        this.AddLineSeries("JAW Line", Color.Blue, 1, LineStyle.Solid);
         this.AddLineSeries("TEETH Line", Color.Red, 1, LineStyle.Solid);
-        this.AddLineSeries("LIPS Line", Color.Blue, 1, LineStyle.Solid);
+        this.AddLineSeries("LIPS Line", Color.Green, 1, LineStyle.Solid);
 
         this.SeparateWindow = false;
     }
@@ -122,14 +114,11 @@ public sealed class IndicatorAlligator : Indicator
     /// </summary>
     protected override void OnInit()
     {
-        this.LinesSeries[0].TimeShift = this.JawMAShift;
-        this.LinesSeries[1].TimeShift = this.TeethMAShift;
-        this.LinesSeries[2].TimeShift = this.LipsMAShift;
-        this.jawMa = Core.Indicators.BuiltIn.MA(this.JawMAPeiod, this.JawSourcePrice, this.JawMAType, this.CalculationType);
+        this.jawMa = Core.Indicators.BuiltIn.MA(this.JawMAPeriod, this.JawSourcePrice, this.JawMAType, this.CalculationType);
         this.AddIndicator(this.jawMa);
-        this.teethMa = Core.Indicators.BuiltIn.MA(this.TeethMAPeiod, this.TeethSourcePrice, this.TeethMAType, this.CalculationType);
+        this.teethMa = Core.Indicators.BuiltIn.MA(this.TeethMAPeriod, this.TeethSourcePrice, this.TeethMAType, this.CalculationType);
         this.AddIndicator(this.teethMa);
-        this.lipsMa = Core.Indicators.BuiltIn.MA(this.LipsMAPeiod, this.LipsSourcePrice, this.LipsMAType, this.CalculationType);
+        this.lipsMa = Core.Indicators.BuiltIn.MA(this.LipsMAPeriod, this.LipsSourcePrice, this.LipsMAType, this.CalculationType);
         this.AddIndicator(this.lipsMa);
     }
 
