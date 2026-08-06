@@ -133,10 +133,7 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
         get
         {
             if (this.customRangeStartTime == default)
-            {
-                var session = this.GetFullDayTimeInterval(this.GetTimeZone());
-                this.customRangeStartTime = session.From;
-            }
+                this.customRangeStartTime = DateTime.Today;
 
             return DateTime.SpecifyKind(this.customRangeStartTime, DateTimeKind.Local);
         }
@@ -149,10 +146,7 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
         get
         {
             if (this.customRangeEndTime == default)
-            {
-                var session = this.GetFullDayTimeInterval(this.GetTimeZone());
-                this.customRangeEndTime = session.To;
-            }
+                this.customRangeEndTime = DateTime.Today;
 
             return DateTime.SpecifyKind(this.customRangeEndTime, DateTimeKind.Local);
         }
@@ -604,7 +598,7 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
             timeZone,
             new[]
             {
-            this.CreateCustomSession(TimeSpan.Zero, new TimeSpan(23, 59, 59), timeZone.TimeZoneInfo)
+                this.CreateCustomSession(TimeSpan.Zero, TimeSpan.Zero, timeZone.TimeZoneInfo)
             });
 
         switch (this.DailySessionType)
@@ -699,7 +693,7 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
 
                 var aggregation = new HistoryAggregationTime(inputPeriod, currHistoryType);
 
-                if (this.DailySessionType != DailySessionType.AllDay)
+                if (this.BasePeriod == BasePeriod.Day && this.SessionContainer != null)
                     aggregation.SessionsContainer = this.SessionContainer;
 
                 this.history = this.Symbol.GetHistory(new HistoryRequestParameters()
@@ -1242,6 +1236,8 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
                 var newValue = Core.Instance.TimeUtils.ConvertFromUTCToSelectedTimeZone(item.GetValue<DateTime>());
 
                 if (this.CustomRangeStartTime != newValue)
+
+                if (this.CustomRangeStartTime.TimeOfDay != newValue.TimeOfDay)
                 {
                     this.CustomRangeStartTime = newValue;
                     needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
@@ -1252,7 +1248,7 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
             {
                 var newValue = Core.Instance.TimeUtils.ConvertFromUTCToSelectedTimeZone(item.GetValue<DateTime>());
 
-                if (this.CustomRangeEndTime != newValue)
+                if (this.CustomRangeEndTime.TimeOfDay != newValue.TimeOfDay)
                 {
                     this.CustomRangeEndTime = newValue;
                     needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
@@ -1323,7 +1319,6 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
 
             foreach (var p in periodsToDraw)
             {
-                DateTime firstBarTime = DateTime.MinValue;
                 DateTime lastBarRightTime = DateTime.MinValue;
 
                 int fromIndex = (int)this.HistoricalData.GetIndexByTime(p.From.Ticks);
@@ -1341,28 +1336,34 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
                     if (barRight <= p.From || barLeft >= p.To)
                         continue;
 
-                    if (this.DailySessionType != DailySessionType.AllDay)
-                    {
-                        if (this.SessionContainer == null || !this.SessionContainer.ContainsDate(barLeft))
-                            continue;
-                    }
-
-                    if (firstBarTime == DateTime.MinValue || barLeft < firstBarTime)
-                        firstBarTime = barLeft;
-
-                    if (barRight > lastBarRightTime)
-                        lastBarRightTime = barRight;
+                    DateTime clippedBarRight = barRight > p.To ? p.To : barRight;
+                    if (clippedBarRight > lastBarRightTime)
+                        lastBarRightTime = clippedBarRight;
                 }
 
-                if (firstBarTime == DateTime.MinValue || lastBarRightTime == DateTime.MinValue)
+                bool hasChartBars = lastBarRightTime != DateTime.MinValue;
+                if (!hasChartBars && !p.IsProjected)
                     continue;
 
-                float startX = (float)conv.GetChartX(firstBarTime);
-                DateTime endTimeForLine = this.ExtendToPeriodEnd && Core.Instance.TimeUtils.DateTimeUtcNow < p.To
-                    ? p.To
-                    : lastBarRightTime;
+                float startX = (float)conv.GetChartX(p.From);
+
+                bool periodIsFinished = Core.Instance.TimeUtils.DateTimeUtcNow >= p.To;
+                DateTime endTimeForLine;
+
+                if (periodIsFinished || this.ExtendToPeriodEnd)
+                    endTimeForLine = p.To;
+                else if (hasChartBars)
+                    endTimeForLine = lastBarRightTime;
+                else
+                    endTimeForLine = p.To;
+
+                if (endTimeForLine <= p.From)
+                    continue;
+
                 float lineEndX = (float)conv.GetChartX(endTimeForLine);
-                float actualEndX = (float)conv.GetChartX(lastBarRightTime);
+                float actualEndX = hasChartBars
+                    ? (float)conv.GetChartX(lastBarRightTime)
+                    : lineEndX;
 
                 bool hasR2 = IsValidLevel(p.R2);
                 bool hasR3 = IsValidLevel(p.R3);
@@ -1534,6 +1535,7 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
         this.pivotPeriods.Clear();
         this.pivotPeriods.AddRange(pivotPoints);
 
+        this.EnsureLatestDailySessionPeriod();
         this.UpdateLabelsFromLastPivot();
     }
     private PivotPointCalculationResponce CalculatePivotPoint(HistoricalData hd, int hdOffset)
@@ -1544,30 +1546,69 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
         if (hd.Count <= hdOffset || hd.Count <= hdOffset + 1)
             return null;
 
-        var currentItem = hd[hdOffset + 1];
+        var historyItem = hd[hdOffset, SeekOriginHistory.End] as HistoryItemBar;
+        if (historyItem == null)
+            return null;
 
-        var close = currentItem[PriceType.Close];
-        var high = currentItem[PriceType.High];
-        var low = currentItem[PriceType.Low];
+        var periodInterval = this.GetPeriodInterval(historyItem);
+        if (periodInterval.To <= periodInterval.From)
+            return null;
+
+        return this.CalculatePivotPointForInterval(
+            hd,
+            sourceOffset: hdOffset + 1,
+            deMarkOpenOffset: hdOffset + 2,
+            startTime: periodInterval.From,
+            endTime: periodInterval.To,
+            isProjected: false);
+    }
+
+    private PivotPointCalculationResponce CalculatePivotPointForInterval(
+        HistoricalData hd,
+        int sourceOffset,
+        int deMarkOpenOffset,
+        DateTime startTime,
+        DateTime endTime,
+        bool isProjected)
+    {
+        if (hd == null ||
+            sourceOffset < 0 ||
+            sourceOffset >= hd.Count ||
+            endTime <= startTime)
+        {
+            return null;
+        }
+
+        var sourceItem = hd[sourceOffset, SeekOriginHistory.End];
+        if (sourceItem == null)
+            return null;
+
+        double close = sourceItem[PriceType.Close];
+        double high = sourceItem[PriceType.High];
+        double low = sourceItem[PriceType.Low];
+
         double pp, r1, r2, r3, r4, r5, r6, s1, s2, s3, s4, s5, s6;
         pp = r1 = r2 = r3 = r4 = r5 = r6 = s1 = s2 = s3 = s4 = s5 = s6 = 0;
+
         switch (this.IndicatorCalculationMethod)
         {
             case CalculationMethod.Classic:
                 {
                     pp = (high + low + close) / 3;
-                    var range = high - low;
+                    double range = high - low;
+
                     r1 = 2 * pp - low;
                     r2 = pp + range;
-                    r3 = r2+range;
-                    r4 = r3+range;
+                    r3 = r2 + range;
+                    r4 = r3 + range;
 
                     s1 = 2 * pp - high;
                     s2 = pp - range;
                     s3 = s2 - range;
                     s4 = s3 - range;
+                    break;
                 }
-                break;
+
             case CalculationMethod.Camarilla:
                 {
                     pp = (high + low + close) / 3;
@@ -1585,8 +1626,9 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
                     s4 = close - 0.55 * (high - low);
                     s5 = s4 - 1.168 * (s3 - s4);
                     s6 = close - (r6 - close);
+                    break;
                 }
-                break;
+
             case CalculationMethod.Fibonacci:
                 {
                     pp = (high + low + close) / 3;
@@ -1598,8 +1640,9 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
                     s1 = pp - 0.382 * (high - low);
                     s2 = pp - 0.618 * (high - low);
                     s3 = pp - (high - low);
+                    break;
                 }
-                break;
+
             case CalculationMethod.Woodie:
                 {
                     pp = (high + low + 2 * close) / 4;
@@ -1611,82 +1654,34 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
                     s1 = 2 * pp - high;
                     s2 = pp + low - high;
                     s3 = low - 2 * (high - pp);
+                    break;
                 }
-                break;
+
             case CalculationMethod.DeMark:
                 {
-                    var x = 0D;
-                    if (hd.Count > hdOffset + 2)
-                    {
-                        var open0 = hd[hdOffset + 2][PriceType.Open];
+                    var openItem =
+                        deMarkOpenOffset >= 0 && deMarkOpenOffset < hd.Count
+                            ? hd[deMarkOpenOffset, SeekOriginHistory.End]
+                            : sourceItem;
 
-                        if (close < open0)
-                            x = high + 2 * low + close;
-                        else if (close > open0)
-                            x = 2 * high + low + close;
-                        else
-                            x = high + low + 2 * close;
-                    }
+                    double open = openItem != null
+                        ? openItem[PriceType.Open]
+                        : sourceItem[PriceType.Open];
+                    double x;
+
+                    if (close < open)
+                        x = high + 2 * low + close;
+                    else if (close > open)
+                        x = 2 * high + low + close;
+                    else
+                        x = high + low + 2 * close;
 
                     pp = x / 4;
                     r1 = x / 2 - low;
                     s1 = x / 2 - high;
-
-                }
-                break;
-        }
-        var timeZone = this.GetTimeZone();
-        var historyItem = (HistoryItemBar)hd[hdOffset, SeekOriginHistory.End];
-
-        var leftUtc = DateTime.SpecifyKind(new DateTime(historyItem.TicksLeft), DateTimeKind.Utc);
-        var leftLocal = TimeZoneInfo.ConvertTimeFromUtc(leftUtc, timeZone.TimeZoneInfo);
-
-        DateTime startLocal;
-        DateTime endLocal;
-
-        switch (this.BasePeriod)
-        {
-            case BasePeriod.Hour:
-                {
-                    int alignedHour = leftLocal.Hour - (leftLocal.Hour % this.PeriodValue);
-                    startLocal = new DateTime(leftLocal.Year, leftLocal.Month, leftLocal.Day, alignedHour, 0, 0, DateTimeKind.Unspecified);
-                    endLocal = startLocal.AddHours(this.PeriodValue);
-                    break;
-                }
-
-            case BasePeriod.Day:
-                {
-                    startLocal = new DateTime(leftLocal.Year, leftLocal.Month, leftLocal.Day, 0, 0, 0, DateTimeKind.Unspecified);
-                    endLocal = startLocal.AddDays(this.PeriodValue);
-                    break;
-                }
-
-            case BasePeriod.Week:
-                {
-                    var baseDate = new DateTime(leftLocal.Year, leftLocal.Month, leftLocal.Day, 0, 0, 0, DateTimeKind.Unspecified);
-                    int delta = (int)baseDate.DayOfWeek;
-                    startLocal = baseDate.AddDays(-delta);
-                    endLocal = startLocal.AddDays(7 * this.PeriodValue);
-                    break;
-                }
-
-            case BasePeriod.Month:
-                {
-                    startLocal = new DateTime(leftLocal.Year, leftLocal.Month, 1, 0, 0, 0, DateTimeKind.Unspecified);
-                    endLocal = startLocal.AddMonths(this.PeriodValue);
-                    break;
-                }
-
-            default:
-                {
-                    startLocal = new DateTime(leftLocal.Year, leftLocal.Month, leftLocal.Day, 0, 0, 0, DateTimeKind.Unspecified);
-                    endLocal = startLocal.AddDays(1);
                     break;
                 }
         }
-
-        DateTime startTime = Core.Instance.TimeUtils.ConvertFromTimeZoneToUTC(startLocal, timeZone);
-        DateTime endTime = Core.Instance.TimeUtils.ConvertFromTimeZoneToUTC(endLocal, timeZone);
 
         return new PivotPointCalculationResponce(startTime, endTime)
         {
@@ -1695,18 +1690,20 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
             R2 = r2,
             R3 = r3,
             R4 = r4,
+            R5 = r5,
+            R6 = r6,
             S1 = s1,
             S2 = s2,
             S3 = s3,
             S4 = s4,
             S5 = s5,
             S6 = s6,
-            R5 = r5,
-            R6 = r6,
             Method = this.IndicatorCalculationMethod,
-            Period = new Period(this.BasePeriod, this.PeriodValue)
+            Period = new Period(this.BasePeriod, this.PeriodValue),
+            IsProjected = isProjected
         };
     }
+
     private void CalculateLastPeriod()
     {
         var last = this.CalculatePivotPoint(this.history, 0);
@@ -1722,6 +1719,7 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
         else
             this.pivotPeriods.Insert(0, last);
 
+        this.EnsureLatestDailySessionPeriod();
         this.UpdateLabelsFromLastPivot();
 
     }
@@ -1812,13 +1810,13 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
     }
 
     private void DrawLevelLabel(
-        Graphics g,
-        Rectangle chartRect,
-        float y,
-        string text,
-        Color backColor,
-        float anchorX,
-        bool placeRight)
+    Graphics g,
+    Rectangle chartRect,
+    float y,
+    string text,
+    Color backColor,
+    float anchorX,
+    bool placeRight)
     {
         if (float.IsNaN(y) || y <= chartRect.Top || y >= chartRect.Bottom)
             return;
@@ -1826,22 +1824,29 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
         var size = g.MeasureString(text, this.labelFont);
         float labelWidth = size.Width + LabelPadX * 2f;
         float labelHeight = size.Height + LabelPadY * 2f;
+
+        if (!placeRight && anchorX <= chartRect.Left)
+            return;
+
         float visibleAnchorX = Math.Max(chartRect.Left, Math.Min(chartRect.Right, anchorX));
 
+        const float rightLabelGap = LabelGapX;
+        const float leftLabelGap = 1f;
+
         float x = placeRight
-            ? visibleAnchorX + LabelGapX
-            : visibleAnchorX - labelWidth - LabelGapX;
+            ? visibleAnchorX + rightLabelGap
+            : visibleAnchorX - labelWidth - leftLabelGap+2;
 
-        // Prefer the requested side. If there is no room at the chart edge,
-        // move the label to the other side so it remains fully visible.
         if (placeRight && x + labelWidth > chartRect.Right)
-            x = visibleAnchorX - labelWidth - LabelGapX;
-        else if (!placeRight && x < chartRect.Left)
-            x = visibleAnchorX + LabelGapX;
+            x = visibleAnchorX - labelWidth - leftLabelGap;
 
-        x = Math.Max(chartRect.Left, Math.Min(chartRect.Right - labelWidth, x));
+        if (!placeRight && x < chartRect.Left)
+            return;
+
         float top = y - size.Height / 2f - LabelPadY;
         top = Math.Max(chartRect.Top, Math.Min(chartRect.Bottom - labelHeight, top));
+
+        x = Math.Max(chartRect.Left, Math.Min(chartRect.Right - labelWidth, x));
 
         var labelRect = new RectangleF(x, top, labelWidth, labelHeight);
 
@@ -2100,7 +2105,8 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
 
     private void CurrentChartOnSettingsChanged(object sender, ChartEventArgs e)
     {
-        if (this.DailySessionType == DailySessionType.SpecifiedSession &&
+        if (this.BasePeriod == BasePeriod.Day &&
+            this.DailySessionType == DailySessionType.SpecifiedSession &&
             this.specifiedSessionContainerId == CHART_SESSION_CONTAINER_SELECT_ITEM)
         {
             if (this.CurrentChart?.CurrentSessionContainer == null || this.chartSessionContainer == null)
@@ -2119,14 +2125,176 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
         return this.CurrentChart?.CurrentTimeZone ?? Core.Instance.TimeUtils.SelectedTimeZone;
     }
 
-    private Interval<DateTime> GetFullDayTimeInterval(TradingPlatform.BusinessLayer.TimeZone timeZone)
+    private Interval<DateTime> GetPeriodInterval(HistoryItemBar historyItem)
     {
-        var openTime = new DateTime(DateTime.UtcNow.Date.Ticks, DateTimeKind.Unspecified);
-        var closeTime = new DateTime(DateTime.UtcNow.Date.AddDays(-1).Ticks, DateTimeKind.Unspecified);
+        var timeZone = this.GetTimeZone();
+        DateTime itemStartUtc = DateTime.SpecifyKind(new DateTime(historyItem.TicksLeft), DateTimeKind.Utc);
+        DateTime itemEndUtc = DateTime.SpecifyKind(new DateTime(historyItem.TicksRight), DateTimeKind.Utc);
+
+        if (this.BasePeriod == BasePeriod.Day &&
+            (this.DailySessionType == DailySessionType.CustomRange ||
+             this.DailySessionType == DailySessionType.AllDay))
+        {
+            TimeSpan open = this.DailySessionType == DailySessionType.AllDay
+                ? TimeSpan.Zero
+                : this.CustomRangeStartTime.TimeOfDay;
+            TimeSpan close = this.DailySessionType == DailySessionType.AllDay
+                ? TimeSpan.Zero
+                : this.CustomRangeEndTime.TimeOfDay;
+
+            TimeSpan normalizedClose = NormalizeSessionClose(open, close);
+            DateTime itemStartLocal = TimeZoneInfo.ConvertTimeFromUtc(itemStartUtc, timeZone.TimeZoneInfo);
+
+            DateTime startLocal = DateTime.SpecifyKind(itemStartLocal.Date + open, DateTimeKind.Unspecified);
+            if (itemStartLocal < startLocal)
+                startLocal = startLocal.AddDays(-1);
+
+            DateTime endLocal = DateTime.SpecifyKind(
+                startLocal.Date + normalizedClose + TimeSpan.FromDays(Math.Max(0, this.PeriodValue - 1)),
+                DateTimeKind.Unspecified);
+
+            return new Interval<DateTime>(
+                Core.Instance.TimeUtils.ConvertFromTimeZoneToUTC(startLocal, timeZone),
+                Core.Instance.TimeUtils.ConvertFromTimeZoneToUTC(endLocal, timeZone));
+        }
+        if (itemEndUtc <= itemStartUtc)
+            return new Interval<DateTime>(itemStartUtc, itemStartUtc.AddDays(1));
+
+        return new Interval<DateTime>(itemStartUtc, itemEndUtc);
+    }
+
+    private void EnsureLatestDailySessionPeriod()
+    {
+        if (this.BasePeriod != BasePeriod.Day ||
+            (this.DailySessionType != DailySessionType.AllDay &&
+             this.DailySessionType != DailySessionType.CustomRange) ||
+            this.history == null ||
+            this.history.Count == 0)
+        {
+            return;
+        }
+
+        var newestHistoryBar = this.history[0, SeekOriginHistory.End] as HistoryItemBar;
+        if (newestHistoryBar == null)
+            return;
+
+        Interval<DateTime> newestInterval = this.GetPeriodInterval(newestHistoryBar);
+        Interval<DateTime> expectedInterval = this.GetExpectedLatestDailySessionInterval(newestInterval);
+
+        if (expectedInterval.To <= expectedInterval.From ||
+            expectedInterval.From <= newestInterval.From)
+        {
+            return;
+        }
+
+        int existingIndex = this.pivotPeriods.FindIndex(
+            period => period.From == expectedInterval.From &&
+                      period.To == expectedInterval.To);
+
+        if (existingIndex >= 0)
+            return;
+
+        var projected = this.CalculatePivotPointForInterval(
+            this.history,
+            sourceOffset: 0,
+            deMarkOpenOffset: 0,
+            startTime: expectedInterval.From,
+            endTime: expectedInterval.To,
+            isProjected: true);
+
+        if (projected != null)
+            this.pivotPeriods.Add(projected);
+    }
+
+    private Interval<DateTime> GetExpectedLatestDailySessionInterval(
+        Interval<DateTime> newestInterval)
+    {
+        var timeZone = this.GetTimeZone();
+
+        DateTime utcNow = DateTime.SpecifyKind(
+            Core.Instance.TimeUtils.DateTimeUtcNow,
+            DateTimeKind.Utc);
+
+        DateTime localNow = TimeZoneInfo.ConvertTimeFromUtc(
+            utcNow,
+            timeZone.TimeZoneInfo);
+
+        TimeSpan open = this.DailySessionType == DailySessionType.AllDay
+            ? TimeSpan.Zero
+            : this.CustomRangeStartTime.TimeOfDay;
+
+        TimeSpan close = this.DailySessionType == DailySessionType.AllDay
+            ? TimeSpan.Zero
+            : this.CustomRangeEndTime.TimeOfDay;
+
+        bool crossesMidnight = close <= open;
+        TimeSpan normalizedClose = NormalizeSessionClose(open, close);
+
+        DateTime expectedStartLocal;
+        if (crossesMidnight)
+        {
+            expectedStartLocal = localNow.TimeOfDay >= open
+                ? localNow.Date + open
+                : localNow.Date.AddDays(-1) + open;
+        }
+        else
+        {
+            expectedStartLocal = localNow.Date + open;
+        }
+
+        expectedStartLocal = DateTime.SpecifyKind(
+            expectedStartLocal,
+            DateTimeKind.Unspecified);
+
+        DateTime newestStartUtc = DateTime.SpecifyKind(
+            newestInterval.From,
+            DateTimeKind.Utc);
+
+        DateTime newestEndUtc = DateTime.SpecifyKind(
+            newestInterval.To,
+            DateTimeKind.Utc);
+
+        DateTime newestStartLocal = TimeZoneInfo.ConvertTimeFromUtc(
+            newestStartUtc,
+            timeZone.TimeZoneInfo);
+
+        DateTime newestEndLocal = TimeZoneInfo.ConvertTimeFromUtc(
+            newestEndUtc,
+            timeZone.TimeZoneInfo);
+
+        if (expectedStartLocal >= newestStartLocal &&
+            expectedStartLocal < newestEndLocal)
+        {
+            return newestInterval;
+        }
+
+        DateTime candidateStartLocal = DateTime.SpecifyKind(
+            newestStartLocal.AddDays(Math.Max(1, this.PeriodValue)),
+            DateTimeKind.Unspecified);
+
+        DateTime candidateEndLocal = DateTime.SpecifyKind(
+            candidateStartLocal.Date +
+            normalizedClose +
+            TimeSpan.FromDays(Math.Max(0, this.PeriodValue - 1)),
+            DateTimeKind.Unspecified);
+        if (expectedStartLocal < candidateStartLocal ||
+            expectedStartLocal >= candidateEndLocal)
+        {
+            return newestInterval;
+        }
 
         return new Interval<DateTime>(
-            Core.Instance.TimeUtils.ConvertFromTimeZoneToUTC(openTime, timeZone),
-            Core.Instance.TimeUtils.ConvertFromTimeZoneToUTC(closeTime, timeZone));
+            Core.Instance.TimeUtils.ConvertFromTimeZoneToUTC(
+                candidateStartLocal,
+                timeZone),
+            Core.Instance.TimeUtils.ConvertFromTimeZoneToUTC(
+                candidateEndLocal,
+                timeZone));
+    }
+
+    private static TimeSpan NormalizeSessionClose(TimeSpan open, TimeSpan close)
+    {
+        return close <= open ? close.Add(TimeSpan.FromDays(1)) : close;
     }
 
     private CustomSession CreateCustomSession(TimeSpan open, TimeSpan close, TimeZoneInfo info)
@@ -2134,7 +2302,7 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
         var session = new CustomSession
         {
             OpenOffset = open,
-            CloseOffset = close,
+            CloseOffset = NormalizeSessionClose(open, close),
             IsActive = true,
             Name = "Main",
             Days = Enum.GetValues(typeof(DayOfWeek)).Cast<DayOfWeek>().ToArray(),
@@ -2173,6 +2341,7 @@ internal class PivotPointCalculationResponce
     public DateTime To { get; private set; }
     public Period Period { get; set; }
     public CalculationMethod Method { get; internal set; }
+    public bool IsProjected { get; set; }
 }
 public enum CalculationMethod
 {
