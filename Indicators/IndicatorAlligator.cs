@@ -22,13 +22,13 @@ public sealed class IndicatorAlligator : Indicator
          "High", PriceType.High,
          "Low", PriceType.Low,
          "Typical", PriceType.Typical,
-         "Medium", PriceType.Median,
+         "Median", PriceType.Median,
          "Weighted", PriceType.Weighted}
     )]
     public PriceType JawSourcePrice = PriceType.Median;
 
     // Displays Input Parameter as input field (or checkbox if value type is bolean).
-    [InputParameter("Period of Jaw Moving Average", 2, 1, 999)]
+    [InputParameter("Period of Jaw Moving Average", 2, 1, 9999)]
     public int JawMAPeriod = 13;
 
     [InputParameter("Type of Teeth Moving Average", 4, variants: new object[]{
@@ -114,6 +114,9 @@ public sealed class IndicatorAlligator : Indicator
     /// </summary>
     protected override void OnInit()
     {
+        this.LinesSeries[0].TimeShift = 3;
+        this.LinesSeries[1].TimeShift = 5;
+        this.LinesSeries[2].TimeShift = 8;
         this.jawMa = Core.Indicators.BuiltIn.MA(this.JawMAPeriod, this.JawSourcePrice, this.JawMAType, this.CalculationType);
         this.AddIndicator(this.jawMa);
         this.teethMa = Core.Indicators.BuiltIn.MA(this.TeethMAPeriod, this.TeethSourcePrice, this.TeethMAType, this.CalculationType);

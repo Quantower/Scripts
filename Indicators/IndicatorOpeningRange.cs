@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -228,6 +229,8 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
         if (!this.IsLoadedSuccessfully)
             return;
         var (startTimeUTC, endTimeUTC) = this.GetFullConvertedRangeTimes();
+        if (this.ExtendToDayEnd)
+            endTimeUTC = endTimeUTC.Date.AddDays(1);
         var currTime = this.Time();
         if (currTime < startTimeUTC || currTime > endTimeUTC)
         {
@@ -811,7 +814,6 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
             this.SetValue(d300, SERIES_EXT_D300, i);
         }
     }
-
     #endregion Drawing
 
     #region Event handlers
@@ -1057,24 +1059,24 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
             switch (lineOptions.LineStyle)
             {
                 case LineStyle.Solid:
-                    pen.DashStyle = System.Drawing.Drawing2D.DashStyle.Solid;
+                    pen.DashStyle = DashStyle.Solid;
                     break;
 
                 case LineStyle.Dot:
-                    pen.DashStyle = System.Drawing.Drawing2D.DashStyle.Dot;
+                    pen.DashStyle = DashStyle.Dot;
                     break;
 
                 case LineStyle.Dash:
-                    pen.DashStyle = System.Drawing.Drawing2D.DashStyle.Dash;
+                    pen.DashStyle = DashStyle.Dash;
                     break;
 
                 case LineStyle.DashDot:
-                    pen.DashStyle = System.Drawing.Drawing2D.DashStyle.Custom;
+                    pen.DashStyle = DashStyle.Custom;
                     pen.DashPattern = new float[] { 2, 4, 7, 4 };
                     break;
 
                 case LineStyle.Histogramm:
-                    pen.DashStyle = System.Drawing.Drawing2D.DashStyle.Custom;
+                    pen.DashStyle = DashStyle.Custom;
                     pen.DashPattern = new float[] { 0.25F, 1 };
                     pen.Width = 4;
                     break;
@@ -1129,6 +1131,8 @@ public class IndicatorOpeningRange : Indicator, IWatchlistIndicator
                 this.IsLoading = true;
 
                 var (startTime, endTime) = this.GetFullConvertedRangeTimes();
+                if (this.ExtendToDayEnd)
+                    endTime = endTime.Date.AddDays(1);
                 var zeroBarLastUpdateTime = this.GetLastTradingUpdateTime();
 
                 // Hack. У випадку, якщо зона в поточному дні ще не почалася - грузимо і показуємо попередню.
