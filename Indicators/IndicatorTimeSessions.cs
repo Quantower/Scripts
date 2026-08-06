@@ -17,8 +17,6 @@ namespace OtherIndicators
 
         private readonly Session[] sessions;
 
-        private bool drawUnbegunSessions = false;
-
         public IndicatorTimeSessions()
             : base()
         {
@@ -40,7 +38,7 @@ namespace OtherIndicators
         {
             this.currentPeriod = this.HistoricalData.Aggregation.GetPeriod;
             base.OnInit();
-            if(this.HistoricalData.Aggregation is HistoryAggregationTime haTime)
+            if (this.HistoricalData.Aggregation is HistoryAggregationTime haTime)
                 this.currentPeriod = haTime.Period;
             else
                 this.currentPeriod = Period.TICK1;
@@ -109,8 +107,7 @@ namespace OtherIndicators
 
                     for (int j = 0; j <= daysSpan; j++)
                     {
-                        if ((this.drawUnbegunSessions && (startTime < screenRightTime || endTime > screenLeftTime)) ||
-                            (!this.drawUnbegunSessions && startTime < screenRightTime && endTime > screenLeftTime))
+                        if (startTime < screenRightTime || endTime > screenLeftTime)
                         {
                             bool isInChartArea = startTime < screenRightTime || endTime > screenLeftTime;
                             var currentZoneStartTime = startTime;
@@ -120,7 +117,8 @@ namespace OtherIndicators
                                 currentZoneStartTime = screenLeftTime;
                             if (currentZoneEndTime > screenRightTime)
                                 currentZoneEndTime = screenRightTime;
-                            bool drawAnyway = this.drawUnbegunSessions && s.DrawMode == SessionDrawMode.Simple;
+
+                            bool drawAnyway = s.DrawMode == SessionDrawMode.Simple;
 
                             bool startInSession = isInChartArea ? this.HistoricalData.Aggregation.SessionsContainer.ContainsDate(currentZoneStartTime) : false;
                             bool endInSession = isInChartArea ? this.HistoricalData.Aggregation.SessionsContainer.ContainsDate(currentZoneEndTime) : false;
@@ -134,7 +132,7 @@ namespace OtherIndicators
                                     if (!endInSession)
                                         currentZoneEndTime = this.HistoricalData[(int)this.HistoricalData.GetIndexByTime(currentZoneEndTime.Ticks, SeekOriginHistory.Begin)-1, SeekOriginHistory.Begin].TimeLeft;
                                 }
-                                if (!startInSession && !endInSession)
+                                if (!drawAnyway && !startInSession && !endInSession)
                                     continue;
                                 leftCoordinate = (int)mainWindow.CoordinatesConverter.GetChartX(startTime);
                                 rightCoordinate = (int)mainWindow.CoordinatesConverter.GetChartX(endTime);
@@ -204,7 +202,7 @@ namespace OtherIndicators
                                 {
                                     int startIndex = (int)mainWindow.CoordinatesConverter.GetBarIndex(startTime);
                                     int endIndex = (int)mainWindow.CoordinatesConverter.GetBarIndex(endTime)-1;
-                                    if(!((endIndex >= this.HistoricalData.Count && startIndex >= this.HistoricalData.Count)|| (endIndex < 0 && startIndex < 0)))
+                                    if (!((endIndex >= this.HistoricalData.Count && startIndex >= this.HistoricalData.Count)|| (endIndex < 0 && startIndex < 0)))
                                     {
                                         if (endIndex >= this.HistoricalData.Count)
                                             endIndex = this.HistoricalData.Count-1;
@@ -254,11 +252,6 @@ namespace OtherIndicators
             get
             {
                 var settings = base.Settings;
-                settings.Add(new SettingItemBooleanSwitcher("drawUnbegunSessions", this.drawUnbegunSessions)
-                {
-                    Text = "Draw unincluded sessions",
-                    SortIndex = 0,
-                });
                 for (int i = 0; i < this.sessions.Length; i++)
                     settings.Add(new SettingItemGroup(this.sessions[i].SessionName, this.sessions[i].Settings));
                 return settings;
@@ -266,8 +259,6 @@ namespace OtherIndicators
             set
             {
                 base.Settings = value;
-                if (value.TryGetValue("drawUnbegunSessions", out bool drawUnbegunSessions))
-                    this.drawUnbegunSessions = drawUnbegunSessions;
                 for (int i = 0; i < this.sessions.Length; i++)
                     this.sessions[i].Settings = value;
             }
