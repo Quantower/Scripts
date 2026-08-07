@@ -5,9 +5,11 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using TradingPlatform.BusinessLayer;
+using TradingPlatform.BusinessLayer.Chart;
 using TradingPlatform.BusinessLayer.Utils;
 
 namespace OtherIndicators;
+
 public class IndicatorVerticalLine : Indicator
 {
     private TimeLine[] lines = new TimeLine[5] { new TimeLine(Color.Green, "First Line", 1), new TimeLine(Color.Red, "Second Line", 2), new TimeLine(Color.GreenYellow, "Third Line", 3), new TimeLine(Color.Blue, "Fourth Line", 4), new TimeLine(Color.Cyan, "Fifth Line", 5) };
@@ -59,61 +61,151 @@ public class IndicatorVerticalLine : Indicator
             var mainWindow = this.CurrentChart.MainWindow;
             DateTime leftBorderTime = mainWindow.CoordinatesConverter.GetTime(0);
             DateTime rightBorderTime = mainWindow.CoordinatesConverter.GetTime(mainWindow.ClientRectangle.Width);
-            TimeSpan bordersSpan = rightBorderTime - leftBorderTime;
-            int bottomY = this.CurrentChart.MainWindow.ClientRectangle.Height;
-            int daysSpan = bordersSpan.Days;
-            if (daysSpan <= 0)
-                daysSpan = 1;
-            if (currentPeriod.Duration.Days < 1)
-                for (int i = 0; i < lines.Length; i++)
+            int bottomY = mainWindow.ClientRectangle.Height;
+
+            if (this.currentPeriod.Duration.Days >= 1)
+                return;
+
+            // We check one extra calendar day on each side because a periodic line
+            // can be visible even when its main (anchor) line is outside the screen.
+            DateTime firstDate = leftBorderTime.Date.AddDays(-1);
+            DateTime lastDate = rightBorderTime.Date.AddDays(1);
+
+            for (int i = 0; i < this.lines.Length; i++)
+            {
+                TimeLine line = this.lines[i];
+                if (!line.LineVisibility)
+                    continue;
+
+                int labelY = 0;
+                if (line.LabelPosition == Position.MiddleLeft || line.LabelPosition == Position.MiddleRight)
+                    labelY = bottomY / 2;
+                else if (line.LabelPosition == Position.BottomLeft || line.LabelPosition == Position.BottomRight)
+                    labelY = bottomY;
+
+                for (DateTime date = firstDate; date <= lastDate; date = date.AddDays(1))
                 {
-                    DateTime lineTime = lines[i].Time;
+                    DateTime anchorTime = new DateTime(
+                        date.Year,
+                        date.Month,
+                        date.Day,
+                        line.Time.Hour,
+                        line.Time.Minute,
+                        line.Time.Second,
+                        DateTimeKind.Utc);
 
-                    DateTime currentLineTime = new DateTime(leftBorderTime.Year, leftBorderTime.Month, leftBorderTime.Day, lineTime.Hour, lineTime.Minute, lineTime.Second, DateTimeKind.Utc);
+                    bool drawCurrentDay = this.allWeekAvailable || this.awailableDays[anchorTime.DayOfWeek];
+                    if (!drawCurrentDay)
+                        continue;
 
-                    if (currentLineTime < leftBorderTime)
-                        currentLineTime = currentLineTime.AddDays(1);
-                    if (currentLineTime > rightBorderTime)
-                        currentLineTime = currentLineTime.AddDays(-1);
-                    // 
-                    int labelY = 0;
-                    if (lines[i].LabelPosition == Position.MiddleLeft || lines[i].LabelPosition == Position.MiddleRight)
-                        labelY = bottomY / 2;
-                    else if (lines[i].LabelPosition == Position.BottomLeft || lines[i].LabelPosition == Position.BottomRight)
-                        labelY = bottomY;
+                    // Main daily line.
+                    if (anchorTime > leftBorderTime && anchorTime < rightBorderTime)
+                        this.DrawMainLine(graphics, mainWindow, line, anchorTime, labelY, bottomY);
 
-                    if (lines[i].LineVisibility && currentLineTime > leftBorderTime && currentLineTime < rightBorderTime)
+                    // Additional lines are built in both directions from the main line.
+                    // The periodic grid is restarted for every enabled calendar day so
+                    // that day-of-week filtering remains predictable.
+                    if (line.DrawPeriodicLine)
                     {
-                        bool drawCurrentLine = true;
-                        for (int j = 0; j <= daysSpan; j++)
-                        {
-                            if (!this.allWeekAvailable)
-                                drawCurrentLine = this.awailableDays[currentLineTime.DayOfWeek];
-                            if (drawCurrentLine)
-                            {
-                                int topX = (int)mainWindow.CoordinatesConverter.GetChartX(currentLineTime);
-                                graphics.DrawLine(lines[i].linePen, topX, 0, topX, bottomY);
-                                if (lines[i].LabelVisibility)
-                                {
-                                    //
-                                    string labelText = "";
-                                    if (lines[i].textFormat == Format.DateTime || lines[i].textFormat == Format.DateTimeText)
-                                        labelText = Core.Instance.TimeUtils.ConvertFromUTCToSelectedTimeZone(currentLineTime).ToString();
-                                    if (lines[i].textFormat == Format.DateTimeText || lines[i].textFormat == Format.Text)
-                                        labelText = labelText + " " + lines[i].labelText;
-
-                                    //
-                                    graphics.DrawString(labelText, lines[i].labelFont, lines[i].labelBrush, new PointF(topX, labelY), lines[i].lineSF);
-                                }
-                            }
-                            currentLineTime = currentLineTime.AddDays(1);
-                        }
+                        this.DrawPeriodicLines(
+                            graphics,
+                            mainWindow,
+                            line,
+                            anchorTime,
+                            leftBorderTime,
+                            rightBorderTime,
+                            bottomY);
                     }
                 }
+            }
         }
         finally
         {
             graphics.SetClip(prevClipRectangle);
+        }
+    }
+
+    private void DrawMainLine(
+        Graphics graphics,
+        IChartWindow mainWindow,
+        TimeLine line,
+        DateTime lineTime,
+        int labelY,
+        int bottomY)
+    {
+        int x = (int)mainWindow.CoordinatesConverter.GetChartX(lineTime);
+        graphics.DrawLine(line.linePen, x, 0, x, bottomY);
+
+        if (!line.LabelVisibility)
+            return;
+
+        string labelText = string.Empty;
+
+        if (line.textFormat == Format.DateTime || line.textFormat == Format.DateTimeText)
+            labelText = Core.Instance.TimeUtils.ConvertFromUTCToSelectedTimeZone(lineTime).ToString();
+
+        if (line.textFormat == Format.DateTimeText || line.textFormat == Format.Text)
+            labelText = labelText + " " + line.labelText;
+
+        graphics.DrawString(
+            labelText,
+            line.labelFont,
+            line.labelBrush,
+            new PointF(x, labelY),
+            line.lineSF);
+    }
+
+    private void DrawPeriodicLines(
+        Graphics graphics,
+        IChartWindow mainWindow,
+        TimeLine line,
+        DateTime anchorTime,
+        DateTime leftBorderTime,
+        DateTime rightBorderTime,
+        int bottomY)
+    {
+        TimeSpan step = line.PeriodicLinePeriod.Duration;
+        if (step <= TimeSpan.Zero)
+            return;
+
+        // Periodic lines belong to the same calendar day as their anchor.
+        // The next day receives its own periodic grid from its own main line.
+        DateTime dayStart = new DateTime(
+            anchorTime.Year,
+            anchorTime.Month,
+            anchorTime.Day,
+            0,
+            0,
+            0,
+            DateTimeKind.Utc);
+        DateTime dayEnd = dayStart.AddDays(1);
+
+        DateTime visibleStart = leftBorderTime > dayStart ? leftBorderTime : dayStart;
+        DateTime visibleEnd = rightBorderTime < dayEnd ? rightBorderTime : dayEnd;
+
+        if (visibleEnd <= visibleStart)
+            return;
+
+        long stepTicks = step.Ticks;
+        long firstOffset = (long)Math.Ceiling((visibleStart.Ticks - anchorTime.Ticks) / (double)stepTicks);
+        long lastOffset = (long)Math.Floor((visibleEnd.Ticks - anchorTime.Ticks) / (double)stepTicks);
+
+        for (long offset = firstOffset; offset <= lastOffset; offset++)
+        {
+            // Offset zero is the main line and is drawn separately (with its label).
+            if (offset == 0)
+                continue;
+
+            DateTime periodicTime = anchorTime.AddTicks(offset * stepTicks);
+
+            if (periodicTime <= leftBorderTime || periodicTime >= rightBorderTime ||
+                periodicTime < dayStart || periodicTime >= dayEnd)
+            {
+                continue;
+            }
+
+            int x = (int)mainWindow.CoordinatesConverter.GetChartX(periodicTime);
+            graphics.DrawLine(line.linePen, x, 0, x, bottomY);
         }
     }
 
@@ -217,6 +309,8 @@ public class TimeLine : ICustomizable
 
     public DateTime Time { get; set; }
     public bool LineVisibility { get; set; }
+    public bool DrawPeriodicLine { get; set; }
+    public Period PeriodicLinePeriod { get; set; }
     public string LineName { get; set; }
     private int lineSortIndex { get; set; }
     public Pen linePen { get; set; }
@@ -255,6 +349,8 @@ public class TimeLine : ICustomizable
         this.lineSortIndex = sortingIndex;
         this.Time = new DateTime();
         this.LineVisibility = false;
+        this.DrawPeriodicLine = false;
+        this.PeriodicLinePeriod = new Period(BasePeriod.Hour, 1);
         this.linePen = new Pen(color);
         this.lineOptions = new LineOptions();
         this.lineOptions.Color = color;
@@ -272,18 +368,25 @@ public class TimeLine : ICustomizable
         get
         {
             var settings = new List<SettingItem>();
-            SettingItemSeparatorGroup separatorGroup1 = new SettingItemSeparatorGroup(LineName, lineSortIndex);
 
             string relationName = this.LineName + "LineVisibility";
             string relationNameLabel = this.LineName + "ShowLabel";
             string relationNameCustomTextFormat = this.LineName + "CustomTextFormat";
+            string periodicRelationName = this.LineName + "DrawPeriodicLine";
+            string periodicPeriodName = this.LineName + "PeriodicLinePeriod";
+
+            var separatorGroup1 = new SettingItemSeparatorGroup(this.LineName, this.lineSortIndex)
+            {
+                ItemsEnabilitySettingName = this.LineName + "LineVisibility",
+            };
+
             settings.Add(new SettingItemBooleanSwitcher(relationName, this.LineVisibility)
             {
                 Text = "Line Visibility",
                 SortIndex = lineSortIndex,
                 SeparatorGroup = separatorGroup1,
             });
-            SettingItemRelationVisibility visibleRelation = new SettingItemRelationVisibility(relationName, true);
+            SettingItemRelationEnability visibleRelation = new SettingItemRelationEnability(relationName, true);
             SettingItemRelationVisibility visibleRelationLabel = new SettingItemRelationVisibility(relationNameLabel, true);
             settings.Add(new SettingItemDateTime(this.LineName + "LineTime", this.Time)
             {
@@ -291,7 +394,7 @@ public class TimeLine : ICustomizable
                 SortIndex = lineSortIndex,
                 Format = DatePickerFormat.Time,
                 SeparatorGroup = separatorGroup1,
-                Relation = visibleRelation
+                Relation = visibleRelation,
             });
             settings.Add(new SettingItemLineOptions(this.LineName + "LineStyle", this.lineOptions)
             {
@@ -300,7 +403,36 @@ public class TimeLine : ICustomizable
                 SeparatorGroup = separatorGroup1,
                 Relation = visibleRelation,
                 ExcludedStyles = new LineStyle[] { LineStyle.Histogramm, LineStyle.Points },
-                UseEnabilityToggler = true
+                UseEnabilityToggler = false,
+            });
+            settings.Add(new SettingItemBoolean(periodicRelationName, this.DrawPeriodicLine)
+            {
+                Text = "Draw periodic line",
+                SortIndex = lineSortIndex,
+                SeparatorGroup = separatorGroup1,
+                Relation = visibleRelation
+            });
+
+            var periodicVisibleRelation = new SettingItemMultipleRelation(
+                visibleRelation,
+                new SettingItemRelationVisibility(periodicRelationName, true));
+
+            settings.Add(new SettingItemPeriod(periodicPeriodName, this.PeriodicLinePeriod)
+            {
+                Text = "Draw line every",
+                SortIndex = lineSortIndex,
+                SeparatorGroup = separatorGroup1,
+                Relation = periodicVisibleRelation,
+                MultiplierMinimum = 1,
+                MultiplierMaximum = 9999,
+                ExcludedPeriods = new[]
+                {
+                    BasePeriod.Tick,
+                    BasePeriod.Day,
+                    BasePeriod.Week,
+                    BasePeriod.Month,
+                    BasePeriod.Year
+                }
             });
             settings.Add(new SettingItemBoolean(relationNameLabel, this.LabelVisibility)
             {
@@ -372,6 +504,10 @@ public class TimeLine : ICustomizable
                 this.linePen.Color = lineStyle.Color;
                 this.linePen.DashStyle = (DashStyle)lineStyle.LineStyle;
             }
+            if (settings.TryGetValue(this.LineName + "DrawPeriodicLine", out bool drawPeriodicLine))
+                this.DrawPeriodicLine = drawPeriodicLine;
+            if (settings.TryGetValue(this.LineName + "PeriodicLinePeriod", out Period periodicLinePeriod))
+                this.PeriodicLinePeriod = periodicLinePeriod;
             if (settings.TryGetValue(this.LineName + "ShowLabel", out bool LabelVisibility))
                 this.LabelVisibility = LabelVisibility;
             if (settings.TryGetValue(this.LineName + "CustomTextFormat", out Format textFormat))

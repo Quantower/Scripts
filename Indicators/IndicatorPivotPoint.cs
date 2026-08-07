@@ -104,6 +104,8 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
     private ISessionsContainer fullDaySessionContainer;
     private ISessionsContainer selectedSessionContainer;
     private ISessionsContainer chartSessionContainer;
+    private ISessionsContainer specifiedSessionCalculationContainer;
+    private ISession specifiedMainSession;
 
     private ISessionsContainer SessionContainer
     {
@@ -113,10 +115,10 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
             {
                 case DailySessionType.SpecifiedSession:
                     {
-                        if (this.specifiedSessionContainerId == CHART_SESSION_CONTAINER_SELECT_ITEM)
-                            return this.CurrentChart?.CurrentSessionContainer ?? this.fullDaySessionContainer;
+                        if (this.specifiedSessionCalculationContainer != null)
+                            return this.specifiedSessionCalculationContainer;
 
-                        return this.selectedSessionContainer ?? this.fullDaySessionContainer;
+                        return this.GetSpecifiedSourceSessionContainer() ?? this.fullDaySessionContainer;
                     }
 
                 case DailySessionType.CustomRange:
@@ -625,6 +627,8 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
                     {
                         this.selectedSessionContainer = Core.Instance.CustomSessions[this.specifiedSessionContainerId];
                     }
+
+                    this.PrepareSpecifiedSessionCalculationContainer(timeZone);
                     break;
                 }
 
@@ -742,6 +746,8 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
         this.customSessionContainer = null;
         this.fullDaySessionContainer = null;
         this.selectedSessionContainer = null;
+        this.specifiedSessionCalculationContainer = null;
+        this.specifiedMainSession = null;
 
         if (this.CurrentChart != null)
             this.CurrentChart.SettingsChanged -= this.CurrentChartOnSettingsChanged;
@@ -1237,11 +1243,11 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
 
                 if (this.CustomRangeStartTime != newValue)
 
-                if (this.CustomRangeStartTime.TimeOfDay != newValue.TimeOfDay)
-                {
-                    this.CustomRangeStartTime = newValue;
-                    needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
-                }
+                    if (this.CustomRangeStartTime.TimeOfDay != newValue.TimeOfDay)
+                    {
+                        this.CustomRangeStartTime = newValue;
+                        needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
+                    }
             }
 
             if (holder.TryGetValue(CUSTOM_CLOSE_SESSION_NAME_SI, out item))
@@ -2132,31 +2138,29 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
         DateTime itemEndUtc = DateTime.SpecifyKind(new DateTime(historyItem.TicksRight), DateTimeKind.Utc);
 
         if (this.BasePeriod == BasePeriod.Day &&
-            (this.DailySessionType == DailySessionType.CustomRange ||
-             this.DailySessionType == DailySessionType.AllDay))
+            this.TryGetDailySessionRange(out TimeSpan open, out TimeSpan close))
         {
-            TimeSpan open = this.DailySessionType == DailySessionType.AllDay
-                ? TimeSpan.Zero
-                : this.CustomRangeStartTime.TimeOfDay;
-            TimeSpan close = this.DailySessionType == DailySessionType.AllDay
-                ? TimeSpan.Zero
-                : this.CustomRangeEndTime.TimeOfDay;
-
             TimeSpan normalizedClose = NormalizeSessionClose(open, close);
             DateTime itemStartLocal = TimeZoneInfo.ConvertTimeFromUtc(itemStartUtc, timeZone.TimeZoneInfo);
 
-            DateTime startLocal = DateTime.SpecifyKind(itemStartLocal.Date + open, DateTimeKind.Unspecified);
+            DateTime startLocal = DateTime.SpecifyKind(
+                itemStartLocal.Date + open,
+                DateTimeKind.Unspecified);
+
             if (itemStartLocal < startLocal)
                 startLocal = startLocal.AddDays(-1);
 
             DateTime endLocal = DateTime.SpecifyKind(
-                startLocal.Date + normalizedClose + TimeSpan.FromDays(Math.Max(0, this.PeriodValue - 1)),
+                startLocal.Date +
+                normalizedClose +
+                TimeSpan.FromDays(Math.Max(0, this.PeriodValue - 1)),
                 DateTimeKind.Unspecified);
 
             return new Interval<DateTime>(
                 Core.Instance.TimeUtils.ConvertFromTimeZoneToUTC(startLocal, timeZone),
                 Core.Instance.TimeUtils.ConvertFromTimeZoneToUTC(endLocal, timeZone));
         }
+
         if (itemEndUtc <= itemStartUtc)
             return new Interval<DateTime>(itemStartUtc, itemStartUtc.AddDays(1));
 
@@ -2166,8 +2170,7 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
     private void EnsureLatestDailySessionPeriod()
     {
         if (this.BasePeriod != BasePeriod.Day ||
-            (this.DailySessionType != DailySessionType.AllDay &&
-             this.DailySessionType != DailySessionType.CustomRange) ||
+            !this.TryGetDailySessionRange(out _, out _) ||
             this.history == null ||
             this.history.Count == 0)
         {
@@ -2219,13 +2222,8 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
             utcNow,
             timeZone.TimeZoneInfo);
 
-        TimeSpan open = this.DailySessionType == DailySessionType.AllDay
-            ? TimeSpan.Zero
-            : this.CustomRangeStartTime.TimeOfDay;
-
-        TimeSpan close = this.DailySessionType == DailySessionType.AllDay
-            ? TimeSpan.Zero
-            : this.CustomRangeEndTime.TimeOfDay;
+        if (!this.TryGetDailySessionRange(out TimeSpan open, out TimeSpan close))
+            return newestInterval;
 
         bool crossesMidnight = close <= open;
         TimeSpan normalizedClose = NormalizeSessionClose(open, close);
@@ -2283,6 +2281,9 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
             return newestInterval;
         }
 
+        if (!this.IsSpecifiedSessionIntervalActive(candidateStartLocal, candidateEndLocal, timeZone))
+            return newestInterval;
+
         return new Interval<DateTime>(
             Core.Instance.TimeUtils.ConvertFromTimeZoneToUTC(
                 candidateStartLocal,
@@ -2290,6 +2291,119 @@ public class IndicatorPivotPoint : Indicator, IWatchlistIndicator
             Core.Instance.TimeUtils.ConvertFromTimeZoneToUTC(
                 candidateEndLocal,
                 timeZone));
+    }
+
+    private ISessionsContainer GetSpecifiedSourceSessionContainer()
+    {
+        if (this.specifiedSessionContainerId == CHART_SESSION_CONTAINER_SELECT_ITEM)
+            return this.CurrentChart?.CurrentSessionContainer;
+
+        return this.selectedSessionContainer;
+    }
+
+    private void PrepareSpecifiedSessionCalculationContainer(TradingPlatform.BusinessLayer.TimeZone timeZone)
+    {
+        this.specifiedMainSession = null;
+        this.specifiedSessionCalculationContainer = null;
+
+        var sourceContainer = this.GetSpecifiedSourceSessionContainer();
+        if (sourceContainer?.ActiveSessions == null)
+            return;
+
+        this.specifiedMainSession = sourceContainer.ActiveSessions
+            .FirstOrDefault(session => session.Type == SessionType.Main)
+            ?? sourceContainer.ActiveSessions.FirstOrDefault();
+
+        if (this.specifiedMainSession == null)
+            return;
+
+        TimeSpan open = this.specifiedMainSession.OpenTime;
+        TimeSpan close = this.specifiedMainSession.CloseTime;
+
+        this.specifiedSessionCalculationContainer = new CustomSessionsContainer(
+            "SpecifiedSessionCalculation",
+            timeZone,
+            new[]
+            {
+                this.CreateCustomSession(open, close, timeZone.TimeZoneInfo)
+            });
+    }
+
+    private bool TryGetDailySessionRange(out TimeSpan open, out TimeSpan close)
+    {
+        open = TimeSpan.Zero;
+        close = TimeSpan.Zero;
+
+        switch (this.DailySessionType)
+        {
+            case DailySessionType.AllDay:
+                return true;
+
+            case DailySessionType.CustomRange:
+                open = this.CustomRangeStartTime.TimeOfDay;
+                close = this.CustomRangeEndTime.TimeOfDay;
+                return true;
+
+            case DailySessionType.SpecifiedSession:
+                {
+                    if (this.specifiedMainSession == null)
+                    {
+                        var sourceContainer = this.GetSpecifiedSourceSessionContainer();
+                        if (sourceContainer?.ActiveSessions != null)
+                        {
+                            this.specifiedMainSession = sourceContainer.ActiveSessions
+                                .FirstOrDefault(session => session.Type == SessionType.Main)
+                                ?? sourceContainer.ActiveSessions.FirstOrDefault();
+                        }
+                    }
+
+                    if (this.specifiedMainSession == null)
+                        return false;
+
+                    open = this.specifiedMainSession.OpenTime;
+                    close = this.specifiedMainSession.CloseTime;
+                    return true;
+                }
+
+            default:
+                return false;
+        }
+    }
+
+    private bool IsSpecifiedSessionIntervalActive(
+        DateTime startLocal,
+        DateTime endLocal,
+        TradingPlatform.BusinessLayer.TimeZone timeZone)
+    {
+        if (this.DailySessionType != DailySessionType.SpecifiedSession ||
+            this.specifiedMainSession == null)
+        {
+            return true;
+        }
+
+        if (endLocal <= startLocal)
+            return false;
+
+        if (!this.TryGetDailySessionRange(out TimeSpan open, out TimeSpan close))
+            return false;
+
+        TimeSpan normalizedClose = NormalizeSessionClose(open, close);
+        DateTime firstSessionEndLocal = DateTime.SpecifyKind(
+            startLocal.Date + normalizedClose,
+            DateTimeKind.Unspecified);
+
+        if (firstSessionEndLocal <= startLocal)
+            return false;
+
+        DateTime probeLocal = DateTime.SpecifyKind(
+            startLocal + TimeSpan.FromTicks((firstSessionEndLocal - startLocal).Ticks / 2),
+            DateTimeKind.Unspecified);
+
+        DateTime probeUtc = Core.Instance.TimeUtils.ConvertFromTimeZoneToUTC(
+            probeLocal,
+            timeZone);
+
+        return this.specifiedMainSession.ContainsDate(probeUtc);
     }
 
     private static TimeSpan NormalizeSessionClose(TimeSpan open, TimeSpan close)

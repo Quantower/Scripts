@@ -58,16 +58,16 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
     })]
     public CumulativeDeltaSessionMode SessionMode;
 
-    [InputParameter("Period of Moving Average", 3, 1, 9999, 1, 1)]
-    public int MAPeriod = 20;
-
-    [InputParameter("Average Type", 2, variants: new object[]{
+    [InputParameter("Average Type", 21, variants: new object[]{
             "Simple Moving Average", MaMode.SMA,
             "Exponential Moving Average", MaMode.EMA,
             "Smoothed Moving Average", MaMode.SMMA,
             "Linearly Weighted Moving Average", MaMode.LWMA,
         })]
     public MaMode MaType = MaMode.SMA;
+
+    [InputParameter("Period of Moving Average", 22, 1, 9999, 1, 1)]
+    public int MAPeriod = 20;
 
     private MALineColorOption maLineColorOption;
 
@@ -181,7 +181,9 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
     public IndicatorCumulativeDelta()
         : base()
     {
+        this.LinesSeries[1].Style = LineStyle.Solid;
         this.AddLineSeries("MA", Color.Red, 2, LineStyle.Solid);
+        this.LinesSeries[2].Visible = false;
 
         this.upLineColor = Color.FromArgb(0, 178, 89);
         this.downLineColor = Color.FromArgb(251, 87, 87);
@@ -351,7 +353,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
                 SeparatorGroup = separ,
                 Relation = new SettingItemRelationVisibility(RESET_TYPE_NAME_SI, new SelectItem("", (int)CumulativeDeltaSessionMode.CustomRange))
             });
-            settings.Add(new SettingItemDateTime(RESET_TIME_NAME_SI, this.ByPeriodResetTime, 6)
+            settings.Add(new SettingItemDateTime(RESET_TIME_NAME_SI, this.ByPeriodResetTime, 8)
             {
                 Text = loc._("Reset time"),
                 ValueChangingBehavior = SettingItemValueChangingBehavior.WithConfirmation,
@@ -376,13 +378,13 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
                 new SelectItem(loc._("Value Change (Up/Down)"), MALineColorOption.ValueChange),
                 new SelectItem(loc._("Solid Color"), MALineColorOption.SolidColor)
             };
-            settings.Add(new SettingItemSelectorLocalized(MA_LINE_COLOR_BY_SI, lineColorOptions.GetItemByValue(this.maLineColorOption), lineColorOptions, 12)
+            settings.Add(new SettingItemSelectorLocalized(MA_LINE_COLOR_BY_SI, lineColorOptions.GetItemByValue(this.maLineColorOption), lineColorOptions, 23)
             {
                 Text = loc._("Color by"),
                 SeparatorGroup = separ
             });
 
-            settings.Add(new SettingItemPairColor(MA_LINE_COLORS_SI, new PairColor(this.maUpLineColor, this.maDownLineColor, loc._("Up"), loc._("Down")), 3)
+            settings.Add(new SettingItemPairColor(MA_LINE_COLORS_SI, new PairColor(this.maUpLineColor, this.maDownLineColor, loc._("Up"), loc._("Down")), 24)
             {
                 Text = loc._("Lines"),
                 SeparatorGroup = separ,

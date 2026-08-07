@@ -9,7 +9,8 @@ public class IndicatorTrueRange : Indicator, IWatchlistIndicator
     [InputParameter("Value mode", 0, variants: new object[]
     {
         "Absolute True Range", TrueRangeValueMode.AbsoluteTrueRange,
-        "Percent Candle Range (Long)", TrueRangeValueMode.PercentCandleRangeLong
+        "Percent Candle Range (Long)", TrueRangeValueMode.PercentCandleRangeLong,
+        "Tick Range", TrueRangeValueMode.TickRange
     })]
     public TrueRangeValueMode ValueMode = TrueRangeValueMode.AbsoluteTrueRange;
 
@@ -35,6 +36,7 @@ public class IndicatorTrueRange : Indicator, IWatchlistIndicator
         double value = this.ValueMode switch
         {
             TrueRangeValueMode.PercentCandleRangeLong => this.CalculatePercentCandleRangeLong(),
+            TrueRangeValueMode.TickRange => this.CalculateTickRange(),
             _ => this.CalculateTrueRange()
         };
 
@@ -62,10 +64,21 @@ public class IndicatorTrueRange : Indicator, IWatchlistIndicator
 
         return (hi - lo) / lo * 100.0;
     }
+    public double CalculateTickRange(int offset = 0)
+    {
+        double hi = this.GetPrice(PriceType.High, offset);
+        double lo = this.GetPrice(PriceType.Low, offset);
+
+        if (lo <= 0)
+            return 0;
+
+        return (hi - lo) / this.Symbol.TickSize;
+    }
 }
 
 public enum TrueRangeValueMode
 {
     AbsoluteTrueRange,
-    PercentCandleRangeLong
+    PercentCandleRangeLong,
+    TickRange
 }
