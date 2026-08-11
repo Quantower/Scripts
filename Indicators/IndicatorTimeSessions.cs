@@ -97,7 +97,7 @@ namespace OtherIndicators
 
                     startTime = new DateTime(leftBorderTime.Year, leftBorderTime.Month, leftBorderTime.Day, leftTime.Hour, leftTime.Minute, leftTime.Second);
                     endTime   = new DateTime(leftBorderTime.Year, leftBorderTime.Month, leftBorderTime.Day, rightTime.Hour, rightTime.Minute, rightTime.Second);
-                    if (startTime > endTime && startTime.Date == leftBorderTime.Date)
+                    if (startTime >= endTime && startTime.Date == leftBorderTime.Date)
                     {
                         startTime = startTime.AddDays(-1);
                         endTime = endTime.AddDays(-1);
@@ -120,8 +120,8 @@ namespace OtherIndicators
 
                             bool drawAnyway = s.DrawMode == SessionDrawMode.Simple;
 
-                            bool startInSession = isInChartArea ? this.HistoricalData.Aggregation.SessionsContainer.ContainsDate(currentZoneStartTime) : false;
-                            bool endInSession = isInChartArea ? this.HistoricalData.Aggregation.SessionsContainer.ContainsDate(currentZoneEndTime) : false;
+                            bool startInSession = isInChartArea ? this.HistoricalData.Aggregation.SessionsContainer is null || this.HistoricalData.Aggregation.SessionsContainer.ContainsDate(currentZoneStartTime) : false;
+                            bool endInSession = isInChartArea ? this.HistoricalData.Aggregation.SessionsContainer is null || this.HistoricalData.Aggregation.SessionsContainer.ContainsDate(currentZoneEndTime) : false;
 
                             if (drawAnyway || startInSession || endInSession)
                             {
