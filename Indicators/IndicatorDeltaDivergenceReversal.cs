@@ -46,6 +46,9 @@ public class IndicatorDeltaDivergenceReversal : Indicator, IVolumeAnalysisIndica
         if (currentItem.VolumeAnalysisData == null)
             return;
 
+        LinesSeries[0].RemoveMarker(offset);
+        LinesSeries[1].RemoveMarker(offset);
+
         var previousItem = this.HistoricalData[offset + 1];
         double delta = currentItem.VolumeAnalysisData.Total.Delta;
         double currentHigh = ((HistoryItemBar)currentItem).High;
@@ -57,11 +60,6 @@ public class IndicatorDeltaDivergenceReversal : Indicator, IVolumeAnalysisIndica
             LinesSeries[1].SetMarker(offset, new IndicatorLineMarker(sellColor, upperIcon: IndicatorLineMarkerIconType.DownArrow));
         else if ((currentHigh < previousHigh && currentLow < previousLow) && delta >= 0)
             LinesSeries[0].SetMarker(offset, new IndicatorLineMarker(buyColor, bottomIcon: IndicatorLineMarkerIconType.UpArrow));
-        else
-        {
-            LinesSeries[0].RemoveMarker(offset);
-            LinesSeries[1].RemoveMarker(offset);
-        }
     }
 
     public override IList<SettingItem> Settings
