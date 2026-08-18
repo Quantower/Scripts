@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using TradingPlatform.BusinessLayer;
+using TradingPlatform.PresentationLayer.Plugins;
 
 namespace BarsDataIndicators;
 
@@ -120,11 +121,31 @@ public sealed class IndicatorVolume : Indicator, IWatchlistIndicator
         if (this.Count < 2)
             return;
 
-        double volume = this.VolumeAsset == PriceType.Volume ? this.Volume() : this.QuoteAssetVolume();
+        double volume = this.VolumeAsset == PriceType.Volume
+            ? this.Volume()
+            : this.QuoteAssetVolume();
 
-        // If symbol type or chart aggregation doesn't provide volumes - use ticks value.
-        double curVolume = (double.IsNaN(volume) || volume == 0) ? this.Ticks() : volume;
-        double prevVolume = (this.Count > 1) ? this.GetValue(1) : curVolume;
+        bool useTicks = double.IsNaN(volume) || volume == 0;
+
+        double curVolume = useTicks
+            ? this.Ticks()
+            : volume;
+
+        bool quantityInLots = Application.Instance.NeedDisplayQuantityInLots(this.Symbol.SymbolType);
+
+        bool displayInLots =
+            this.VolumeAsset == PriceType.Volume &&
+            !useTicks &&
+            this.Symbol != null &&
+            this.Symbol.LotSize > 0 &&
+            quantityInLots;
+
+        if (displayInLots)
+            curVolume /= this.Symbol.LotSize;
+
+        double prevVolume = this.Count > 1
+            ? this.GetValue(1)
+            : curVolume;
 
         this.SetValue(curVolume);
 
@@ -136,25 +157,28 @@ public sealed class IndicatorVolume : Indicator, IWatchlistIndicator
                         this.LinesSeries[0].SetMarker(0, this.pairColor.Color2);
                     else if (this.Open() > this.Close())
                         this.LinesSeries[0].SetMarker(0, this.pairColor.Color1);
-                    else if(this.Open() == this.Close())
+                    else if (this.Open() == this.Close())
                         this.LinesSeries[0].SetMarker(0, this.LinesSeries[0].Color);
+
                     break;
                 }
+
             case VolumeColoringScheme.ByDifference:
                 {
                     if (prevVolume < curVolume)
                         this.LinesSeries[0].SetMarker(0, this.pairColor.Color2);
                     else if (prevVolume > curVolume)
                         this.LinesSeries[0].SetMarker(0, this.pairColor.Color1);
+
                     break;
                 }
         }
 
-        //
         if (this.Count < this.SmoothMaPeriod)
             return;
 
         double smaValue = this.sma.GetValue();
+
         this.SetValue(smaValue, 1, 0);
 
         if (this.ColoringScheme == VolumeColoringScheme.AboveBelowMA)

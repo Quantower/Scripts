@@ -307,13 +307,13 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
                 new SelectItem(loc._("By Delta"), CloseLineColorOption.Delta),
                 new SelectItem(loc._("By Sign"), CloseLineColorOption.Sign),
             };
-            settings.Add(new SettingItemSelectorLocalized(CLOSE_LINE_COLOR_BY_SI, closeLineColorOptions.GetItemByValue(this.closeLineСoloringOption), closeLineColorOptions, 5)
+            settings.Add(new SettingItemSelectorLocalized(CLOSE_LINE_COLOR_BY_SI, closeLineColorOptions.GetItemByValue(this.closeLineСoloringOption), closeLineColorOptions, 11)
             {
                 Text = loc._("Coloring mode"),
                 SeparatorGroup = separ,
                 Relation = lineRelationVisibility
             });
-            settings.Add(new SettingItemPairColor(LINE_COLORS_SI, new PairColor(this.upLineColor, this.downLineColor, loc._("Up"), loc._("Down")), 6)
+            settings.Add(new SettingItemPairColor(LINE_COLORS_SI, new PairColor(this.upLineColor, this.downLineColor, loc._("Up"), loc._("Down")), 12)
             {
                 Text = loc._("Lines"),
                 SeparatorGroup = separ,
