@@ -27,17 +27,18 @@ public class IndicatorDeltaDivergenceReversal : Indicator, IVolumeAnalysisIndica
 
     public void VolumeAnalysisData_Loaded()
     {
-        for (int i = 0; i < this.Count - 1; i++)
-            DrawMarkers(i);
+        this.Recalculate();
     }
 
     protected override void OnUpdate(UpdateArgs args)
     {
         SetValue(High(), 1);
         SetValue(Low(), 0);
-        if (this.HistoricalData.VolumeAnalysisCalculationProgress == null || this.HistoricalData.VolumeAnalysisCalculationProgress.State != VolumeAnalysisCalculationState.Finished)
+
+        if (this.HistoricalData.VolumeAnalysisCalculationProgress == null ||
+            this.HistoricalData.VolumeAnalysisCalculationProgress.State != VolumeAnalysisCalculationState.Finished)
             return;
-        DrawMarkers();
+        this.DrawMarkers();
     }
 
     private void DrawMarkers(int offset = 0)
@@ -80,16 +81,21 @@ public class IndicatorDeltaDivergenceReversal : Indicator, IVolumeAnalysisIndica
         set
         {
             base.Settings = value;
+            bool needRecalc = false;
+
             if (value.TryGetValue("BuyColor", out Color buyColor))
                 this.buyColor = buyColor;
+
             if (value.TryGetValue("SellColor", out Color sellColor))
                 this.sellColor = sellColor;
-            OnSettingsUpdated();
+
+            this.Recalculate();
+
         }
     }
-    protected override void OnSettingsUpdated()
+
+    private void Recalculate()
     {
-        base.OnSettingsUpdated();
         for (int i = 0; i < this.Count - 1; i++)
             DrawMarkers(i);
     }
