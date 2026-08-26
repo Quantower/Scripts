@@ -361,22 +361,37 @@ namespace IndicatorSwing
         {
             if (pivot.Ended) return;
 
+            int lastBarIndex = this.HistoricalData.Count - 1;
             int targetStrength = pivot.StartIndex + this.Strength;
-            int workingLimit = this.toEnd ? this.HistoricalData.Count - 1 : Math.Min(targetStrength, this.HistoricalData.Count - 1);
+
+            int workingLimit = this.toEnd
+                ? lastBarIndex
+                : Math.Min(targetStrength, lastBarIndex);
 
             if (!this.toCross)
             {
                 pivot.EndIndex = workingLimit;
 
-                pivot.Ended = !this.toEnd;
+                if (!this.toEnd && workingLimit >= targetStrength)
+                    pivot.Ended = true;
 
                 return;
             }
 
-            for (int i = pivot.StartIndex + 1; i < workingLimit; i++)
+            int startIndex = Math.Max(
+                pivot.StartIndex + 1,
+                pivot.EndIndex
+            );
+
+            for (int i = startIndex; i <= workingLimit; i++)
             {
-                var bar = (HistoryItemBar)this.HistoricalData[i, SeekOriginHistory.Begin];
-                if (pivot.Value <= bar.High && pivot.Value >= bar.Low)
+                var bar = (HistoryItemBar)this.HistoricalData[
+                    i,
+                    SeekOriginHistory.Begin
+                ];
+
+                if (pivot.Value <= bar.High &&
+                    pivot.Value >= bar.Low)
                 {
                     pivot.EndIndex = i;
                     pivot.Ended = true;
@@ -385,7 +400,8 @@ namespace IndicatorSwing
             }
 
             pivot.EndIndex = workingLimit;
-            if (!toEnd && workingLimit == targetStrength)
+
+            if (!this.toEnd && workingLimit >= targetStrength)
                 pivot.Ended = true;
         }
 
