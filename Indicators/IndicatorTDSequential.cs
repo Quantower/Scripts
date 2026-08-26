@@ -367,7 +367,7 @@ public class IndicatorTDSequential : Indicator
 
             var showFromRelation = new SettingItemRelationVisibility(
                 SHOW_NUMBERS_SI,
-                new SelectItem("", (int)TDSVisualMode.FromValue)
+                new SelectItem("From value", TDSVisualMode.FromValue)
             );
 
             settings.Add(new SettingItemInteger(FROM_VALUE_SI, this.FromValue)
