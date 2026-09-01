@@ -167,7 +167,14 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
 
     private AreaBuilder currentAreaBuider;
 
-    private IntervalGenerator intervalGenerator;
+    // Count observed on the previous realtime update. It lets us determine
+    // how many Renko/Range bars were actually created by one market update.
+    private int lastKnownCount;
+
+    // Absolute chronological index of the EARLIEST CLOSED bar whose
+    // VolumeAnalysisData.Total was unavailable when it was calculated.
+    // -1 means there is no pending bar.
+    private int earliestPendingBarIndex = -1;
 
     private Color upLineColor;
     private Color downLineColor;
@@ -251,38 +258,47 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
 
         base.OnInit();
 
+        this.lastKnownCount = 0;
+        this.earliestPendingBarIndex = -1;
+
         this.ma = Core.Indicators.BuiltIn.MA(this.MAPeriod, PriceType.Close, this.MaType);
         this.CandleHistoricalData.AddIndicator(this.ma);
     }
 
     protected override void OnUpdate(UpdateArgs args)
     {
-        if (this.IsLoading)
+        if (this.IsLoading || this.Count == 0)
             return;
-
-        var currentVolumeData = this.GetVolumeAnalysisData(0);
-
-        //
-        // Try to recalculate prev items
-        //
-        if (currentVolumeData?.Total == null && this.currentAreaBuider!= null)
+        if (args.Reason == UpdateReason.HistoricalBar)
         {
-            var offset = 1;
-            while (this.GetVolumeAnalysisData(offset) == null && this.Count > offset)
-                offset++;
-
-            this.CalculateIndicatorByOffset(offset, true, true);
+            this.CalculateIndicatorByOffset(0, false);
+            this.lastKnownCount = this.Count;
+            return;
         }
-        //
-        // Try to calculate current item
-        //
-        else
+        if (this.lastKnownCount <= 0 || this.lastKnownCount > this.Count)
         {
-            var isNewBar = args.Reason == UpdateReason.NewBar || args.Reason == UpdateReason.HistoricalBar;
-            this.CalculateIndicatorByOffset(0, isNewBar, false);
+            this.lastKnownCount = this.Count;
+            this.CalculateIndicatorByOffset(0, true);
+            return;
         }
 
+        int addedBars = this.Count - this.lastKnownCount;
+
+        if (addedBars > 0 || args.Reason == UpdateReason.NewBar)
+        {
+            int maxOffset = addedBars > 0
+                ? Math.Min(addedBars, this.Count - 1)
+                : Math.Min(1, this.Count - 1);
+
+            this.lastKnownCount = this.Count;
+            if (this.TryResolveEarliestPendingBar())
+                return;
+            this.RecalculateBars(maxOffset, true);
+            return;
+        }
+        this.CalculateIndicatorByOffset(0, true);
     }
+
     protected override void OnClear()
     {
         if (this.currentAreaBuider != null)
@@ -291,8 +307,12 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
             this.currentAreaBuider = null;
         }
 
+        this.lastKnownCount = 0;
+        this.earliestPendingBarIndex = -1;
+
         base.OnClear();
     }
+
     public override IList<SettingItem> Settings
     {
         get
@@ -531,99 +551,214 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
     #endregion Overrides
 
     #region Misc
-
-    private void CalculateIndicatorByOffset(int offset, bool isNewBar, bool isPrevVolumeDataUsed = false)
+        private void RecalculateBars(int maxOffset, bool trackPending)
     {
-        if (this.Count <= offset)
+        if (this.Count == 0)
             return;
+        maxOffset = Math.Min(maxOffset, this.Count - 1);
+        for (int offset = maxOffset; offset >= 0; offset--)
+            this.CalculateIndicatorByOffset(offset, trackPending);
+    }
+    private void CalculateIndicatorByOffset(int offset, bool trackPending)
+    {
+        if (offset < 0 || this.Count <= offset)
+            return;
+        DateTime time = this.Time(offset);
+        var sessionContainer = this.SessionContainer;
 
-        var time = this.Time(offset);
-
-        //
-        // Check session
-        //
-        if (this.SessionMode == CumulativeDeltaSessionMode.SpecifiedSession || this.SessionMode == CumulativeDeltaSessionMode.CustomRange)
+        if (this.SessionMode == CumulativeDeltaSessionMode.SpecifiedSession ||
+            this.SessionMode == CumulativeDeltaSessionMode.CustomRange)
         {
-            if (!this.SessionContainer.ContainsDate(time))
+            if (sessionContainer == null || !sessionContainer.ContainsDate(time))
             {
                 this.currentAreaBuider?.Reset();
                 return;
             }
         }
 
-        //
-        //
-        //
-        if (this.currentAreaBuider == null)
+
+        Interval<DateTime> range;
+        if (this.currentAreaBuider != null &&
+            this.IsAreaBuilderCompatible(this.currentAreaBuider) &&
+            this.currentAreaBuider.Contains(time))
         {
-            var period = this.GetStepPeriod();
-
-            Interval<DateTime> range;
-
-            if (this.SessionMode == CumulativeDeltaSessionMode.FullHistory)
-                range = new Interval<DateTime>(time, DateTime.MaxValue);
-            else
-            {
-                this.intervalGenerator = new IntervalGenerator(time, period, this.SessionContainer, this.GetTimeZone());
-                range = this.intervalGenerator.Current;
-            }
+            range = this.currentAreaBuider.Range;
+        }
+        else
+        {
+            range = this.GetAccumulationRange(time);
 
             if (range.IsEmpty)
                 return;
 
+            this.currentAreaBuider?.Dispose();
             this.currentAreaBuider = this.CreateAreaBuilder(range);
         }
-        else if (this.intervalGenerator != null && !this.currentAreaBuider.Contains(time))
+
+
+        double previousClose = 0d;
+
+        if (!this.IsStartOfAccumulationRange(offset, range) && offset + 1 < this.Count)
         {
-            this.intervalGenerator.MoveUntil(time);
+            double value = this.LinesSeries[1].GetValue(offset + 1);
 
-            var range = this.intervalGenerator.Current;
-
-            if (range.IsEmpty)
-                return;
-
-            this.currentAreaBuider = this.CreateAreaBuilder(range);
+            if (!double.IsNaN(value) && !double.IsInfinity(value))
+                previousClose = value;
         }
 
-        //
         var currentItem = this.GetVolumeAnalysisData(offset);
-        if (currentItem == null || currentItem.Total == null)
-            return;
-
-        //
-        if (isNewBar)
-            this.currentAreaBuider.StartNew();
-
-        if (!isPrevVolumeDataUsed)
-            this.currentAreaBuider.Update(currentItem.Total);
-
-        if (isNewBar && isPrevVolumeDataUsed)
-            offset = 0;
-
-        this.SetValues(this.currentAreaBuider.Bar.Open, this.currentAreaBuider.Bar.High, this.currentAreaBuider.Bar.Low, this.currentAreaBuider.Bar.Close, offset);
-
-        bool isUpColor = this.closeLineСoloringOption switch
+        var total = currentItem?.Total;
+        if (trackPending && offset > 0 && total == null)
         {
-            CloseLineColorOption.Sign => this.LinesSeries[1].GetValue(offset) > 0,
-            CloseLineColorOption.Delta => (this.DeltaSourceType == CumulativeDeltaSourceType.Volume && currentItem.Total.Delta > 0) ||
-                                            (this.DeltaSourceType == CumulativeDeltaSourceType.Trades && (currentItem.Total.BuyTrades - currentItem.Total.SellTrades) > 0),
+            int barIndex = this.GetAbsoluteBarIndex(offset);
 
-            _ => true,
-        };
-        this.LinesSeries[1].SetMarker(offset, isUpColor ? this.upLineColor : this.downLineColor);
+            if (this.earliestPendingBarIndex < 0 ||
+                barIndex < this.earliestPendingBarIndex)
+            {
+                this.earliestPendingBarIndex = barIndex;
+            }
+        }
+
+
+        this.currentAreaBuider.Calculate(previousClose, total);
+
+        this.SetValues(
+            this.currentAreaBuider.Bar.Open,
+            this.currentAreaBuider.Bar.High,
+            this.currentAreaBuider.Bar.Low,
+            this.currentAreaBuider.Bar.Close,
+            offset);
+
+        if (total != null)
+        {
+            bool isUpColor = this.closeLineСoloringOption switch
+            {
+                CloseLineColorOption.Sign => this.currentAreaBuider.Bar.Close > 0,
+
+                CloseLineColorOption.Delta =>
+                    (this.DeltaSourceType == CumulativeDeltaSourceType.Volume && total.Delta > 0) ||
+                    (this.DeltaSourceType == CumulativeDeltaSourceType.Trades &&
+                     (total.BuyTrades - total.SellTrades) > 0),
+
+                _ => true,
+            };
+
+            this.LinesSeries[1].SetMarker(
+                offset,
+                isUpColor ? this.upLineColor : this.downLineColor);
+        }
+        else
+        {
+            this.LinesSeries[1].RemoveMarker(offset);
+        }
 
         if (this.Count > offset && this.Count > this.MAPeriod)
         {
             switch (this.maLineColorOption)
             {
                 case MALineColorOption.PriceCross:
-                    this.LinesSeries[2].SetMarker(offset, this.LinesSeries[1].GetValue(offset) > this.LinesSeries[2].GetValue(offset) ? this.maUpLineColor : this.maDownLineColor);
+                    this.LinesSeries[2].SetMarker(
+                        offset,
+                        this.LinesSeries[1].GetValue(offset) > this.LinesSeries[2].GetValue(offset)
+                            ? this.maUpLineColor
+                            : this.maDownLineColor);
                     break;
+
                 case MALineColorOption.ValueChange:
-                    this.LinesSeries[2].SetMarker(offset, this.LinesSeries[2].GetValue(offset) > this.LinesSeries[2].GetValue(offset + 1) ? this.maUpLineColor : this.maDownLineColor);
+                    if (offset + 1 < this.Count)
+                    {
+                        this.LinesSeries[2].SetMarker(
+                            offset,
+                            this.LinesSeries[2].GetValue(offset) > this.LinesSeries[2].GetValue(offset + 1)
+                                ? this.maUpLineColor
+                                : this.maDownLineColor);
+                    }
+                    break;
+
+                case MALineColorOption.SolidColor:
+                    this.LinesSeries[2].RemoveMarker(offset);
                     break;
             }
         }
+    }
+
+    private int GetAbsoluteBarIndex(int offset)
+    {
+        return this.Count - 1 - offset;
+    }
+
+    private int GetOffsetByAbsoluteBarIndex(int barIndex)
+    {
+        return this.Count - 1 - barIndex;
+    }
+
+    private bool TryResolveEarliestPendingBar()
+    {
+        if (this.earliestPendingBarIndex < 0 || this.Count == 0)
+            return false;
+
+        int offset = this.GetOffsetByAbsoluteBarIndex(this.earliestPendingBarIndex);
+
+
+        if (offset <= 0 || offset >= this.Count)
+        {
+            this.earliestPendingBarIndex = -1;
+            return false;
+        }
+
+        var total = this.GetVolumeAnalysisData(offset)?.Total;
+
+        if (total == null)
+            return false;
+
+        int recalcFromOffset = offset;
+
+        this.earliestPendingBarIndex = -1;
+
+        this.RecalculateBars(recalcFromOffset, true);
+
+        return true;
+    }
+
+    private Interval<DateTime> GetAccumulationRange(DateTime time)
+    {
+        if (this.SessionMode == CumulativeDeltaSessionMode.FullHistory)
+            return new Interval<DateTime>(time, DateTime.MaxValue);
+
+        var sessionContainer = this.SessionContainer;
+
+        if (sessionContainer == null)
+            return default;
+
+        var generator = new IntervalGenerator(
+            time,
+            this.GetStepPeriod(),
+            sessionContainer,
+            this.GetTimeZone());
+
+        return generator.Current;
+    }
+
+    private bool IsStartOfAccumulationRange(int offset, Interval<DateTime> currentRange)
+    {
+        if (offset + 1 >= this.Count)
+            return true;
+
+        if (this.SessionMode == CumulativeDeltaSessionMode.FullHistory)
+            return false;
+
+        DateTime previousTime = this.Time(offset + 1);
+
+        return !currentRange.Contains(previousTime);
+    }
+
+    private bool IsAreaBuilderCompatible(AreaBuilder areaBuilder)
+    {
+        return this.DeltaSourceType switch
+        {
+            CumulativeDeltaSourceType.Trades => areaBuilder is AreaBuilderByTrades,
+            _ => areaBuilder is AreaBuilderByVolume,
+        };
     }
 
     protected override void SetValues(double open, double high, double low, double close, int offset)
@@ -739,31 +874,33 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
         internal Interval<DateTime> Range { get; }
         internal BarBuilder Bar { get; private set; }
 
-        public AreaBuilder(Interval<DateTime> range)
+        protected AreaBuilder(Interval<DateTime> range)
         {
             this.Range = range;
-
             this.Bar = new BarBuilder();
-            this.StartNew();
         }
 
-        internal abstract void Update(VolumeAnalysisItem total);
-
-        internal void StartNew()
+        internal void Calculate(double previousClose, VolumeAnalysisItem total)
         {
-            var prevClose = !double.IsNaN(this.Bar.Close)
-                ? this.Bar.Close
-                : 0d;
-
             this.Bar.Clear();
-            this.Bar.Open = prevClose;
-            this.Bar.Close = prevClose;
+
+            this.Bar.Open = previousClose;
+            this.Bar.High = previousClose;
+            this.Bar.Low = previousClose;
+            this.Bar.Close = previousClose;
+
+            if (total != null)
+                this.Update(total);
         }
+        internal abstract void Update(VolumeAnalysisItem total);
         internal bool Contains(DateTime dt) => this.Range.Contains(dt);
         internal void Reset()
         {
             this.Bar.Clear();
-            this.Bar.Open = 0;
+            this.Bar.Open = 0d;
+            this.Bar.High = 0d;
+            this.Bar.Low = 0d;
+            this.Bar.Close = 0d;
         }
 
         public void Dispose()
@@ -781,13 +918,15 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
         {
             this.Bar.Close = this.Bar.Open + total.Delta;
 
-            this.Bar.High = !double.IsNaN(total.MaxDelta) && total.MaxDelta != double.MinValue
-                ? this.Bar.Open + Math.Abs(total.MaxDelta)
-                : Math.Max(this.Bar.Close, this.Bar.Open);
+            this.Bar.High =
+                !double.IsNaN(total.MaxDelta) && total.MaxDelta != double.MinValue
+                    ? this.Bar.Open + Math.Abs(total.MaxDelta)
+                    : Math.Max(this.Bar.Close, this.Bar.Open);
 
-            this.Bar.Low = !double.IsNaN(total.MinDelta) && total.MinDelta != double.MaxValue
-                ? this.Bar.Open - Math.Abs(total.MinDelta)
-                : Math.Min(this.Bar.Close, this.Bar.Open);
+            this.Bar.Low =
+                !double.IsNaN(total.MinDelta) && total.MinDelta != double.MaxValue
+                    ? this.Bar.Open - Math.Abs(total.MinDelta)
+                    : Math.Min(this.Bar.Close, this.Bar.Open);
         }
     }
     sealed class AreaBuilderByTrades : AreaBuilder
@@ -798,7 +937,10 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
 
         internal override void Update(VolumeAnalysisItem total)
         {
-            this.Bar.Close = this.Bar.Open + (total.BuyTrades - total.SellTrades);
+            this.Bar.Close =
+                this.Bar.Open +
+                (total.BuyTrades - total.SellTrades);
+
             this.Bar.High = Math.Max(this.Bar.Close, this.Bar.Open);
             this.Bar.Low = Math.Min(this.Bar.Close, this.Bar.Open);
         }

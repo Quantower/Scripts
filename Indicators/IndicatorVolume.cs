@@ -45,6 +45,8 @@ public sealed class IndicatorVolume : Indicator, IWatchlistIndicator
     }
     public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorVolume.cs";
 
+    private bool needToDisplayInLots = false;
+
     public override IList<SettingItem> Settings
     {
         get
@@ -101,12 +103,15 @@ public sealed class IndicatorVolume : Indicator, IWatchlistIndicator
             Text1 = "Down",
             Text2 = "Up"
         };
+
     }
 
     protected override void OnInit()
     {
         this.sma = Core.Indicators.BuiltIn.SMA(this.SmoothMaPeriod, this.VolumeAsset);
         this.AddIndicator(this.sma);
+        this.needToDisplayInLots = Application.Instance.NeedDisplayQuantityInLots(this.Symbol.SymbolType);
+
     }
 
     /// <summary>
@@ -133,6 +138,13 @@ public sealed class IndicatorVolume : Indicator, IWatchlistIndicator
 
         bool quantityInLots = Application.Instance.NeedDisplayQuantityInLots(this.Symbol.SymbolType);
 
+
+        if(quantityInLots != this.needToDisplayInLots)
+        {
+            this.needToDisplayInLots = quantityInLots;
+            this.Refresh();
+        }
+
         bool displayInLots =
             this.VolumeAsset == PriceType.Volume &&
             !useTicks &&
@@ -140,8 +152,8 @@ public sealed class IndicatorVolume : Indicator, IWatchlistIndicator
             this.Symbol.LotSize > 0 &&
             quantityInLots;
 
-        if (displayInLots)
-            curVolume /= this.Symbol.LotSize;
+        if (!displayInLots)
+            curVolume *= this.Symbol.LotSize;
 
         double prevVolume = this.Count > 1
             ? this.GetValue(1)
