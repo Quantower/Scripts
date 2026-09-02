@@ -79,6 +79,7 @@ public sealed class IndicatorVolume : Indicator, IWatchlistIndicator
 
     private PairColor pairColor;
     private Indicator sma;
+    private HistoricalDataCustom SmoothingSource;
 
     /// <summary>
     /// Indicator's constructor. Contains general information: name, description, LineSeries etc.
@@ -108,10 +109,10 @@ public sealed class IndicatorVolume : Indicator, IWatchlistIndicator
 
     protected override void OnInit()
     {
-        this.sma = Core.Indicators.BuiltIn.SMA(this.SmoothMaPeriod, this.VolumeAsset);
-        this.AddIndicator(this.sma);
+        this.sma = Core.Indicators.BuiltIn.SMA(this.SmoothMaPeriod, PriceType.Open);
+        this.SmoothingSource = new HistoricalDataCustom(this);
+        this.SmoothingSource.AddIndicator(this.sma);
         this.needToDisplayInLots = Application.Instance.NeedDisplayQuantityInLots(this.Symbol.SymbolType);
-
     }
 
     /// <summary>
@@ -160,6 +161,7 @@ public sealed class IndicatorVolume : Indicator, IWatchlistIndicator
             : curVolume;
 
         this.SetValue(curVolume);
+        this.SmoothingSource.SetValue(curVolume, 0d, 0d, 0d);
 
         switch (this.ColoringScheme)
         {
