@@ -167,6 +167,8 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
 
     private AreaBuilder currentAreaBuider;
 
+    private IntervalGenerator intervalGenerator;
+
     // Count observed on the previous realtime update. It lets us determine
     // how many Renko/Range bars were actually created by one market update.
     private int lastKnownCount;
@@ -260,6 +262,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
 
         this.lastKnownCount = 0;
         this.earliestPendingBarIndex = -1;
+        this.intervalGenerator = null;
 
         this.ma = Core.Indicators.BuiltIn.MA(this.MAPeriod, PriceType.Close, this.MaType);
         this.CandleHistoricalData.AddIndicator(this.ma);
@@ -301,11 +304,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
 
     protected override void OnClear()
     {
-        if (this.currentAreaBuider != null)
-        {
-            this.currentAreaBuider.Dispose();
-            this.currentAreaBuider = null;
-        }
+        this.ResetRangeCalculationState();
 
         this.lastKnownCount = 0;
         this.earliestPendingBarIndex = -1;
@@ -457,7 +456,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
 
             if (holder.TryGetValue(CUSTOM_OPEN_SESSION_NAME_SI, out item))
             {
-                var newValue = Core.Instance.TimeUtils.ConvertFromUTCToSelectedTimeZone(item.GetValue<DateTime>());
+                var newValue = Core.Instance.TimeUtils.ConvertFromUTCToTimeZone(item.GetValue<DateTime>(), this.GetTimeZone());
 
                 if (this.CustomRangeStartTime != newValue)
                 {
@@ -468,7 +467,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
 
             if (holder.TryGetValue(CUSTOM_CLOSE_SESSION_NAME_SI, out item))
             {
-                var newValue = Core.Instance.TimeUtils.ConvertFromUTCToSelectedTimeZone(item.GetValue<DateTime>());
+                var newValue = Core.Instance.TimeUtils.ConvertFromUTCToTimeZone(item.GetValue<DateTime>(), this.GetTimeZone());
                 if (this.CustomRangeEndTime != newValue)
                 {
                     this.CustomRangeEndTime = newValue;
@@ -534,7 +533,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
             }
             if (holder.TryGetValue(RESET_TIME_NAME_SI, out item))
             {
-                var newValue = Core.Instance.TimeUtils.ConvertFromUTCToSelectedTimeZone(item.GetValue<DateTime>());
+                var newValue = Core.Instance.TimeUtils.ConvertFromUTCToTimeZone(item.GetValue<DateTime>(), this.GetTimeZone());
 
                 if (this.ByPeriodResetTime != newValue)
                 {
@@ -551,11 +550,14 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
     #endregion Overrides
 
     #region Misc
-        private void RecalculateBars(int maxOffset, bool trackPending)
+    private void RecalculateBars(int maxOffset, bool trackPending)
     {
         if (this.Count == 0)
             return;
+
         maxOffset = Math.Min(maxOffset, this.Count - 1);
+        this.ResetRangeCalculationState();
+
         for (int offset = maxOffset; offset >= 0; offset--)
             this.CalculateIndicatorByOffset(offset, trackPending);
     }
@@ -730,13 +732,27 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
         if (sessionContainer == null)
             return default;
 
-        var generator = new IntervalGenerator(
-            time,
-            this.GetStepPeriod(),
-            sessionContainer,
-            this.GetTimeZone());
+        if (this.intervalGenerator == null)
+        {
+            this.intervalGenerator = new IntervalGenerator(
+                time,
+                this.GetStepPeriod(),
+                sessionContainer,
+                this.GetTimeZone());
+        }
+        else if (!this.intervalGenerator.Current.Contains(time))
+                    this.intervalGenerator.MoveUntil(time); 
+        return this.intervalGenerator.Current;
+    }
+    private void ResetRangeCalculationState()
+    {
+        this.intervalGenerator = null;
 
-        return generator.Current;
+        if (this.currentAreaBuider != null)
+        {
+            this.currentAreaBuider.Dispose();
+            this.currentAreaBuider = null;
+        }
     }
 
     private bool IsStartOfAccumulationRange(int offset, Interval<DateTime> currentRange)
