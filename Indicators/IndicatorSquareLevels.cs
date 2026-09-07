@@ -102,7 +102,7 @@ public class IndicatorSquareLevels : Indicator
     {
         base.OnInit();
 
-        var squareBasis = SquareBasis.Calculate(this.HistoricalData[0][PriceType.Close]);
+        var squareBasis = SquareBasis.Calculate(this.HistoricalData[0][PriceType.Close], this.Symbol.TickSize);
 
         foreach (var c in this.containersCache.Values)
         {
@@ -114,7 +114,7 @@ public class IndicatorSquareLevels : Indicator
     {
         if (args.Reason == UpdateReason.HistoricalBar)
             return;
-        var squareBasis = SquareBasis.Calculate(this.HistoricalData[0][PriceType.Close]);
+        var squareBasis = SquareBasis.Calculate(this.HistoricalData[0][PriceType.Close], this.Symbol.TickSize);
 
         foreach (var c in this.containersCache.Values)
         {
@@ -248,35 +248,24 @@ internal class SquareBasis
 
     public string VisualBasisValue { get; private set; }
 
-    private double price;
-    private int precition;
+    private double scale;
 
-    public static SquareBasis Calculate(double price)
+    public static SquareBasis Calculate(double price, double tickSize)
     {
+        decimal tick = (decimal)tickSize;
+        int precision = CoreMath.GetValuePrecision((decimal)price);
+        double scale = Math.Pow(10, precision);
+
         var res = new SquareBasis()
         {
-            price = price
+            scale = scale
         };
 
-        int precition = CoreMath.GetValuePrecision((decimal)price);
-
-        if (price >= 1)
-        {
-            double r = price;
-            while (r > 1)
-            {
-                r /= 10;
-                res.precition += 1;
-            }
-        }
-        else
-            res.precition = precition;
-
-        double number = price * Math.Pow(10, precition);
+        double number = price * scale;
         double number1 = Math.Sqrt(number);
 
         res.BasisValue = Math.Floor(number1);
-        res.PriceResult = CalculatePrice(res.price, Math.Pow(res.BasisValue, 2), res.precition);
+        res.PriceResult = CalculatePrice(Math.Pow(res.BasisValue, 2), res.scale);
 
         return res;
     }
@@ -285,15 +274,14 @@ internal class SquareBasis
     public SquareBasis CalculateWithStep(double step)
     {
         double newBasis = this.BasisValue + step;
-        double squareBasis = Math.Floor(Math.Pow(newBasis, 2));
+        double squareBasis = Math.Pow(newBasis, 2);
         var res = new SquareBasis()
         {
             BasisValue = newBasis,
-            price = this.price,
-            precition = this.precition
+            scale = this.scale
         };
 
-        res.PriceResult = CalculatePrice(res.price, squareBasis, res.precition);
+        res.PriceResult = CalculatePrice(squareBasis, res.scale);
 
         return res;
     }
@@ -301,13 +289,9 @@ internal class SquareBasis
     public override string ToString() => $"{this.BasisValue} | {this.PriceResult}";
 
 
-    private static double CalculatePrice(double price, double basis, int precition)
+    private static double CalculatePrice(double basis, double scale)
     {
-        int p = precition;
-        if (price >= 1)
-            p = basis.ToString().Length - precition;
-
-        return basis / Math.Pow(10, p);
+        return basis / scale;
     }
 
     private static string GetFormattedBasisValue(double price, double basisValue) => $"{(decimal)price}({basisValue}\u00B2)";
