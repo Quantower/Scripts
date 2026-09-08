@@ -253,7 +253,7 @@ internal class SquareBasis
     public static SquareBasis Calculate(double price, double tickSize)
     {
         decimal tick = (decimal)tickSize;
-        int precision = CoreMath.GetValuePrecision((decimal)price);
+        int precision = CoreMath.GetValuePrecision((decimal)tick);
         double scale = Math.Pow(10, precision);
 
         var res = new SquareBasis()
