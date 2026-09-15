@@ -550,13 +550,18 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
     #endregion Overrides
 
     #region Misc
-    private void RecalculateBars(int maxOffset, bool trackPending)
+    private void RecalculateBars(
+        int maxOffset,
+        bool trackPending,
+        bool resetRangeState = false)
     {
         if (this.Count == 0)
             return;
 
         maxOffset = Math.Min(maxOffset, this.Count - 1);
-        this.ResetRangeCalculationState();
+
+        if (resetRangeState)
+            this.ResetRangeCalculationState();
 
         for (int offset = maxOffset; offset >= 0; offset--)
             this.CalculateIndicatorByOffset(offset, trackPending);
@@ -717,7 +722,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
 
         this.earliestPendingBarIndex = -1;
 
-        this.RecalculateBars(recalcFromOffset, true);
+        this.RecalculateBars(recalcFromOffset, true, true);
 
         return true;
     }
