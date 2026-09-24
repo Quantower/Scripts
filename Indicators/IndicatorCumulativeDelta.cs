@@ -5,6 +5,8 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using TradingPlatform.BusinessLayer;
 using TradingPlatform.BusinessLayer.Utils;
 using TradingPlatform.BusinessLayer.Utils.IntervalGeneration;
@@ -185,6 +187,12 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
     private Color maDownLineColor;
 
     private Indicator ma;
+
+    private HistoricalData calculationHistory;
+    private Task loadingTask;
+    private CancellationTokenSource cancellationSource;
+    private volatile bool historyIsLoading;
+
     #endregion Parameters
 
     public IndicatorCumulativeDelta()
@@ -266,11 +274,15 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
 
         this.ma = Core.Indicators.BuiltIn.MA(this.MAPeriod, PriceType.Close, this.MaType);
         this.CandleHistoricalData.AddIndicator(this.ma);
+
+        this.AbortHistoryLoading();
+        var token = this.cancellationSource.Token;
+        this.loadingTask = Task.Factory.StartNew(() => this.HistoryDownload(token), token);
     }
 
     protected override void OnUpdate(UpdateArgs args)
     {
-        if (this.IsLoading || this.Count == 0)
+        if (this.IsLoading || this.historyIsLoading || this.calculationHistory == null || this.Count == 0)
             return;
         if (args.Reason == UpdateReason.HistoricalBar)
         {
@@ -309,7 +321,36 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
         this.lastKnownCount = 0;
         this.earliestPendingBarIndex = -1;
 
+        this.AbortHistoryLoading();
+
         base.OnClear();
+    }
+
+    public override void OnPaintChart(PaintChartEventArgs args)
+    {
+        base.OnPaintChart(args);
+
+        if (!this.historyIsLoading)
+            return;
+
+        using var centerCenterSF = new StringFormat()
+        {
+            Alignment = StringAlignment.Center,
+            LineAlignment = StringAlignment.Center
+        };
+
+        using var loadingFont = new Font(
+            "Verdana",
+            10,
+            FontStyle.Regular,
+            GraphicsUnit.Point);
+
+        args.Graphics.DrawString(
+            loc._("Loading history..."),
+            loadingFont,
+            Brushes.DodgerBlue,
+            args.Rectangle,
+            centerCenterSF);
     }
 
     public override IList<SettingItem> Settings
@@ -550,6 +591,84 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
     #endregion Overrides
 
     #region Misc
+
+    private void HistoryDownload(CancellationToken token)
+    {
+        HistoricalData loadedHistory = null;
+
+        try
+        {
+            this.historyIsLoading = true;
+
+            if (token.IsCancellationRequested || this.Symbol == null || this.HistoricalData == null)
+                return;
+
+            loadedHistory = this.Symbol.GetHistory(new HistoryRequestParameters()
+            {
+                Symbol = this.Symbol,
+                FromTime = this.HistoricalData.FromTime,
+                CancellationToken = token,
+                Aggregation = this.HistoricalData.Aggregation,
+                SessionsContainer = this.SessionContainer,
+                ExcludeOutOfSession = false
+            });
+
+            if (token.IsCancellationRequested || loadedHistory == null || loadedHistory.Count == 0)
+                return;
+
+            var volumeProgress = loadedHistory.CalculateVolumeProfile(
+                new VolumeAnalysisCalculationParameters()
+                {
+                    CalculatePriceLevels = false,
+                    SessionsContainer = this.SessionContainer,
+                    TimeZone = this.GetTimeZone()
+                });
+
+            volumeProgress?.Wait(token);
+
+            if (token.IsCancellationRequested)
+                return;
+
+            this.calculationHistory = loadedHistory;
+            loadedHistory = null;
+
+            this.lastKnownCount = this.Count;
+            this.earliestPendingBarIndex = -1;
+            this.ResetRangeCalculationState();
+
+            int maxOffset = Math.Min(this.Count, this.calculationHistory.Count) - 1;
+
+            if (maxOffset >= 0)
+                this.RecalculateBars(maxOffset, false, true);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            Core.Loggers.Log(ex, "Cumulative delta: history loading", LoggingLevel.Error);
+        }
+        finally
+        {
+            loadedHistory?.Dispose();
+            this.historyIsLoading = false;
+        }
+    }
+
+    private void AbortHistoryLoading()
+    {
+        this.cancellationSource?.Cancel();
+        this.cancellationSource = new CancellationTokenSource();
+
+        if (this.calculationHistory != null)
+        {
+            this.calculationHistory.Dispose();
+            this.calculationHistory = null;
+        }
+
+        this.historyIsLoading = false;
+    }
+
     private void RecalculateBars(
         int maxOffset,
         bool trackPending,
@@ -568,9 +687,10 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
     }
     private void CalculateIndicatorByOffset(int offset, bool trackPending)
     {
-        if (offset < 0 || this.Count <= offset)
+        if (offset < 0 || this.Count <= offset || this.calculationHistory == null || this.calculationHistory.Count <= offset)
             return;
-        DateTime time = this.Time(offset);
+
+        DateTime time = this.calculationHistory[offset].TimeLeft;
         var sessionContainer = this.SessionContainer;
 
         if (this.SessionMode == CumulativeDeltaSessionMode.SpecifiedSession ||
@@ -613,7 +733,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
                 previousClose = value;
         }
 
-        var currentItem = this.GetVolumeAnalysisData(offset);
+        var currentItem = this.calculationHistory[offset].VolumeAnalysisData;
         var total = currentItem?.Total;
         if (trackPending && offset > 0 && total == null)
         {
@@ -713,7 +833,10 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
             return false;
         }
 
-        var total = this.GetVolumeAnalysisData(offset)?.Total;
+        if (this.calculationHistory == null || this.calculationHistory.Count <= offset)
+            return false;
+
+        var total = this.calculationHistory[offset].VolumeAnalysisData?.Total;
 
         if (total == null)
             return false;
@@ -746,7 +869,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
                 this.GetTimeZone());
         }
         else if (!this.intervalGenerator.Current.Contains(time))
-                    this.intervalGenerator.MoveUntil(time); 
+            this.intervalGenerator.MoveUntil(time);
         return this.intervalGenerator.Current;
     }
     private void ResetRangeCalculationState()
@@ -768,7 +891,10 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
         if (this.SessionMode == CumulativeDeltaSessionMode.FullHistory)
             return false;
 
-        DateTime previousTime = this.Time(offset + 1);
+        if (this.calculationHistory == null || this.calculationHistory.Count <= offset + 1)
+            return true;
+
+        DateTime previousTime = this.calculationHistory[offset + 1].TimeLeft;
 
         return !currentRange.Contains(previousTime);
     }
