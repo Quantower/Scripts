@@ -116,7 +116,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
                 var session = this.GetFullDayTimeInterval(this.GetTimeZone());
                 this.customRangeStartTime = session.From;
             }
-            return DateTime.SpecifyKind(this.customRangeStartTime, DateTimeKind.Local);
+            return Core.Instance.TimeUtils.ConvertFromUTCToTimeZone(this.customRangeStartTime, this.GetTimeZone());
         }
         set => this.customRangeStartTime = value;
     }
@@ -132,7 +132,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
                 this.customRangeEndTime = session.To;
             }
 
-            return DateTime.SpecifyKind(this.customRangeEndTime, DateTimeKind.Local);
+            return Core.Instance.TimeUtils.ConvertFromUTCToTimeZone(this.customRangeEndTime, this.GetTimeZone());
         }
         set => this.customRangeEndTime = value;
     }
@@ -144,7 +144,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
         {
             if (this.byPeriodResetTime == default)
                 this.byPeriodResetTime = DateTime.Today; // 00:00
-            return DateTime.SpecifyKind(this.byPeriodResetTime, DateTimeKind.Local);
+            return Core.Instance.TimeUtils.ConvertFromUTCToTimeZone(this.byPeriodResetTime, this.GetTimeZone());
         }
         set => this.byPeriodResetTime = value;
     }
@@ -326,33 +326,6 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
         base.OnClear();
     }
 
-    public override void OnPaintChart(PaintChartEventArgs args)
-    {
-        base.OnPaintChart(args);
-
-        if (!this.historyIsLoading)
-            return;
-
-        using var centerCenterSF = new StringFormat()
-        {
-            Alignment = StringAlignment.Center,
-            LineAlignment = StringAlignment.Center
-        };
-
-        using var loadingFont = new Font(
-            "Verdana",
-            10,
-            FontStyle.Regular,
-            GraphicsUnit.Point);
-
-        args.Graphics.DrawString(
-            loc._("Loading history..."),
-            loadingFont,
-            Brushes.DodgerBlue,
-            args.Rectangle,
-            centerCenterSF);
-    }
-
     public override IList<SettingItem> Settings
     {
         get
@@ -497,9 +470,10 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
 
             if (holder.TryGetValue(CUSTOM_OPEN_SESSION_NAME_SI, out item))
             {
-                var newValue = Core.Instance.TimeUtils.ConvertFromUTCToTimeZone(item.GetValue<DateTime>(), this.GetTimeZone());
+                var newValue = Core.Instance.TimeUtils.ConvertFromTimeZoneToUTC(item.GetValue<DateTime>(), this.GetTimeZone());
+                var timeZoneTime = Core.Instance.TimeUtils.ConvertFromUTCToTimeZone(newValue, this.GetTimeZone());
 
-                if (this.CustomRangeStartTime != newValue)
+                if (this.CustomRangeStartTime != timeZoneTime)
                 {
                     this.CustomRangeStartTime = newValue;
                     needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
@@ -508,8 +482,10 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
 
             if (holder.TryGetValue(CUSTOM_CLOSE_SESSION_NAME_SI, out item))
             {
-                var newValue = Core.Instance.TimeUtils.ConvertFromUTCToTimeZone(item.GetValue<DateTime>(), this.GetTimeZone());
-                if (this.CustomRangeEndTime != newValue)
+                var newValue = Core.Instance.TimeUtils.ConvertFromTimeZoneToUTC(item.GetValue<DateTime>(), this.GetTimeZone());
+                var timeZoneTime = Core.Instance.TimeUtils.ConvertFromUTCToTimeZone(newValue, this.GetTimeZone());
+
+                if (this.CustomRangeEndTime != timeZoneTime)
                 {
                     this.CustomRangeEndTime = newValue;
                     needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
@@ -574,9 +550,10 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
             }
             if (holder.TryGetValue(RESET_TIME_NAME_SI, out item))
             {
-                var newValue = Core.Instance.TimeUtils.ConvertFromUTCToTimeZone(item.GetValue<DateTime>(), this.GetTimeZone());
+                var newValue = Core.Instance.TimeUtils.ConvertFromTimeZoneToUTC(item.GetValue<DateTime>(), this.GetTimeZone());
+                var timeZoneTime = Core.Instance.TimeUtils.ConvertFromUTCToTimeZone(newValue, this.GetTimeZone());
 
-                if (this.ByPeriodResetTime != newValue)
+                if (this.ByPeriodResetTime != timeZoneTime)
                 {
                     this.ByPeriodResetTime = newValue;
                     needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
@@ -599,6 +576,8 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
         try
         {
             this.historyIsLoading = true;
+
+            this.IsLoading = true;
 
             if (token.IsCancellationRequested || this.Symbol == null || this.HistoricalData == null)
                 return;
@@ -652,6 +631,11 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
         {
             loadedHistory?.Dispose();
             this.historyIsLoading = false;
+
+            this.IsLoading =
+                this.HistoricalData?.VolumeAnalysisCalculationProgress != null &&
+                this.HistoricalData.VolumeAnalysisCalculationProgress.State !=
+                    VolumeAnalysisCalculationState.Finished;
         }
     }
 
@@ -983,7 +967,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
     {
         this.Refresh();
 
-        this.IsLoading = false;
+        this.IsLoading = this.historyIsLoading;
     }
 
     #endregion IVolumeAnalysisIndicator
