@@ -1,14 +1,16 @@
 // Copyright QUANTOWER LLC. © 2017-2023. All rights reserved.
 
+using CommandLine;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
-using TradingPlatform.BusinessLayer;
-using TradingPlatform.BusinessLayer.Utils;
-using TradingPlatform.BusinessLayer.Chart;
-using System.Threading.Tasks;
+using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
+using TradingPlatform.BusinessLayer;
+using TradingPlatform.BusinessLayer.Chart;
+using TradingPlatform.BusinessLayer.Utils;
 
 
 namespace IndicatorPowerOfThree
@@ -24,6 +26,19 @@ namespace IndicatorPowerOfThree
         private int barInterval = 0;
         private bool useCustomBarWidth = false;
         private int customBarWidth = 10;
+
+        public NewBarOnSessionBoundaryType IsResetOnSessionBoundaryEnabled
+        {
+            get => this.isResetOnSessionBoundaryEnabled;
+            set
+            {
+                if (this.isResetOnSessionBoundaryEnabled == value)
+                    return;
+
+                this.isResetOnSessionBoundaryEnabled = value;
+            }
+        }
+        private NewBarOnSessionBoundaryType isResetOnSessionBoundaryEnabled;
         public Color decreasingCandleColor
         {
             get => this.decreasingCandleBrush.Color;
@@ -448,6 +463,7 @@ namespace IndicatorPowerOfThree
                     SortIndex = 1,
                     SeparatorGroup = calculatingGroup,
                 });
+
                 SettingItemRelationVisibility tfPeriodRelation = new SettingItemRelationVisibility("useTFPeriod", true);
                 SettingItemRelationVisibility notTFPeriodRelation = new SettingItemRelationVisibility("useTFPeriod", false);
                 settings.Add(new SettingItemInteger("barsPeriod", this.barsPeriod)
@@ -464,6 +480,19 @@ namespace IndicatorPowerOfThree
                     SortIndex = 1,
                     Relation = tfPeriodRelation,
                     SeparatorGroup = calculatingGroup,
+                });
+
+                var newBarOnSessionBoundaryTypeItems = new List<SelectItem> {
+                    new SelectItem(loc._("Disabled"), (int)NewBarOnSessionBoundaryType.Disabled),
+                    new SelectItem(loc._("Only intraday"), (int)NewBarOnSessionBoundaryType.OnlyIntraday),
+                    new SelectItem(loc._("All bars"), (int)NewBarOnSessionBoundaryType.AllBars)
+                };
+                settings.Add(new SettingItemSelectorLocalized("NewBarOnSessionBoundaryType", newBarOnSessionBoundaryTypeItems.FirstOrDefault(i => (int)i.Value == (int)this.IsResetOnSessionBoundaryEnabled) ?? newBarOnSessionBoundaryTypeItems.First(), newBarOnSessionBoundaryTypeItems, 120)
+                {
+                    Text = loc._("New bar on session boundary"),
+                    ValueChangingBehavior = SettingItemValueChangingBehavior.WithConfirmation,
+                    SeparatorGroup = calculatingGroup,
+                    SortIndex = 1,
                 });
                 settings.Add(new SettingItemColor("decreasingCandleColor", this.decreasingCandleColor)
                 {
@@ -637,6 +666,12 @@ namespace IndicatorPowerOfThree
                     this.tfPeriod = tfPeriod;
                     this.needRedownload = true;
                 }
+
+                if (value.TryGetValue("NewBarOnSessionBoundaryType", out NewBarOnSessionBoundaryType boundaryType))
+                {
+                    this.IsResetOnSessionBoundaryEnabled = boundaryType;
+                    this.needRedownload = true;
+                }
                 if (value.TryGetValue("useTFPeriod", out bool useTFPeriod))
                     this.useTFPeriod = useTFPeriod;
                 if (value.TryGetValue("decreasingCandleColor", out Color decreasingCandleColor))
@@ -743,7 +778,10 @@ namespace IndicatorPowerOfThree
                     Symbol = this.Symbol,
                     FromTime = fromTime,
                     CancellationToken = this.cancellationSource.Token,
-                    Aggregation = aggregation
+                    Aggregation = aggregation,
+                    NewBarOnSessionBoundaryType = this.isResetOnSessionBoundaryEnabled,
+                    SessionsContainer = this.HistoricalData.Aggregation.SessionsContainer,
+                    ExcludeOutOfSession = false
                 });
                 if (token.IsCancellationRequested || prevHistoryCount == this.tfData.Count)
                 {
