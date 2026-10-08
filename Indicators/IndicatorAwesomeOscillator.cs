@@ -1,5 +1,6 @@
 // Copyright QUANTOWER LLC. © 2017-2024. All rights reserved.
 
+using System.Collections.Generic;
 using System.Drawing;
 using TradingPlatform.BusinessLayer;
 
@@ -18,6 +19,11 @@ public sealed class IndicatorAwesomeOscillator : Indicator, IWatchlistIndicator
     // Fixed periods for SMA indicators.
     private const int FAST_PERIOD = 5;
     private const int SLOW_PERIOD = 34;
+    private const string COLORS_SI = "Colors";
+
+
+    private Color upColor = Color.Green;
+    private Color downColor = Color.Red;
 
     /// <summary>
     /// Indicator's constructor. Contains general information: name, description, LineSeries etc. 
@@ -69,8 +75,55 @@ public sealed class IndicatorAwesomeOscillator : Indicator, IWatchlistIndicator
         // Set values to 'AO' line buffer.
         this.SetValue(ao);
 
-        var indicatorColor = (prevAO > ao) ? Color.Red : Color.Green;
+
+        var indicatorColor = prevAO > ao
+            ? this.downColor
+            : this.upColor;
+
 
         this.LinesSeries[0].SetMarker(0, indicatorColor);
+    }
+
+    public override IList<SettingItem> Settings
+    {
+        get
+        {
+            var settings = base.Settings;
+
+            settings.Add(new SettingItemPairColor(
+                COLORS_SI,
+                new PairColor(
+                    this.upColor,
+                    this.downColor,
+                    loc._("Up"),
+                    loc._("Down")),
+                10)
+            {
+                Text = loc._("Colors")
+            });
+
+            return settings;
+        }
+        set
+        {
+            var holder = new SettingsHolder(value);
+
+            base.Settings = value;
+
+            if (holder.TryGetValue(COLORS_SI, out var item))
+            {
+                var newValue = item.GetValue<PairColor>();
+
+                if (this.upColor != newValue.Color1 ||
+                    this.downColor != newValue.Color2)
+                {
+                    this.upColor = newValue.Color1;
+                    this.downColor = newValue.Color2;
+
+                    if (item.ValueChangingReason == SettingItemValueChangingReason.Manually)
+                        this.Refresh();
+                }
+            }
+        }
     }
 }
