@@ -29,6 +29,7 @@ public sealed class IndicatorRegressionLine : Indicator, IWatchlistIndicator
     public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorRegressionLine.cs";
 
     private int sumPeriod;
+    private int sumSqrPeriod;
 
     /// <summary>
     /// Indicator's constructor. Contains general information: name, description, LineSeries etc. 
@@ -50,8 +51,12 @@ public sealed class IndicatorRegressionLine : Indicator, IWatchlistIndicator
     protected override void OnInit()
     {
         this.sumPeriod = 0;
+        this.sumSqrPeriod = 0;
         for (int i = 0; i < this.Period; i++)
+        {
             this.sumPeriod += i;
+            this.sumSqrPeriod += i * i;
+        }
     }
     /// <summary>
     /// Calculation entry point. This function is called when a price data updates. 
@@ -82,10 +87,18 @@ public sealed class IndicatorRegressionLine : Indicator, IWatchlistIndicator
         }
 
         // Calculation of coefficients
-        double p = (this.Period * sumPeriod_Price - this.sumPeriod * sumPrices) / (this.Period * sumSqr_Price - this.sumPeriod * this.sumPeriod);
-        double b = (sumPrices * sumSqr_Price - this.sumPeriod * sumPeriod_Price) / (this.Period * sumSqr_Price - this.sumPeriod * this.sumPeriod);
+        double denominator = this.Period * this.sumSqrPeriod - this.sumPeriod * this.sumPeriod;
+
+        if (denominator == 0.0)
+        {
+            this.SetValue(this.GetPrice(this.SourcePrice));
+            return;
+        }
+
+        double p = (this.Period * sumPeriod_Price - this.sumPeriod * sumPrices) / denominator;
+        double b = (sumPrices * this.sumSqrPeriod - this.sumPeriod * sumPeriod_Price) / denominator;
 
         // Setting of current value
-        this.SetValue(p * this.Period + b);
+        this.SetValue(b);
     }
 }

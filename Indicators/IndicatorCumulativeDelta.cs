@@ -38,6 +38,8 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
     private const string CLOSE_LINE_COLOR_BY_SI = "CloseLineColorBy";
     private const string MA_LINE_COLORS_SI = "MAColorLines";
     private const string MA_LINE_COLOR_BY_SI = "MALineColorBy";
+    private const string MA_TYPE_NAME_SI = "Average Type";
+    private const string MA_PERIOD_NAME_SI = "Period of Moving Average";
 
     private const string SHOW_WICKS_SI = "ShowWicks";
     #endregion Consts
@@ -60,15 +62,8 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
     })]
     public CumulativeDeltaSessionMode SessionMode;
 
-    [InputParameter("Average Type", 21, variants: new object[]{
-            "Simple Moving Average", MaMode.SMA,
-            "Exponential Moving Average", MaMode.EMA,
-            "Smoothed Moving Average", MaMode.SMMA,
-            "Linearly Weighted Moving Average", MaMode.LWMA,
-        })]
     public MaMode MaType = MaMode.SMA;
 
-    [InputParameter("Period of Moving Average", 22, 1, 9999, 1, 1)]
     public int MAPeriod = 20;
 
     private MALineColorOption maLineColorOption;
@@ -405,6 +400,26 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
                 Relation = new SettingItemRelationVisibility(RESET_TYPE_NAME_SI, new SelectItem("", (int)CumulativeDeltaSessionMode.ByPeriod))
             });
 
+            var maTypeOptions = new List<SelectItem>()
+            {
+                new SelectItem(loc._("Simple Moving Average"), MaMode.SMA),
+                new SelectItem(loc._("Exponential Moving Average"), MaMode.EMA),
+                new SelectItem(loc._("Smoothed Moving Average"), MaMode.SMMA),
+                new SelectItem(loc._("Linearly Weighted Moving Average"), MaMode.LWMA)
+            };
+            settings.Add(new SettingItemSelectorLocalized(MA_TYPE_NAME_SI, maTypeOptions.GetItemByValue(this.MaType), maTypeOptions, 21)
+            {
+                Text = loc._("Average Type"),
+                SeparatorGroup = separ
+            });
+            settings.Add(new SettingItemInteger(MA_PERIOD_NAME_SI, this.MAPeriod, 22)
+            {
+                Text = loc._("Period of Moving Average"),
+                Minimum = 1,
+                Maximum = 9999,
+                SeparatorGroup = separ
+            });
+
             var lineColorOptions = new List<SelectItem>()
             {
                 new SelectItem(loc._("Price Cross"), MALineColorOption.PriceCross),
@@ -444,6 +459,8 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
             base.Settings = value;
 
             var needRefresh = false;
+            var needMARecalculate = false;
+            var needMARecreate = false;
 
             if (holder.TryGetValue(SESSION_TEMPLATE_NAME_SI, out var item))
             {
@@ -504,6 +521,38 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
                 }
             }
 
+            if (holder.TryGetValue(MA_TYPE_NAME_SI, out item))
+            {
+                var newValue = (MaMode)((SelectItem)item.Value).Value;
+
+                if (this.MaType != newValue)
+                {
+                    this.MaType = newValue;
+
+                    if (item.ValueChangingReason == SettingItemValueChangingReason.Manually)
+                    {
+                        needMARecalculate = true;
+                        needMARecreate = true;
+                    }
+                }
+            }
+
+            if (holder.TryGetValue(MA_PERIOD_NAME_SI, out item))
+            {
+                var newValue = item.GetValue<int>();
+
+                if (this.MAPeriod != newValue)
+                {
+                    this.MAPeriod = newValue;
+
+                    if (item.ValueChangingReason == SettingItemValueChangingReason.Manually)
+                    {
+                        needMARecalculate = true;
+                        needMARecreate = true;
+                    }
+                }
+            }
+
             if (holder.TryGetValue(MA_LINE_COLOR_BY_SI, out item))
             {
                 var newValue = (MALineColorOption)((SelectItem)item.Value).Value;
@@ -511,7 +560,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
                 if (this.maLineColorOption != newValue)
                 {
                     this.maLineColorOption = newValue;
-                    needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
+                    needMARecalculate |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
                 }
             }
 
@@ -519,11 +568,11 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
             {
                 var newValue = item.GetValue<PairColor>();
 
-                if (this.upLineColor != newValue.Color1 || this.downLineColor != newValue.Color2)
+                if (this.maUpLineColor != newValue.Color1 || this.maDownLineColor != newValue.Color2)
                 {
                     this.maUpLineColor = newValue.Color1;
                     this.maDownLineColor = newValue.Color2;
-                    needRefresh |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
+                    needMARecalculate |= item.ValueChangingReason == SettingItemValueChangingReason.Manually;
                 }
             }
 
@@ -562,6 +611,8 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
             //
             if (needRefresh)
                 this.Refresh();
+            else if (needMARecalculate)
+                this.RecalculateMovingAverage(needMARecreate);
         }
     }
 
@@ -615,10 +666,13 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
             this.earliestPendingBarIndex = -1;
             this.ResetRangeCalculationState();
 
-            int maxOffset = Math.Min(this.Count, this.calculationHistory.Count) - 1;
+            int maxOffset = this.Count - 1;
 
             if (maxOffset >= 0)
+            {
                 this.RecalculateBars(maxOffset, false, true);
+                this.RecalculateMovingAverage(true);
+            }
         }
         catch (OperationCanceledException)
         {
@@ -653,6 +707,75 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
         this.historyIsLoading = false;
     }
 
+    private void RecalculateMovingAverage(bool recreateIndicator)
+    {
+        if (this.CandleHistoricalData == null || this.Count == 0)
+            return;
+
+        if (recreateIndicator || this.ma == null)
+        {
+            if (this.ma != null)
+            {
+                this.CandleHistoricalData.RemoveIndicator(this.ma);
+                this.ma.Dispose();
+            }
+
+            this.ma = Core.Indicators.BuiltIn.MA(this.MAPeriod, PriceType.Close, this.MaType);
+            this.CandleHistoricalData.AddIndicator(this.ma);
+        }
+
+        for (int offset = this.Count - 1; offset >= 0; offset--)
+        {
+            double maValue = this.ma.GetValue(offset);
+            this.SetValue(maValue, 2, offset);
+
+            if (double.IsNaN(maValue) || double.IsInfinity(maValue))
+            {
+                this.LinesSeries[2].RemoveMarker(offset);
+                continue;
+            }
+
+            switch (this.maLineColorOption)
+            {
+                case MALineColorOption.PriceCross:
+                    this.LinesSeries[2].SetMarker(
+                        offset,
+                        this.LinesSeries[1].GetValue(offset) > maValue
+                            ? this.maUpLineColor
+                            : this.maDownLineColor);
+                    break;
+
+                case MALineColorOption.ValueChange:
+                    if (offset + 1 < this.Count)
+                    {
+                        double previousMA = this.LinesSeries[2].GetValue(offset + 1);
+
+                        if (!double.IsNaN(previousMA) && !double.IsInfinity(previousMA))
+                        {
+                            this.LinesSeries[2].SetMarker(
+                                offset,
+                                maValue > previousMA
+                                    ? this.maUpLineColor
+                                    : this.maDownLineColor);
+                        }
+                        else
+                        {
+                            this.LinesSeries[2].RemoveMarker(offset);
+                        }
+                    }
+                    else
+                    {
+                        this.LinesSeries[2].RemoveMarker(offset);
+                    }
+                    break;
+
+                case MALineColorOption.SolidColor:
+                    this.LinesSeries[2].RemoveMarker(offset);
+                    break;
+            }
+        }
+    }
+
     private void RecalculateBars(
         int maxOffset,
         bool trackPending,
@@ -671,10 +794,14 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
     }
     private void CalculateIndicatorByOffset(int offset, bool trackPending)
     {
-        if (offset < 0 || this.Count <= offset || this.calculationHistory == null || this.calculationHistory.Count <= offset)
+        if (offset < 0 || this.Count <= offset || this.calculationHistory == null)
             return;
 
-        DateTime time = this.calculationHistory[offset].TimeLeft;
+        int calculationOffset = this.GetCalculationHistoryOffset(offset);
+        if (calculationOffset < 0)
+            return;
+
+        DateTime time = this.HistoricalData[offset].TimeLeft;
         var sessionContainer = this.SessionContainer;
 
         if (this.SessionMode == CumulativeDeltaSessionMode.SpecifiedSession ||
@@ -717,7 +844,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
                 previousClose = value;
         }
 
-        var currentItem = this.calculationHistory[offset].VolumeAnalysisData;
+        var currentItem = this.calculationHistory[calculationOffset].VolumeAnalysisData;
         var total = currentItem?.Total;
         if (trackPending && offset > 0 && total == null)
         {
@@ -803,6 +930,23 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
         return this.Count - 1 - barIndex;
     }
 
+    private int GetCalculationHistoryOffset(int offset)
+    {
+        if (offset < 0 || offset >= this.Count || this.calculationHistory == null || this.calculationHistory.Count == 0)
+            return -1;
+
+        long ticksLeft = this.HistoricalData[offset].TicksLeft;
+        int calculationOffset = (int)this.calculationHistory.GetIndexByTime(ticksLeft, SeekOriginHistory.End);
+
+        if (calculationOffset < 0 || calculationOffset >= this.calculationHistory.Count)
+            return -1;
+
+        if (this.calculationHistory[calculationOffset].TicksLeft != ticksLeft)
+            return -1;
+
+        return calculationOffset;
+    }
+
     private bool TryResolveEarliestPendingBar()
     {
         if (this.earliestPendingBarIndex < 0 || this.Count == 0)
@@ -817,10 +961,11 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
             return false;
         }
 
-        if (this.calculationHistory == null || this.calculationHistory.Count <= offset)
+        int calculationOffset = this.GetCalculationHistoryOffset(offset);
+        if (calculationOffset < 0)
             return false;
 
-        var total = this.calculationHistory[offset].VolumeAnalysisData?.Total;
+        var total = this.calculationHistory[calculationOffset].VolumeAnalysisData?.Total;
 
         if (total == null)
             return false;
@@ -875,10 +1020,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
         if (this.SessionMode == CumulativeDeltaSessionMode.FullHistory)
             return false;
 
-        if (this.calculationHistory == null || this.calculationHistory.Count <= offset + 1)
-            return true;
-
-        DateTime previousTime = this.calculationHistory[offset + 1].TimeLeft;
+        DateTime previousTime = this.HistoricalData[offset + 1].TimeLeft;
 
         return !currentRange.Contains(previousTime);
     }
