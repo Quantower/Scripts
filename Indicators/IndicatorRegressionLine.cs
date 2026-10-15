@@ -25,7 +25,7 @@ public sealed class IndicatorRegressionLine : Indicator, IWatchlistIndicator
     public PriceType SourcePrice = PriceType.Close;
 
     public int MinHistoryDepths => this.Period;
-    public override string ShortName => "REGRESSION " + this.Period;
+    public override string ShortName => "Regression Line " + this.Period;
     public override string SourceCodeLink => "https://github.com/Quantower/Scripts/blob/main/Indicators/IndicatorRegressionLine.cs";
 
     private int sumPeriod;
