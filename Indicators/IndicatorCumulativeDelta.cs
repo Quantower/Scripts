@@ -277,7 +277,12 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
 
     protected override void OnUpdate(UpdateArgs args)
     {
-        if (this.IsLoading || this.historyIsLoading || this.calculationHistory == null || this.Count == 0)
+        if (this.Count == 0)
+            return;
+
+        if ((this.IsLoading || this.historyIsLoading) &&
+            this.HistoricalData[0].VolumeAnalysisData?.Total == null &&
+            this.calculationHistory == null)
             return;
         if (args.Reason == UpdateReason.HistoricalBar)
         {
@@ -794,11 +799,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
     }
     private void CalculateIndicatorByOffset(int offset, bool trackPending)
     {
-        if (offset < 0 || this.Count <= offset || this.calculationHistory == null)
-            return;
-
-        int calculationOffset = this.GetCalculationHistoryOffset(offset);
-        if (calculationOffset < 0)
+        if (offset < 0 || this.Count <= offset)
             return;
 
         DateTime time = this.HistoricalData[offset].TimeLeft;
@@ -844,8 +845,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
                 previousClose = value;
         }
 
-        var currentItem = this.calculationHistory[calculationOffset].VolumeAnalysisData;
-        var total = currentItem?.Total;
+        var total = this.GetVolumeAnalysisTotal(offset);
         if (trackPending && offset > 0 && total == null)
         {
             int barIndex = this.GetAbsoluteBarIndex(offset);
@@ -947,6 +947,24 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
         return calculationOffset;
     }
 
+    private VolumeAnalysisItem GetVolumeAnalysisTotal(int offset)
+    {
+        if (offset < 0 || offset >= this.Count)
+            return null;
+
+        var total = this.HistoricalData[offset].VolumeAnalysisData?.Total;
+
+        if (total != null)
+            return total;
+
+        int calculationOffset = this.GetCalculationHistoryOffset(offset);
+
+        if (calculationOffset < 0)
+            return null;
+
+        return this.calculationHistory[calculationOffset].VolumeAnalysisData?.Total;
+    }
+
     private bool TryResolveEarliestPendingBar()
     {
         if (this.earliestPendingBarIndex < 0 || this.Count == 0)
@@ -961,11 +979,7 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
             return false;
         }
 
-        int calculationOffset = this.GetCalculationHistoryOffset(offset);
-        if (calculationOffset < 0)
-            return false;
-
-        var total = this.calculationHistory[calculationOffset].VolumeAnalysisData?.Total;
+        var total = this.GetVolumeAnalysisTotal(offset);
 
         if (total == null)
             return false;
@@ -1107,9 +1121,16 @@ public class IndicatorCumulativeDelta : IndicatorCandleDrawBase, IVolumeAnalysis
     bool IVolumeAnalysisIndicator.IsRequirePriceLevelsCalculation => false;
     public void VolumeAnalysisData_Loaded()
     {
-        this.Refresh();
-
         this.IsLoading = this.historyIsLoading;
+
+        if (!this.historyIsLoading && this.Count > 0)
+        {
+            this.lastKnownCount = this.Count;
+            this.earliestPendingBarIndex = -1;
+            this.ResetRangeCalculationState();
+            this.RecalculateBars(this.Count - 1, false, true);
+            this.RecalculateMovingAverage(true);
+        }
     }
 
     #endregion IVolumeAnalysisIndicator
